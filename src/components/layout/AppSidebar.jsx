@@ -1,30 +1,32 @@
 import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
-  Rss as RssIcon,
   Package,
-  Type,
-  FolderTree,
-  Sliders,
   ClipboardCheck,
   Settings,
   ChevronLeft,
   Rss,
-  Tag,
+  Trophy,
+  LucideHistory,
+  BarChartBigIcon,
+  MonitorSpeakerIcon,
+  ComponentIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { mixComplex } from "framer-motion";
 
 const navItems = [
+  
   { title: "Dashboard",          icon: LayoutDashboard, path: "/" },
-  { title: "Manage Feed Setup",  icon: Settings,        path: "/manage-feed-setup" },
-  { title: "Feed Audit",         icon: ClipboardCheck,  path: "/feed-audit" },
-  { title: "Field Optimization", icon: Sliders,         path: "/field-optimization" },
-  { title: "Title Optimization", icon: Type,            path: "/title-optimization" },
-  { title: "Custom Labels",      icon: Tag,             path: "/custom-labels" },
-  { title: "Google Category",    icon: FolderTree,      path: "/google-category" },
-  { title: "Feed Product List",  icon: Package,         path: "/feed-products" },
-  { title: "Output Feed",        icon: RssIcon,         path: "/output-feed" },
-  { title: "Settings",           icon: Settings,        path: "/settings" },
+  { title: "Manage Feed Setup",  icon: Rss,        path: "/manage-feed-setup" },
+  { title: "Product History",    icon: LucideHistory,      path: "/product-history"},
+  { title: "Competitors",        icon: Trophy,             path: "/competitors" },
+  { title: "Products",           icon: Package,         path: "/products" },
+  { title: "Notifications",      icon: ClipboardCheck,  path: "/notifications" },
+  {title : "Market Competitor", icon: ComponentIcon, path: "/market"},
+  { title:"Smart Reports",       icon: BarChartBigIcon,      path: "/smart-reports"},
+  { title: "Settings",           icon: Settings,        path: "/settings"},
+  
 ];
 
 export function AppSidebar({ open, onToggle }) {
@@ -44,8 +46,8 @@ export function AppSidebar({ open, onToggle }) {
             <Rss className="h-5 w-5 text-primary-foreground" />
           </div>
           {open && (
-            <span className="text-lg font-bold text-foreground truncate">
-              DigitalDataFeed
+            <span className="text-lg font-semibold text-foreground truncate">
+              E-Price Track
             </span>
           )}
         </div>
@@ -85,23 +87,7 @@ export function AppSidebar({ open, onToggle }) {
             </NavLink>
           );
         })}
-      </nav>
-
-      {/* Settings — bottom-ல தனியா */}
-      <div className="px-3 pb-4 border-t border-sidebar-border pt-3">
-        <NavLink
-          to="/settings"
-          className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium transition-all duration-150",
-            location.pathname === "/settings"
-              ? "bg-sidebar-accent text-sidebar-accent-foreground"
-              : "text-sidebar-foreground hover:bg-accent hover:text-foreground"
-          )}
-        >
-          <Settings className="h-5 w-5 shrink-0" />
-          {open && <span className="truncate">Settings</span>}
-        </NavLink>
-      </div>
+      </nav>    
     </aside>
-  );
+  );       
 }

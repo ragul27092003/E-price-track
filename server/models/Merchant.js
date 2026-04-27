@@ -12,7 +12,7 @@ const feedInfoSchema = new mongoose.Schema({
 }, { _id: false });
 
 const merchantSchema = new mongoose.Schema({
-  companyId: { type: String, required: true, unique: true }, // slugified companyName = tenant DB name
+  companyId: { type: String, required: true, unique: true },
   userId:    { type: String, required: true },
   status:    { type: String, enum: ['active', 'inactive'], default: 'active' },
   feed_info: { type: feedInfoSchema },

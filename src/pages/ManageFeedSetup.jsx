@@ -1,335 +1,341 @@
-import { motion } from "framer-motion";
-import { Save, Pencil, Lock } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useState, useEffect } from "react";
-import API from "@/hooks/useApi";
-import { toast } from "sonner";
-import { useAuth } from "@/context/AuthContext";
+import { useState, useEffect } from 'react';
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  Button,
+  Grid,
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  Stack,
+  Switch,
+  FormControlLabel,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Collapse,
+  Checkbox,
+  CircularProgress
+} from '@mui/material';
+import StorefrontIcon from '@mui/icons-material/Storefront'; 
+import LanguageIcon from '@mui/icons-material/Language'; 
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile'; 
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
 
-export default function ManageFeedSetup() {
-  const { currentStoreId, canEdit } = useAuth();  // ← canEdit from AuthContext
+const ManageFeedSetup = () => {
 
-  const [feedName,     setFeedName]     = useState("");
-  const [cmsUpload,    setCmsUpload]    = useState("none");
-  const [feedFormat,   setFeedFormat]   = useState("Json");
-  const [importUrl,    setImportUrl]    = useState("");
-  const [schedule,     setSchedule]     = useState("Daily");
-  const [scheduleTime, setScheduleTime] = useState("06:00");
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [formData, setFormData] = useState({
+    feedName: '',
+    feedFormat: 'JSON',
+    feedUrl: '',
+    urlFormat: '',
+    importSchedule: 'Daily',
+    importTime: '12:00 PM', 
+    textEncoding: 'UTF-8',
+    useProxy: false,
+    proxyIp: '',
+    proxyPort: '',
+    proxyUsername: '',
+    proxyPassword: ''
+  });
 
-  const [loading,     setLoading]     = useState(false);
-  const [fetching,    setFetching]    = useState(true);
-  const [hasExisting, setHasExisting] = useState(false);
 
-  const [touched, setTouched] = useState({});
-  const [errors,  setErrors]  = useState({});
+  const activityLogs = [
+    { id: 1, date: 'Oct 26, 2024, 12:00 PM', status: 'Success', message: 'Feed synced successfully. 500 products updated.' },
+    { id: 2, date: 'Oct 25, 2024, 12:00 PM', status: 'Success', message: 'Feed synced successfully. 498 products updated.' },
+    { id: 3, date: 'Oct 24, 2024, 12:00 PM', status: 'Error', message: 'Connection timed out. Please check the URL.' },
+    { id: 4, date: 'Oct 23, 2024, 12:00 PM', status: 'Success', message: 'Feed synced successfully. 500 products updated.' },
+    { id: 5, date: 'Oct 22, 2024, 12:00 PM', status: 'Success', message: 'Feed synced successfully. 495 products updated.' },
+  ];
 
-  // ── Validation ───────────────────────────────────────────────────────────────
-  const validate = (field, value) => {
-    switch (field) {
-      case 'feedName':
-        if (!value.trim()) return 'Feed name is required';
-        if (value.trim().length < 2) return 'Minimum 2 characters';
-        return '';
-      case 'importUrl':
-        if (!value.trim()) return 'Feed URL is required';
-        try { new URL(value.trim()); return ''; }
-        catch { return 'Enter a valid URL (e.g. https://...)'; }
-      case 'scheduleTime':
-        if (!value) return 'Import time is required';
-        return '';
-      default:
-        return '';
-    }
-  };
-
-  const validateAll = () => {
-    const fields = { feedName, importUrl, scheduleTime };
-    const newErrors = {};
-    Object.entries(fields).forEach(([k, v]) => { newErrors[k] = validate(k, v); });
-    setErrors(newErrors);
-    setTouched({ feedName: true, importUrl: true, scheduleTime: true });
-    return !Object.values(newErrors).some(Boolean);
-  };
-
-  const handleBlur = (field, value) => {
-    if (!canEdit) return;  // ← ignore blur events for read-only users
-    setTouched(prev => ({ ...prev, [field]: true }));
-    setErrors(prev => ({ ...prev, [field]: validate(field, value) }));
-  };
-
-  const handleChange = (field, value) => {
-    if (!canEdit) return;  // ← block all changes for read-only users
-    const setters = { feedName: setFeedName, importUrl: setImportUrl, scheduleTime: setScheduleTime };
-    if (setters[field]) setters[field](value);
-    if (touched[field]) {
-      setErrors(prev => ({ ...prev, [field]: validate(field, value) }));
-    }
-  };
-
-  // ── Input border class ───────────────────────────────────────────────────────
-  const inputClass = (field) => {
-    const base = canEdit ? '' : 'cursor-not-allowed opacity-70';
-    if (!touched[field]) return `bg-secondary border-0 ${base}`;
-    if (errors[field])   return `border-red-400 focus-visible:ring-red-300 bg-red-50 dark:bg-red-900/10 ${base}`;
-    return `border-green-400 focus-visible:ring-green-300 bg-green-50 dark:bg-green-900/10 ${base}`;
-  };
-
-  // ── Load existing config ─────────────────────────────────────────────────────
+  
   useEffect(() => {
-  setFetching(true);
-  setFeedName("");
-  setCmsUpload("none");
-  setFeedFormat("Json");
-  setImportUrl("");
-  setSchedule("Daily");
-  setScheduleTime("06:00");
-  setHasExisting(false);
-  setTouched({});
-  setErrors({});
-    const loadFeed = async () => {
+    const fetchConfig = async () => {
       try {
-        const res  = await API.get("/feeds");
-        const feed = res.data;
-        if (feed && feed.feed_url) {
-          setFeedName(feed.feed_name        || "");
-          setCmsUpload(feed.cms_upload_type || "none");
-          setFeedFormat(feed.feed_type      || "Json");
-          setImportUrl(feed.feed_url        || "");
-          setSchedule(feed.schedule_info    || "Daily");
-          setScheduleTime(feed.import_time  || "06:00");
-          setHasExisting(true);
-        }
+       
+        setTimeout(() => {
+          const mockBackendData = {
+            feedName: 'Suryaelectronics',
+            feedFormat: 'JSON',
+            feedUrl: 'https://epricetrack.com/eprice/admin/uploads/surya_electronics/products.json',
+            urlFormat: 'https://epricetrack.com/eprice/admin/uploads/surya_electronics/products.json',
+            importSchedule: 'Daily',
+            importTime: '12:00 PM',
+            textEncoding: 'UTF-8',
+            useProxy: false,
+            proxyIp: '',
+            proxyPort: '',
+            proxyUsername: '',
+            proxyPassword: ''
+          };
+          setFormData(mockBackendData);
+          setIsLoading(false);
+        }, 800);
       } catch (error) {
-        console.error("Failed to load feed config:", error);
-      } finally {
-        setFetching(false);
+        console.error("Error fetching feed setup:", error);
+        setIsLoading(false);
       }
     };
-    loadFeed();
-  }, [currentStoreId]);
 
-  // ── Save ─────────────────────────────────────────────────────────────────────
-  const handleSave = async () => {
-    if (!canEdit) return;  // ← extra safety — should never reach here for store_admin
-    if (!validateAll()) {
-      toast.error("Please fix the errors before saving");
-      return;
-    }
-    setLoading(true);
-    try {
-      await API.put("/feeds", { feedName, cmsUpload, feedFormat, importUrl, schedule, scheduleTime });
-      setHasExisting(true);
-      toast.success(hasExisting ? "Feed configuration updated!" : "Feed configuration saved!");
-    } catch (error) {
-      toast.error("Failed to save configuration");
-    } finally {
-      setLoading(false);
-    }
+    fetchConfig();
+  }, []);
+
+ 
+  const handleChange = (e) => {
+    const { name, value, checked, type } = e.target;
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
   };
 
-  // ── Loading skeleton ─────────────────────────────────────────────────────────
-  if (fetching) {
+
+  const handleSave = async () => {
+    console.log("Submitting payload to backend:", formData);
+
+    alert("Configuration saved! Check console for payload.");
+  };
+
+  if (isLoading) {
     return (
-      <div className="space-y-6 max-w-7xl px-4 sm:px-0">
-        <div className="h-8 w-56 bg-secondary rounded animate-pulse" />
-        <div className="bg-card rounded-xl p-6 border border-border space-y-6">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="grid grid-cols-3 gap-4 items-center">
-              <div className="h-4 bg-secondary rounded animate-pulse" />
-              <div className="col-span-2 h-10 bg-secondary rounded animate-pulse" />
-            </div>
-          ))}
-        </div>
-      </div>
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}>
+        <CircularProgress />
+      </Box>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-6 max-w-7xl px-4 sm:px-0"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground">
-            Manage Feed Setup
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Please set the format, text encoding and upload product feed file for us to process.
-          </p>
-        </div>
-        {/* Read-only badge for store_admin */}
-        {!canEdit && (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-secondary px-3 py-1.5 rounded-full border border-border">
-            <Lock className="w-3 h-3" />
-            Read only
-          </div>
-        )}
-      </div>
+    <Box sx={{ p: 3, maxWidth: '100%', bgcolor: '#ffffff', color: '#333' }}>
 
-      {/* Read-only info banner for store_admin */}
-      {!canEdit && (
-        <div className="text-sm text-muted-foreground bg-secondary border border-border rounded-lg px-4 py-3 flex items-center gap-2">
-          <Lock className="w-4 h-4 shrink-0" />
-          This configuration is managed by your administrator. Contact your admin to make changes.
-        </div>
-      )}
+      <Box mb={4}>
+        <Typography variant="body2" sx={{ mb: 2, color: '#555' }}>
+          Select and configure your product data source.
+        </Typography>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={4}>
+            <Card variant="outlined" sx={{ borderRadius: 2, borderColor: '#e0e0e0' }}>
+              <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, pb: 1 }}>
+                <StorefrontIcon sx={{ fontSize: 40, color: '#96bf48' }} />
+                <Box>
+                  <Typography variant="subtitle2" fontWeight="bold">Shopify</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }}>
+                    Connect your Shopify store for<br/>automatic sync.
+                  </Typography>
+                </Box>
+              </CardContent>
+              <Box p={1.5} pt={0} textAlign="center">
+                <Button variant="outlined" size="small" sx={{ textTransform: 'none', color: '#555', borderColor: '#ccc' }}>Connect</Button>
+              </Box>
+            </Card>
+          </Grid>
 
-      {/* Form card */}
-      <div className="bg-card rounded-xl p-4 sm:p-6 card-shadow border border-border space-y-6">
+          <Grid item xs={12} md={4}>
+            <Card variant="outlined" sx={{ borderRadius: 2, borderColor: '#e0e0e0' }}>
+              <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, pb: 1 }}>
+                <LanguageIcon sx={{ fontSize: 40, color: '#21759b' }} />
+                <Box>
+                  <Typography variant="subtitle2" fontWeight="bold">WordPress</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }}>
+                    Link your WooCommerce store for<br/>seamless integration.
+                  </Typography>
+                </Box>
+              </CardContent>
+              <Box p={1.5} pt={0} textAlign="center">
+                <Button variant="outlined" size="small" sx={{ textTransform: 'none', color: '#555', borderColor: '#ccc' }}>Connect</Button>
+              </Box>
+            </Card>
+          </Grid>
 
-        {/* Feed Name */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 items-start sm:items-center">
-          <label className="text-sm font-medium text-foreground">
-            Feed Name {canEdit && <span className="text-red-500">*</span>}
-          </label>
-          <div className="sm:col-span-2 sm:max-w-[350px] space-y-1">
-            <Input
-              value={feedName}
-              onChange={(e) => handleChange('feedName', e.target.value)}
-              onBlur={(e)  => handleBlur('feedName', e.target.value)}
-              placeholder="Enter feed name"
-              disabled={!canEdit}
-              className={`w-full font-semibold text-primary ${inputClass('feedName')}`}
+          <Grid item xs={12} md={4}>
+            <Card variant="outlined" sx={{ borderRadius: 2, borderColor: '#9bb8d9', bgcolor: '#eef3fb' }}>
+              <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, pb: 1 }}>
+                <InsertDriveFileIcon sx={{ fontSize: 40, color: '#3b6eac' }} />
+                <Box>
+                  <Typography variant="subtitle2" fontWeight="bold">URL Feed</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }}>
+                    Import a product feed via URL (CSV,<br/>XML, JSON).
+                  </Typography>
+                </Box>
+              </CardContent>
+              <Box p={1.5} pt={0} textAlign="center">
+                <Button variant="contained" size="small" sx={{ textTransform: 'none', bgcolor: '#3b6eac', boxShadow: 'none' }}>Import</Button>
+              </Box>
+            </Card>
+          </Grid>
+        </Grid>
+      </Box>
+
+      <Box mb={3}>
+        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+          URL Feed Configuration
+        </Typography>
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={4}>
+            <Typography variant="caption" fontWeight="bold" sx={{ mb: 0.5, display: 'block' }}>Feed Name</Typography>
+            <TextField 
+              fullWidth size="small" variant="outlined" 
+              name="feedName" value={formData.feedName} onChange={handleChange} 
             />
-            {touched.feedName && errors.feedName && (
-              <p className="text-xs text-red-500 flex items-center gap-1">
-                <span>✕</span>{errors.feedName}
-              </p>
-            )}
-            {touched.feedName && !errors.feedName && feedName && canEdit && (
-              <p className="text-xs text-green-600 flex items-center gap-1">
-                <span>✓</span> Looks good!
-              </p>
-            )}
-          </div>
-        </div>
+          </Grid>
+          <Grid item xs={12} md={2}>
+            <Typography variant="caption" fontWeight="bold" sx={{ mb: 0.5, display: 'block' }}>Feed Format</Typography>
+            <FormControl fullWidth size="small">
+              <Select name="feedFormat" value={formData.feedFormat} onChange={handleChange}>
+                <MenuItem value="JSON">JSON</MenuItem>
+                <MenuItem value="CSV">CSV</MenuItem>
+                <MenuItem value="XML">XML</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Typography variant="caption" fontWeight="bold" sx={{ mb: 0.5, display: 'block' }}>URL for Import</Typography>
+            <TextField 
+              fullWidth size="small" variant="outlined" 
+              name="feedUrl" value={formData.feedUrl} onChange={handleChange} 
+            />
+          </Grid>
 
-        {/* CMS Upload */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 items-start sm:items-center">
-          <label className="text-sm font-medium text-foreground">
-            Upload CMS products via?
-          </label>
-          <div className="sm:col-span-2 flex flex-wrap gap-4">
-            {["none", "shopify", "wordpress"].map((option) => {
-              const isDisabled = !canEdit || option === "shopify" || option === "wordpress";
-              return (
-                <label
-                  key={option}
-                  className={`flex items-center gap-2 ${isDisabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                >
-                  <input
-                    type="radio"
-                    name="cmsUpload"
-                    value={option}
-                    checked={cmsUpload === option}
-                    onChange={(e) => canEdit && setCmsUpload(e.target.value)}
-                    disabled={isDisabled}
-                    className="h-4 w-4 accent-primary"
+          <Grid item xs={12} md={6}>
+            <Typography variant="caption" fontWeight="bold" sx={{ mb: 0.5, display: 'block' }}>URL Format</Typography>
+            <TextField 
+              fullWidth size="small" variant="outlined" 
+              name="urlFormat" value={formData.urlFormat} onChange={handleChange} 
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
+                <Typography variant="caption" fontWeight="bold" sx={{ mb: 0.5, display: 'block' }}>Import Schedule</Typography>
+                <FormControl fullWidth size="small">
+                  <Select name="importSchedule" value={formData.importSchedule} onChange={handleChange}>
+                    <MenuItem value="Daily">Daily</MenuItem>
+                    <MenuItem value="Weekly">Weekly</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={6}>
+                <Typography variant="caption" sx={{ mb: 0.5, display: 'block', visibility: 'hidden' }}>Time</Typography>
+                <TextField
+                  fullWidth size="small"
+                  name="importTime" value={formData.importTime} onChange={handleChange}
+                  InputProps={{
+                    startAdornment: <AccessTimeIcon sx={{ color: 'action.active', mr: 1, fontSize: 20 }} />,
+                    sx: { bgcolor: '#f4f5f8' }
+                  }}
+                />
+              </Grid>
+            </Grid>
+          </Grid>
+        </Grid>
+      </Box>
+
+      <Box mb={4} sx={{ bgcolor: '#f8f9fc', p: 2, borderRadius: 2, border: '1px solid #e0e0e0' }}>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ cursor: 'pointer' }} onClick={() => setAdvancedOpen(!advancedOpen)}>
+          {advancedOpen ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
+          <Typography variant="subtitle2" fontWeight="bold">Advanced Settings</Typography>
+          <Switch size="small" checked={advancedOpen} onChange={() => setAdvancedOpen(!advancedOpen)} />
+        </Stack>
+        
+        <Collapse in={advancedOpen}>
+          <Box pt={3}>
+            <Grid container spacing={3} alignItems="flex-end">
+              <Grid item xs={12} md={3}>
+                <Typography variant="caption" fontWeight="bold" sx={{ mb: 0.5, display: 'block' }}>Text Encoding</Typography>
+                <FormControl fullWidth size="small">
+                  <Select name="textEncoding" value={formData.textEncoding} onChange={handleChange}>
+                    <MenuItem value="UTF-8">UTF-8</MenuItem>
+                    <MenuItem value="ASCII">ASCII</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={9}>
+                <Stack direction="row" alignItems="center" spacing={2}>
+                  <Box>
+                    <Typography variant="caption" fontWeight="bold" sx={{ mb: 0.5, display: 'block' }}>Proxy Settings</Typography>
+                    <FormControlLabel
+                      control={<Checkbox size="small" name="useProxy" checked={formData.useProxy} onChange={handleChange} />}
+                      label={<Typography variant="body2">Use Proxy</Typography>}
+                      sx={{ m: 0 }}
+                    />
+                  </Box>
+                  <TextField fullWidth placeholder="IP" size="small" sx={{ bgcolor: '#fff' }} 
+                    name="proxyIp" value={formData.proxyIp} onChange={handleChange} disabled={!formData.useProxy} 
                   />
-                  <span className="text-sm text-foreground capitalize">
-                    {option === "none" ? "None" : option}
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
+                  <TextField fullWidth placeholder="Port" size="small" sx={{ bgcolor: '#fff' }} 
+                    name="proxyPort" value={formData.proxyPort} onChange={handleChange} disabled={!formData.useProxy} 
+                  />
+                  <TextField fullWidth placeholder="Username" size="small" sx={{ bgcolor: '#fff' }} 
+                    name="proxyUsername" value={formData.proxyUsername} onChange={handleChange} disabled={!formData.useProxy} 
+                  />
+                  <TextField fullWidth placeholder="Password" type="password" size="small" sx={{ bgcolor: '#fff' }} 
+                    name="proxyPassword" value={formData.proxyPassword} onChange={handleChange} disabled={!formData.useProxy} 
+                  />
+                </Stack>
+              </Grid>
+            </Grid>
+          </Box>
+        </Collapse>
+      </Box>
 
-        {/* Feed Format */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 items-start sm:items-center">
-          <label className="text-sm font-medium text-foreground">Feed Format:</label>
-          <div className="sm:col-span-2">
-            <select
-              value={feedFormat}
-              onChange={(e) => canEdit && setFeedFormat(e.target.value)}
-              disabled={!canEdit}
-              className={`w-full sm:max-w-[200px] rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground ${!canEdit ? 'opacity-70 cursor-not-allowed' : ''}`}
-            >
-              <option>Json</option>
-            </select>
-          </div>
-        </div>
+      <Box mb={4}>
+        <Typography variant="subtitle1" fontWeight="bold">Activity Log</Typography>
+        <Typography variant="caption" color="text.secondary" gutterBottom display="block" sx={{ mb: 1 }}>
+          Last 5 sync attempts
+        </Typography>
+        
+        <TableContainer sx={{ borderTop: '1px solid #eee' }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 'bold', borderBottom: '1px solid #eee', color: '#555' }}>Date & Time</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', borderBottom: '1px solid #eee', color: '#555' }}>Status</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', borderBottom: '1px solid #eee', color: '#555' }}>Message</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {activityLogs.map((log) => (
+                <TableRow key={log.id} sx={{ '& td': { borderBottom: '1px solid #f5f5f5' } }}>
+                  <TableCell sx={{ fontSize: '0.85rem', py: 1.5, color: '#333' }}>{log.date}</TableCell>
+                  <TableCell sx={{ py: 1.5 }}>
+                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                      {log.status === 'Success' ? (
+                        <CheckCircleIcon sx={{ color: '#2e7d32', fontSize: 18 }} />
+                      ) : (
+                        <CancelIcon sx={{ color: '#d32f2f', fontSize: 18 }} />
+                      )}
+                      <Typography variant="body2" sx={{ fontSize: '0.85rem', color: log.status === 'Success' ? '#2e7d32' : '#d32f2f' }}>
+                        {log.status}
+                      </Typography>
+                    </Stack>
+                  </TableCell>
+                  <TableCell sx={{ fontSize: '0.85rem', py: 1.5, color: '#555' }}>{log.message}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Box>
 
-        {/* URL for import */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 items-start sm:items-center">
-          <label className="text-sm font-medium text-foreground">
-            URL for import {canEdit && <span className="text-red-500">*</span>}
-          </label>
-          <div className="sm:col-span-2 space-y-1">
-            <Input
-              value={importUrl}
-              onChange={(e) => handleChange('importUrl', e.target.value)}
-              onBlur={(e)  => handleBlur('importUrl', e.target.value)}
-              placeholder="https://your-feed-url.com/products.json"
-              disabled={!canEdit}
-              className={`font-mono text-[11px] sm:text-xs w-full ${inputClass('importUrl')}`}
-            />
-            {touched.importUrl && errors.importUrl && (
-              <p className="text-xs text-red-500 flex items-center gap-1">
-                <span>✕</span>{errors.importUrl}
-              </p>
-            )}
-            {touched.importUrl && !errors.importUrl && importUrl && canEdit && (
-              <p className="text-xs text-green-600 flex items-center gap-1">
-                <span>✓</span> Valid URL
-              </p>
-            )}
-          </div>
-        </div>
-
-        {/* Import Schedule */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 items-start sm:items-center">
-          <label className="text-sm font-medium text-foreground">
-            Import schedule {canEdit && <span className="text-red-500">*</span>}
-          </label>
-          <div className="sm:col-span-2 space-y-1">
-            <div className="flex flex-wrap items-center gap-3">
-              <select
-                value={schedule}
-                onChange={(e) => canEdit && setSchedule(e.target.value)}
-                disabled={!canEdit}
-                className={`flex-1 sm:flex-none rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground min-w-[120px] ${!canEdit ? 'opacity-70 cursor-not-allowed' : ''}`}
-              >
-                <option>Daily</option>
-                <option>Hourly</option>
-                <option>Weekly</option>
-                <option>Monthly</option>
-              </select>
-              <span className="text-sm text-muted-foreground">At:</span>
-              <Input
-                type="time"
-                value={scheduleTime}
-                onChange={(e) => handleChange('scheduleTime', e.target.value)}
-                onBlur={(e)  => handleBlur('scheduleTime', e.target.value)}
-                disabled={!canEdit}
-                className={`w-full sm:w-32 ${inputClass('scheduleTime')}`}
-              />
-            </div>
-            {touched.scheduleTime && errors.scheduleTime && (
-              <p className="text-xs text-red-500 flex items-center gap-1">
-                <span>✕</span>{errors.scheduleTime}
-              </p>
-            )}
-          </div>
-        </div>
-
-      </div>
-
-      {/* Save/Edit button — only visible to super_admin */}
-      {canEdit && (
-        <Button
-          onClick={handleSave}
-          disabled={loading}
-          className="w-full sm:w-auto bg-primary text-primary-foreground gap-2 h-11 sm:h-10"
-        >
-          {hasExisting ? <Pencil className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-          {loading ? "Saving..." : hasExisting ? "Edit Configuration" : "Save Configuration"}
-        </Button>
-      )}
-    </motion.div>
+      <Box textAlign="right">
+         <Button variant="contained" color="primary" onClick={handleSave} sx={{ bgcolor: '#3b6eac', textTransform: 'none' }}>
+           Save Configuration
+         </Button>
+      </Box>
+      
+    </Box>
   );
-}
+};
+
+export default ManageFeedSetup;

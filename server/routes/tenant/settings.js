@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const auth = require('../../middleware/auth');
 const User = require('../../models/User');
 const Access = require('../../models/Access');
@@ -11,16 +12,30 @@ router.get('/profile', auth, async (req, res) => {
   try {
     let userId = req.user.userId;
 
-    // Super admin viewing a store — get that store's admin profile
+    // Super admin — email from super admin, other details from switched store
     if (req.user.userType === 'super_admin') {
       const tenantId = req.headers['x-tenant-id'];
+
+      // Get super admin email
+      const superAdmin = await User.findOne({ userId }).select('email');
+
       if (tenantId) {
+        // Get switched store admin profile
         const storeUser = await User.findOne({
           companyId: tenantId,
           userType:  'store_admin',
         }).select('-password');
-        if (storeUser) return res.json(storeUser);
+
+        if (storeUser) {
+          // Return store data but override email with super admin email
+          return res.json({
+            ...storeUser.toObject(),
+            email: superAdmin?.email || '',
+          });
+        }
       }
+
+      // No store selected — return super admin own profile
       const admin = await User.findOne({ userId }).select('-password');
       return res.json(admin);
     }
@@ -33,7 +48,6 @@ router.get('/profile', auth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
 // PUT /api/settings/profile — Update phone number
 router.put('/profile', auth, async (req, res) => {
   try {
@@ -53,18 +67,32 @@ router.put('/profile', auth, async (req, res) => {
 // PUT /api/settings/password — Update password
 router.put('/password', auth, async (req, res) => {
   try {
-    const { oldPassword, newPassword } = req.body;
-    if (!oldPassword || !newPassword)
-      return res.status(400).json({ message: 'Old and new password are required' });
-
+    const { newPassword } = req.body;
+    if (!newPassword)
+      return res.status(400).json({ message: 'New password is required' });
     if (newPassword.length < 8)
-      return res.status(400).json({ message: 'Password must be at least 8 characters' });
+      return res.status(400).json({ message: 'Minimum 8 characters required' });
+    if (!/[A-Z]/.test(newPassword))
+      return res.status(400).json({ message: 'Must contain at least one uppercase letter' });
+    if (!/[0-9]/.test(newPassword))
+      return res.status(400).json({ message: 'Must contain at least one number' });
 
-    const user = await User.findOne({ userId: req.user.userId });
+    let userId = req.user.userId;
+
+    // Super admin → change switched store admin password
+    if (req.user.userType === 'super_admin') {
+      const tenantId = req.headers['x-tenant-id'];
+      if (tenantId) {
+        const storeUser = await User.findOne({
+          companyId: tenantId,
+          userType:  'store_admin',
+        });
+        if (storeUser) userId = storeUser.userId;
+      }
+    }
+
+    const user = await User.findOne({ userId });
     if (!user) return res.status(404).json({ message: 'User not found' });
-
-    const isMatch = await user.comparePassword(oldPassword);
-    if (!isMatch) return res.status(401).json({ message: 'Current password is incorrect' });
 
     user.password = newPassword;
     await user.save();
@@ -74,7 +102,6 @@ router.put('/password', auth, async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 });
-
 // GET /api/settings/users — List all users in same company
 router.get('/users', auth, async (req, res) => {
   try {
@@ -87,9 +114,11 @@ router.get('/users', auth, async (req, res) => {
     const company = await Company.findOne({ companyId });
     if (!company) return res.status(404).json({ message: 'Store not found' });
 
+    // Show only 'user' type — not store_admin or super_admin
     const users = await User.find({
       companyId,
-      userId: { $ne: req.user.userId },
+      userType: 'user', // ← only users ✅
+      userId:   { $ne: req.user.userId },
     }).select('-password');
 
     res.json(users);
@@ -112,13 +141,27 @@ router.post('/add-user', auth, async (req, res) => {
     const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({ message: 'Email already registered' });
 
+    // Super admin adding user → use switched store company
+    // Store admin adding user → use own company
+    const targetCompanyId = req.user.userType === 'super_admin'
+      ? req.headers['x-tenant-id']
+      : req.user.companyId;
+
+    if (!targetCompanyId) {
+      return res.status(400).json({ message: 'No store selected' });
+    }
+
     const adminUser = await User.findOne({ userId: req.user.userId });
-    const company   = await Company.findOne({ companyId: req.user.companyId });
+    const company   = await Company.findOne({ companyId: targetCompanyId });
+
+    if (!company) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
 
     const newUser = await User.create({
-      companyId:   req.user.companyId,
-      companyName: company?.companyName || '',
-      companyUrl:  company?.companyUrl  || '',
+      companyId:   targetCompanyId,        
+      companyName: company.companyName,    
+      companyUrl:  company.companyUrl || '', 
       userName:    userName || '',
       email,
       password,
@@ -127,8 +170,8 @@ router.post('/add-user', auth, async (req, res) => {
     });
 
     await Access.create({
-      companyId:   req.user.companyId,
-      companyName: company?.companyName || '',
+      companyId:   targetCompanyId,
+      companyName: company.companyName,
       userId:      newUser.userId,
       userType:    'user',
       status:      'active',
@@ -171,25 +214,34 @@ router.delete('/users/:userId', auth, async (req, res) => {
 // GET /api/settings/users-log — Activity log
 router.get('/users-log', auth, async (req, res) => {
   try {
-    const logs = await Access.find({ companyId: req.user.companyId })
-      .sort({ createdAt: -1 })
-      .limit(50);
+    const mainDb = mongoose.connection.useDb('gmc_main_admin_db');
 
-    const logsWithEmail = await Promise.all(
-      logs.map(async (log) => {
-        const user = await User.findOne({ userId: log.userId }).select('email');
-        return {
-          userId:    log.userId,
-          email:     user?.email || '',
-          userType:  log.userType,
-          status:    log.status,
-          action:    log.status === 'active' ? 'User added' : 'User removed',
-          createdAt: log.createdAt,
-        };
-      })
-    );
+    let query = {};
 
-    res.json(logsWithEmail);
+    if (req.user.userType === 'super_admin') {
+      // Super admin → show switched store's store_admin + users logs
+      const tenantId = req.headers['x-tenant-id'];
+      if (!tenantId) return res.status(400).json({ message: 'No store selected' });
+
+      query = {
+        companyId: tenantId,
+        userType:  { $in: ['store_admin', 'user'] },
+      };
+    } else {
+      // Store admin → own company users logs only
+      query = {
+        companyId: req.user.companyId,
+        userType:  'user',
+      };
+    }
+
+    const logs = await mainDb.collection('userlogs')
+      .find(query)
+      .sort({ loginAt: -1 })
+      .limit(50)
+      .toArray();
+
+    res.json(logs);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

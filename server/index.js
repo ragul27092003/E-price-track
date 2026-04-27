@@ -23,6 +23,7 @@ app.use('/api/title-rules', require('./routes/tenant/titleRules'));
 app.use('/api/custom-labels', require('./routes/tenant/customLabels'));
 app.use('/api/output-feeds', require('./routes/tenant/outputFeeds'));
 app.use('/api/settings', require('./routes/tenant/settings'));
+app.use('/api/competitors', require('./routes/tenant/competitors'));
 app.use('/api/cron', cronRoutes);
 app.use('/api/audit', auditRoutes);
 

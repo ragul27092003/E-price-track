@@ -9,17 +9,15 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import Dashboard from "@/pages/Dashboard";
-import OutputFeed from "@/pages/OutputFeed";
-import FeedProductList from "@/pages/FeedProductList";
-import TitleOptimization from "@/pages/TitleOptimization";
-import GoogleCategory from "@/pages/GoogleCategory";
-import FieldOptimization from "@/pages/FieldOptimization";
-import FeedAudit from "@/pages/FeedAudit";
 import ManageFeedSetup from "@/pages/ManageFeedSetup";
-import CustomLabels from "@/pages/CustomLabels";
 import NotFound from "@/pages/NotFound";
 import Settings from "./pages/Settings";
-
+import ProductHistory from "./pages/ProductHistory";
+import Competitors from "./pages/Competitors";
+import Products from "./pages/Products";
+import Notifications from "./pages/Notifications";
+import SmartReports from "./pages/SmartReports";
+import MarketCompetitor from "./pages/MarketCompetitor";
 
 const queryClient = new QueryClient();
 
@@ -42,17 +40,15 @@ const App = () => (
               </ProtectedRoute>
             }>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/output-feed" element={<OutputFeed />} />
-              <Route path="/feed-products" element={<FeedProductList />} />
-              <Route path="/title-optimization" element={<TitleOptimization />} />
-              <Route path="/google-category" element={<GoogleCategory />} />
-              <Route path="/field-optimization" element={<FieldOptimization />} />
-              <Route path="/feed-audit" element={<FeedAudit />} />
+              <Route path="/product-history" element={<ProductHistory />} />
+              <Route path="/notifications" element={<Notifications />}/>
               <Route path="/manage-feed-setup" element={<ManageFeedSetup />} />
-              <Route path="/custom-labels" element={<CustomLabels />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/competitors" element={<Competitors />} />
+              <Route path="/products" element={<Products />} />
+              <Route path="/market" element={<MarketCompetitor />} />
+              <Route path="/smart-reports" element={<SmartReports />} />
             </Route>
-
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

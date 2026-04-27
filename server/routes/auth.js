@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Company = require('../models/Company');
@@ -50,6 +51,19 @@ router.post('/login', async (req, res) => {
       companyId: user.companyId,
     });
 
+    // Step 6: Save login log to main DB
+    const mainDb = mongoose.connection.useDb('gmc_main_admin_db');
+    await mainDb.collection('userlogs').insertOne({
+      userId:    user.userId,
+      email:     user.email,
+      userType:  user.userType,
+      companyId: user.companyId,
+      action:    'login',
+      loginAt:   new Date(),
+      ip:        req.ip || req.headers['x-forwarded-for'] || '',
+    });
+
+    // Step 7: Send response
     res.json({
       token,
       userId:      user.userId,

@@ -9,21 +9,21 @@ export function AppHeader({ onMenuToggle }) {
   const [darkMode,     setDarkMode]     = useState(false);
   const [stores,       setStores]       = useState([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [profile,      setProfile]      = useState(null); // DB profile data
+  const [profile,      setProfile]      = useState(null);
   const { user, logout, switchStore, activeShopName } = useAuth();
   const navigate = useNavigate();
 
   const isSuperAdmin = user?.userType === 'super_admin';
   const isStoreAdmin = user?.userType === 'store_admin';
 
-  // Load profile from DB — companyName, companyUrl, email
+  
   useEffect(() => {
     API.get('/settings/profile')
       .then(({ data }) => setProfile(data))
       .catch(console.error);
   }, [user?.userId]);
 
-  // Load all stores for super admin
+
   useEffect(() => {
     if (isSuperAdmin) {
       API.get('/auth/all-stores').then(({ data }) => {
