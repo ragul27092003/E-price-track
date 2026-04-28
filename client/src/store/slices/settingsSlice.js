@@ -1,0 +1,21 @@
+export const createSettingsSlice = (set) => ({
+  // ── State ──────────────────────────────────────────────────────────
+  profile:         null,   // current user profile
+  storeUsers:      [],     // users in same company
+  usersLog:        [],     // login activity log
+  settingsLoading: false,
+  settingsError:   null,
+
+  // ── Actions ────────────────────────────────────────────────────────
+  setProfile:         (profile)         => set({ profile }),
+  setStoreUsers:      (storeUsers)      => set({ storeUsers }),
+  setUsersLog:        (usersLog)        => set({ usersLog }),
+  setSettingsLoading: (settingsLoading) => set({ settingsLoading }),
+  setSettingsError:   (settingsError)   => set({ settingsError }),
+
+  addStoreUser: (user) =>
+    set((state) => ({ storeUsers: [...state.storeUsers, user] })),
+
+  removeStoreUser: (userId) =>
+    set((state) => ({ storeUsers: state.storeUsers.filter((u) => u.userId !== userId) })),
+});

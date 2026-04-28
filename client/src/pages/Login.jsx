@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import API from '../hooks/useApi';
+import { useStore } from '../store';
+import { loginUser } from '../services/authService';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -9,11 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Rss, Loader2 } from 'lucide-react';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const [error,    setError]    = useState('');
+  const [loading,  setLoading]  = useState(false);
+
+  const login    = useStore((s) => s.login);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -21,7 +22,7 @@ const Login = () => {
     setError('');
     setLoading(true);
     try {
-      const { data } = await API.post('/auth/login', { email, password });
+      const data = await loginUser(email, password);
       login(data);
       navigate('/');
     } catch (err) {

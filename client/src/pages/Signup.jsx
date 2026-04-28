@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import API from '../hooks/useApi';
+import { signupUser, checkEmailAvailability, checkCompanyNameAvailability } from '../services/authService';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -18,16 +18,11 @@ const Field = ({ label, error, success, children }) => (
 
 const Signup = () => {
   const [form, setForm] = useState({
-    companyName: '',
-    companyUrl:  '',
-    phone:       '',
-    email:       '',
-    password:    '',
-    confirmPassword: '',
+    companyName: '', companyUrl: '', phone: '', email: '', password: '', confirmPassword: '',
   });
-  const [errors,      setErrors]      = useState({});
-  const [touched,     setTouched]     = useState({});
-  const [emailStatus, setEmailStatus] = useState(null);
+  const [errors,       setErrors]       = useState({});
+  const [touched,      setTouched]      = useState({});
+  const [emailStatus,  setEmailStatus]  = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm,  setShowConfirm]  = useState(false);
   const [loading,      setLoading]      = useState(false);
@@ -73,9 +68,9 @@ const Signup = () => {
     if (id === 'phone' && value && !/^[\d\s\-()+]*$/.test(value)) return;
     const updated = { ...form, [id]: value };
     setForm(updated);
-    if (touched[id]) setErrors(prev => ({ ...prev, [id]: validate(id, value, updated) }));
+    if (touched[id]) setErrors((prev) => ({ ...prev, [id]: validate(id, value, updated) }));
     if (id === 'password' && touched.confirmPassword)
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
         confirmPassword: validate('confirmPassword', updated.confirmPassword, updated),
       }));
@@ -83,51 +78,43 @@ const Signup = () => {
 
   const handleBlur = useCallback(async (e) => {
     const { id, value } = e.target;
-    setTouched(prev => ({ ...prev, [id]: true }));
+    setTouched((prev) => ({ ...prev, [id]: true }));
     const error = validate(id, value);
-    setErrors(prev => ({ ...prev, [id]: error }));
+    setErrors((prev) => ({ ...prev, [id]: error }));
 
-    // Check email availability
     if (id === 'email' && !error && value) {
       setEmailStatus('checking');
       try {
-        const { data } = await API.get(`/auth/check-email?email=${encodeURIComponent(value)}`);
+        const data = await checkEmailAvailability(value);
         setEmailStatus(data.exists ? 'taken' : 'available');
-        if (data.exists) setErrors(prev => ({ ...prev, email: 'This email is already registered' }));
+        if (data.exists) setErrors((prev) => ({ ...prev, email: 'This email is already registered' }));
       } catch {
         setEmailStatus(null);
       }
     }
 
-    // Check company name availability
     if (id === 'companyName' && !error && value.trim().length >= 2) {
       try {
-        const { data } = await API.get(
-          `/auth/check-companyname?companyName=${encodeURIComponent(value.trim())}`
-        );
-        if (data.exists) {
-          setErrors(prev => ({ ...prev, companyName: 'This company name is already taken' }));
-        }
-      } catch {
-        // silently ignore
-      }
+        const data = await checkCompanyNameAvailability(value.trim());
+        if (data.exists)
+          setErrors((prev) => ({ ...prev, companyName: 'This company name is already taken' }));
+      } catch { /* silently ignore */ }
     }
   }, [form]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const fields = ['companyName', 'companyUrl', 'phone', 'email', 'password', 'confirmPassword'];
+    const fields    = ['companyName', 'companyUrl', 'phone', 'email', 'password', 'confirmPassword'];
     const newErrors = {};
-    fields.forEach(f => { newErrors[f] = validate(f, form[f]); });
+    fields.forEach((f) => { newErrors[f] = validate(f, form[f]); });
     setErrors(newErrors);
-    setTouched(Object.fromEntries(fields.map(f => [f, true])));
+    setTouched(Object.fromEntries(fields.map((f) => [f, true])));
     if (Object.values(newErrors).some(Boolean) || emailStatus === 'taken') return;
 
     setServerError('');
     setLoading(true);
     try {
-      // Send companyName + companyUrl to backend
-      await API.post('/auth/signup', {
+      await signupUser({
         companyName: form.companyName,
         companyUrl:  form.companyUrl,
         phone:       form.phone,
@@ -139,8 +126,8 @@ const Signup = () => {
       const message = err.response?.data?.message || 'Signup failed. Please try again.';
       const field   = err.response?.data?.field;
       if (field === 'companyName') {
-        setErrors(prev => ({ ...prev, companyName: message }));
-        setTouched(prev => ({ ...prev, companyName: true }));
+        setErrors((prev) => ({ ...prev, companyName: message }));
+        setTouched((prev) => ({ ...prev, companyName: true }));
       } else {
         setServerError(message);
       }
@@ -150,16 +137,16 @@ const Signup = () => {
   };
 
   const inputClass = (field) =>
-    touched[field] && errors[field]  ? 'border-red-400 focus-visible:ring-red-300'
+    touched[field] && errors[field]   ? 'border-red-400 focus-visible:ring-red-300'
     : touched[field] && !errors[field] ? 'border-green-400 focus-visible:ring-green-300'
     : '';
 
   const strength = (() => {
     let s = 0;
-    if (form.password.length >= 8)       s++;
-    if (/[A-Z]/.test(form.password))     s++;
-    if (/[0-9]/.test(form.password))     s++;
-    if (/[^A-Za-z0-9]/.test(form.password)) s++;
+    if (form.password.length >= 8)           s++;
+    if (/[A-Z]/.test(form.password))         s++;
+    if (/[0-9]/.test(form.password))         s++;
+    if (/[^A-Za-z0-9]/.test(form.password))  s++;
     return s;
   })();
 
@@ -180,102 +167,49 @@ const Signup = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} noValidate className="space-y-4">
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Company Name */}
-                <Field
-                  label="Company Name *"
-                  error={touched.companyName && errors.companyName}
-                >
-                  <Input
-                    id="companyName"
-                    placeholder="e.g. Hari Electronics"
-                    value={form.companyName}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    className={inputClass('companyName')}
-                  />
+                <Field label="Company Name *" error={touched.companyName && errors.companyName}>
+                  <Input id="companyName" placeholder="e.g. Hari Electronics" value={form.companyName}
+                    onChange={handleChange} onBlur={handleBlur} className={inputClass('companyName')} />
                 </Field>
-
-                {/* Company URL */}
-                <Field
-                  label="Company URL *"
-                  error={touched.companyUrl && errors.companyUrl}
-                >
-                  <Input
-                    id="companyUrl"
-                    placeholder="e.g. harielectronics.com"
-                    value={form.companyUrl}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    className={inputClass('companyUrl')}
-                  />
+                <Field label="Company URL *" error={touched.companyUrl && errors.companyUrl}>
+                  <Input id="companyUrl" placeholder="e.g. harielectronics.com" value={form.companyUrl}
+                    onChange={handleChange} onBlur={handleBlur} className={inputClass('companyUrl')} />
                 </Field>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Email */}
-                <Field
-                  label="Email *"
-                  error={touched.email && errors.email}
-                  success={emailStatus === 'available' ? 'Email is available' : ''}
-                >
+                <Field label="Email *" error={touched.email && errors.email}
+                  success={emailStatus === 'available' ? 'Email is available' : ''}>
                   <div className="relative">
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="you@example.com"
-                      value={form.email}
-                      onChange={handleChange}
-                      onBlur={handleBlur}
-                      className={`pr-8 ${inputClass('email')}`}
-                    />
+                    <Input id="email" type="email" placeholder="you@example.com" value={form.email}
+                      onChange={handleChange} onBlur={handleBlur} className={`pr-8 ${inputClass('email')}`} />
                     {emailStatus === 'checking' && (
                       <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
                     )}
                   </div>
                 </Field>
-
-                {/* Phone */}
                 <Field label="Phone Number *" error={touched.phone && errors.phone}>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+91 98765 43210"
-                    value={form.phone}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    inputMode="numeric"
-                    maxLength={15}
-                    className={inputClass('phone')}
-                  />
+                  <Input id="phone" type="tel" placeholder="+91 98765 43210" value={form.phone}
+                    onChange={handleChange} onBlur={handleBlur} inputMode="numeric" maxLength={15}
+                    className={inputClass('phone')} />
                 </Field>
               </div>
 
-              {/* Password */}
               <Field label="Password *" error={touched.password && errors.password}>
                 <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Min. 8 chars, 1 uppercase, 1 number"
-                    value={form.password}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    className={`pr-10 ${inputClass('password')}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
+                  <Input id="password" type={showPassword ? 'text' : 'password'}
+                    placeholder="Min. 8 chars, 1 uppercase, 1 number" value={form.password}
+                    onChange={handleChange} onBlur={handleBlur} className={`pr-10 ${inputClass('password')}`} />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
                 {form.password && (
                   <div className="mt-1.5 space-y-1">
                     <div className="flex gap-1">
-                      {[1,2,3,4].map(i => (
+                      {[1,2,3,4].map((i) => (
                         <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${
                           i <= strength
                             ? ['','bg-red-400','bg-yellow-400','bg-blue-400','bg-green-500'][strength]
@@ -290,27 +224,14 @@ const Signup = () => {
                 )}
               </Field>
 
-              {/* Confirm Password */}
-              <Field
-                label="Confirm Password *"
-                error={touched.confirmPassword && errors.confirmPassword}
-                success={touched.confirmPassword && !errors.confirmPassword && form.confirmPassword ? 'Passwords match' : ''}
-              >
+              <Field label="Confirm Password *" error={touched.confirmPassword && errors.confirmPassword}
+                success={touched.confirmPassword && !errors.confirmPassword && form.confirmPassword ? 'Passwords match' : ''}>
                 <div className="relative">
-                  <Input
-                    id="confirmPassword"
-                    type={showConfirm ? 'text' : 'password'}
-                    placeholder="Re-enter your password"
-                    value={form.confirmPassword}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    className={`pr-10 ${inputClass('confirmPassword')}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirm(!showConfirm)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
+                  <Input id="confirmPassword" type={showConfirm ? 'text' : 'password'}
+                    placeholder="Re-enter your password" value={form.confirmPassword}
+                    onChange={handleChange} onBlur={handleBlur} className={`pr-10 ${inputClass('confirmPassword')}`} />
+                  <button type="button" onClick={() => setShowConfirm(!showConfirm)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                     {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
