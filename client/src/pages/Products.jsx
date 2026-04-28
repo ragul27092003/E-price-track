@@ -11,9 +11,11 @@ function parsePrice(raw) {
 }
 
 function marketStats(product) {
-  const prices = (product.competitor_prices || [])
-    .map((c) => c.price)
-    .filter((p) => p !== null && p !== undefined);
+  // Use product_price from each day in 30-day history
+  const prices = (product.price_history_30days || [])
+    .map((h) => (typeof h.product_price === 'number' ? h.product_price : parseFloat(h.product_price)))
+    .filter((v) => !isNaN(v) && v !== null);
+
   if (!prices.length) return { low: null, avg: null, high: null };
   const low  = Math.min(...prices);
   const high = Math.max(...prices);
@@ -170,7 +172,6 @@ function MarketCap({ low, avg, high }) {
 function CompetitorPrices({ product }) {
   const active = (product.competitor_prices || []).filter((c) => c.price !== null);
   const { low, avg, high } = marketStats(product);
-
   if (active.length === 0) {
     return <MarketCap low={low} avg={avg} high={high} />;
   }
