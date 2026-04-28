@@ -52,7 +52,7 @@ router.post('/login', async (req, res) => {
     });
 
     // Step 6: Save login log to main DB
-    const mainDb = mongoose.connection.useDb('gmc_main_admin_db');
+    const mainDb = mongoose.connection.useDb('eprice_main_admin_db');
     await mainDb.collection('userlogs').insertOne({
       userId:    user.userId,
       email:     user.email,

@@ -10,7 +10,7 @@ async function seedAdmin() {
   await mongoose.connect(process.env.MONGO_URI);
   console.log('Connected to MongoDB');
 
-  const mainDb = mongoose.connection.useDb('gmc_main_admin_db');
+  const mainDb = mongoose.connection.useDb('eprice_main_admin_db');
 
   // Check if super admin already exists in users collection
   const exists = await mainDb.collection('users').findOne({ userType: 'super_admin' });
@@ -19,7 +19,7 @@ async function seedAdmin() {
     process.exit(0);
   }
 
-  const hashedPassword = await bcrypt.hash('gmcadmin@123', 10);
+  const hashedPassword = await bcrypt.hash('Hack@123', 10);
   const companyId      = generateCompanyId();
   const userId         = generateUserId();
 
@@ -61,7 +61,7 @@ async function seedAdmin() {
 
   console.log('\n Super admin created successfully!');
   console.log('Email:    superadmin@gmail.com');
-  console.log('Password: gmcadmin@123');
+  console.log('Password: Hack@123');
   process.exit(0);
 }
 
