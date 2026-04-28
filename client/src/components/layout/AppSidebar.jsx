@@ -19,10 +19,10 @@ const navItems = [
   
   { title: "Dashboard",          icon: LayoutDashboard, path: "/" },
   { title: "Manage Feed Setup",  icon: Rss,        path: "/manage-feed-setup" },
-  { title: "Product History",    icon: LucideHistory,      path: "/product-history"},
   { title: "Competitors",        icon: Trophy,             path: "/competitors" },
   { title: "Products",           icon: Package,         path: "/products" },
   { title: "Notifications",      icon: ClipboardCheck,  path: "/notifications" },
+  { title: "Product History",    icon: LucideHistory,      path: "/product-history"},
   {title : "Market Competitor", icon: ComponentIcon, path: "/market"},
   { title:"Smart Reports",       icon: BarChartBigIcon,      path: "/smart-reports"},
   { title: "Settings",           icon: Settings,        path: "/settings"},
