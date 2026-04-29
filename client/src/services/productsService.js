@@ -1,7 +1,13 @@
 import API from '../hooks/useApi';
 
-export const fetchProducts = () =>
-  API.get('/products').then((r) => r.data);
+// competitorSlug is optional — passed when navigating from MarketCompetitor
+// GET /api/products?competitor=amazon → backend filters products to those amazon sells
+export const fetchProducts = (competitorSlug = null) => {
+  const url = competitorSlug
+    ? `/products?competitor=${competitorSlug}`
+    : '/products';
+  return API.get(url).then((r) => r.data);
+};
 
 export const createProduct = (data) =>
   API.post('/products', data).then((r) => r.data);

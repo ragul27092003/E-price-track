@@ -10,6 +10,7 @@ import RefreshIcon   from '@mui/icons-material/Refresh';
 import { useStore }  from '../store';
 import { fetchCompetitors, createCompetitor, toggleCompetitorSync } from '../services/competitorsService';
 
+// ─── 7-day sparkline seeded from productsTracked + avgPriceDelta ──────────────
 const generateTrend = (seed, delta) => {
   const base  = (seed || 20) % 50 || 20;
   const isNeg = String(delta).includes('-');
@@ -36,7 +37,6 @@ const Sparkline = ({ productsTracked, avgPriceDelta }) => {
   const isNeg = String(avgPriceDelta).includes('-');
   const line  = isNeg ? '#ef5350' : '#1976d2';
   const fill  = isNeg ? '#ffebee' : '#e3f2fd';
-
   return (
     <Box sx={{ width: 120, height: 35, display: 'flex', alignItems: 'flex-end' }}>
       <svg width="100%" height="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
@@ -47,6 +47,7 @@ const Sparkline = ({ productsTracked, avgPriceDelta }) => {
   );
 };
 
+// ─── Single competitor row ────────────────────────────────────────────────────
 const CompetitorRow = ({ data, onToggleSync }) => {
   const [isActive,  setIsActive]  = useState(data.isActive);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -68,6 +69,7 @@ const CompetitorRow = ({ data, onToggleSync }) => {
       display: 'flex', alignItems: 'center', p: 1.5,
       border: '1px solid #90caf9', borderRadius: 2, mb: 1.5, bgcolor: '#ffffff',
     }}>
+      {/* Logo + Name */}
       <Stack direction="row" alignItems="center" spacing={2} sx={{ width: '20%' }}>
         <Box sx={{
           width: 40, height: 40, bgcolor: data.color || '#475e77',
@@ -77,7 +79,7 @@ const CompetitorRow = ({ data, onToggleSync }) => {
         }}>
           {data.logo ? (
             <img
-              src={`http://localhost:5100${data.logo.startsWith('/') ? '' : '/'}${data.logo}`}
+              src={`http://localhost:5100${data.logo}`}
               alt={data.name}
               style={{ width: '100%', objectFit: 'contain' }}
               onError={(e) => { e.target.style.display = 'none'; }}
@@ -91,6 +93,7 @@ const CompetitorRow = ({ data, onToggleSync }) => {
         <Typography variant="body2" fontWeight="500" color="#333">{data.name}</Typography>
       </Stack>
 
+      {/* Status + last sync */}
       <Box sx={{ width: '20%' }}>
         {isSyncing ? (
           <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -109,22 +112,26 @@ const CompetitorRow = ({ data, onToggleSync }) => {
         <Typography variant="caption" color="text.secondary">{data.lastSync || 'Never'}</Typography>
       </Box>
 
+      {/* Avg price delta */}
       <Box sx={{ width: '15%' }}>
         <Typography variant="body2" sx={{ color: isNegDelta ? '#d32f2f' : '#4caf50', fontWeight: 'bold' }}>
           {isNegDelta ? '▼' : '▲'} {data.avgPriceDelta || '+0.0%'}
         </Typography>
       </Box>
 
+      {/* Products tracked */}
       <Box sx={{ width: '15%' }}>
         <Typography variant="body2" fontWeight="500" color="#333">
           {data.productsTracked ?? 0}
         </Typography>
       </Box>
 
+      {/* 7-day sparkline */}
       <Box sx={{ width: '20%' }}>
         <Sparkline productsTracked={data.productsTracked} avgPriceDelta={data.avgPriceDelta} />
       </Box>
 
+      {/* Toggle */}
       <Box sx={{ width: '10%', display: 'flex', justifyContent: 'flex-end' }}>
         <Switch checked={isActive} onChange={handleToggle} color="success" disabled={isSyncing} />
       </Box>
@@ -132,6 +139,7 @@ const CompetitorRow = ({ data, onToggleSync }) => {
   );
 };
 
+// ─── Section wrapper ──────────────────────────────────────────────────────────
 const CompetitorSection = ({ title, items, onToggleSync }) => (
   <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden', mb: 4, borderColor: '#cfd8dc' }}>
     <Box sx={{ bgcolor: '#475e77', color: '#fff', p: 1.5, px: 2 }}>
@@ -157,6 +165,7 @@ const CompetitorSection = ({ title, items, onToggleSync }) => (
   </Paper>
 );
 
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
 const Competitors = () => {
   const competitors           = useStore((s) => s.competitors);
   const setCompetitors        = useStore((s) => s.setCompetitors);
@@ -164,6 +173,8 @@ const Competitors = () => {
   const toggleCompetitor      = useStore((s) => s.toggleCompetitor);
   const competitorsLoading    = useStore((s) => s.competitorsLoading);
   const setCompetitorsLoading = useStore((s) => s.setCompetitorsLoading);
+  // ── FIX: watch activeStoreId so we re-fetch when tenant switches ───
+  const activeStoreId         = useStore((s) => s.activeStoreId);
 
   const [searchTerm,    setSearchTerm]    = useState('');
   const [isRefreshing,  setIsRefreshing]  = useState(false);
@@ -186,20 +197,9 @@ const Competitors = () => {
     }
   };
 
-  useEffect(() => {
-    loadCompetitors();
-
-    // SAFE LISTENER: Only refreshes when explicitly told to by the Header
-    const handleForceRefresh = () => {
-      loadCompetitors(true);
-    };
-
-    window.addEventListener('force-tenant-refresh', handleForceRefresh);
-
-    return () => {
-      window.removeEventListener('force-tenant-refresh', handleForceRefresh);
-    };
-  }, []);
+  // ── FIX: [activeStoreId] dependency → re-fetches when user switches tenant ──
+  // switchStore() in authSlice already clears competitors[] so this runs fresh
+  useEffect(() => { loadCompetitors(); }, [activeStoreId]);
 
   const handleToggleSync = async (id, isActive) => {
     try {
@@ -222,11 +222,11 @@ const Competitors = () => {
     }
   };
 
-  const filtered    = competitors.filter((c) =>
+  const filtered   = competitors.filter((c) =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  const eanList     = filtered.filter((c) => c.mappingType === 'EAN');
-  const nonEanList  = filtered.filter((c) => c.mappingType === 'NON_EAN');
+  const eanList    = filtered.filter((c) => c.mappingType === 'EAN');
+  const nonEanList = filtered.filter((c) => c.mappingType === 'NON_EAN');
 
   if (competitorsLoading) {
     return (
@@ -273,21 +273,8 @@ const Competitors = () => {
         </Stack>
       </Stack>
 
-      {/* CONDITIONAL RENDERING APPLIED HERE */}
-      {eanList.length > 0 && (
-        <CompetitorSection title="EAN Based Competitor Listings" items={eanList} onToggleSync={handleToggleSync} />
-      )}
-      
-      {nonEanList.length > 0 && (
-        <CompetitorSection title="NON EAN Based Competitor Listings" items={nonEanList} onToggleSync={handleToggleSync} />
-      )}
-
-      {/* Fallback if both are empty (e.g., search returns no results) */}
-      {eanList.length === 0 && nonEanList.length === 0 && (
-        <Typography variant="body1" color="text.secondary" textAlign="center" sx={{ mt: 5 }}>
-          No competitors match your search.
-        </Typography>
-      )}
+      <CompetitorSection title="EAN Based Competitor Listings"     items={eanList}    onToggleSync={handleToggleSync} />
+      <CompetitorSection title="NON EAN Based Competitor Listings" items={nonEanList} onToggleSync={handleToggleSync} />
 
       <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ borderBottom: '1px solid #eee' }}>
@@ -309,7 +296,7 @@ const Competitors = () => {
             </Grid>
             <Grid item xs={12} md={4}>
               <Typography variant="caption" color="text.secondary" fontWeight="bold">Search URL</Typography>
-              <TextField fullWidth size="small" placeholder="https://example.com/search?q="
+              <TextField fullWidth size="small"
                 value={newCompetitor.searchUrl}
                 onChange={(e) => setNewCompetitor({ ...newCompetitor, searchUrl: e.target.value })} />
             </Grid>

@@ -9,14 +9,13 @@ function decodeToken(token) {
 export const createAuthSlice = (set) => ({
   // ── State ──────────────────────────────────────────────────────────
   token:           null,
-  user:            null,   // { userId, userType, companyId }
-  activeStoreId:   null,   // super_admin: switched store
+  user:            null,
+  activeStoreId:   null,
   activeShopName:  null,
 
   // ── Actions ────────────────────────────────────────────────────────
   login: (data) => {
     const decoded = decodeToken(data.token);
-    // Keep localStorage in sync so useApi.js interceptor picks up the token
     localStorage.setItem('token', data.token);
     set({
       token: data.token,
@@ -33,9 +32,17 @@ export const createAuthSlice = (set) => ({
     set({ token: null, user: null, activeStoreId: null, activeShopName: null });
   },
 
+  // ── FIX: Clear cached competitors + products when switching tenant ──
+  // Without this, old tenant's data stays in Zustand and pages don't refetch
   switchStore: (companyId, companyName) => {
     localStorage.setItem('activeStoreId',  companyId);
     localStorage.setItem('activeShopName', companyName);
-    set({ activeStoreId: companyId, activeShopName: companyName });
+    set({
+      activeStoreId:  companyId,
+      activeShopName: companyName,
+      // Clear stale data so pages re-fetch from new tenant DB
+      competitors:    [],
+      products:       [],
+    });
   },
 });
