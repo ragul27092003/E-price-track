@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useStore } from "../store";
 import { fetchProducts } from "../services/productsService";
 
@@ -191,6 +191,110 @@ function CompetitorPrices({ product }) {
   );
 }
 
+// ── Searchable filter dropdown with keyboard nav ──────────────────────────────
+
+function FilterSelect({ label, options, value, onChange }) {
+  const [open,   setOpen]   = useState(false);
+  const [query,  setQuery]  = useState("");
+  const [cursor, setCursor] = useState(-1);
+  const inputRef = useRef(null);
+
+  const ALL_LABEL = `All ${label}s`;
+  const matched = ["", ...options.filter(
+    (o) => o.toLowerCase().includes(query.toLowerCase())
+  )];
+
+  const commit = (val) => {
+    onChange(val);
+    setOpen(false);
+    setQuery("");
+    setCursor(-1);
+  };
+
+  const handleKey = (e) => {
+    if (!open) { setOpen(true); return; }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setCursor((c) => Math.min(c + 1, matched.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setCursor((c) => Math.max(c - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (cursor >= 0) commit(matched[cursor]);
+    } else if (e.key === "Escape") {
+      setOpen(false);
+      setQuery("");
+    }
+  };
+
+  const displayValue = open ? query : (value || "");
+  const placeholder  = value ? value : ALL_LABEL;
+
+  return (
+    <div className="relative flex-1 min-w-[160px] max-w-[220px]">
+      <p className="mb-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide">{label}</p>
+      <div
+        className={`flex items-center gap-2 rounded-lg border bg-white px-3 py-2.5 shadow-sm cursor-text ${
+          open ? "border-blue-300 ring-2 ring-blue-100" : "border-slate-200"
+        }`}
+        onClick={() => { setOpen(true); inputRef.current?.focus(); }}
+      >
+        <input
+          ref={inputRef}
+          value={displayValue}
+          placeholder={placeholder}
+          onChange={(e) => { setQuery(e.target.value); setCursor(-1); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={handleKey}
+          className="w-full border-0 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 min-w-0"
+        />
+        {value && (
+          <button
+            onMouseDown={(e) => { e.stopPropagation(); commit(""); }}
+            className="shrink-0 text-slate-400 hover:text-slate-600"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"
+          className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </div>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-20" onMouseDown={() => { setOpen(false); setQuery(""); }} />
+          <div className="absolute left-0 top-full z-30 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg py-1">
+            {matched.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-slate-400">No matches</p>
+            ) : (
+              matched.map((opt, i) => (
+                <button
+                  key={opt || "__all__"}
+                  onMouseDown={(e) => { e.preventDefault(); commit(opt); }}
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                    i === cursor
+                      ? "bg-blue-50 text-blue-700"
+                      : opt === value
+                      ? "bg-slate-50 font-medium text-slate-800"
+                      : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {opt || ALL_LABEL}
+                </button>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Tabs ───────────────────────────────────────────────────────────────────────
 
 const TABS = [
@@ -263,8 +367,11 @@ export default function Products() {
   const setProductsLoading = useStore((s) => s.setProductsLoading);
   const setProductsError   = useStore((s) => s.setProductsError);
 
-  const [activeTab, setActiveTab] = useState("brand");
-  const [search,    setSearch]    = useState("");
+  const [activeTab,     setActiveTab]     = useState("analysis");
+  const [search,        setSearch]        = useState("");
+  const [brandFilter,   setBrandFilter]   = useState("");
+  const [catFilter,     setCatFilter]     = useState("");
+  const [rankFilter,    setRankFilter]    = useState("");
 
   const load = async () => {
     setProductsLoading(true);
@@ -281,14 +388,23 @@ export default function Products() {
 
   useEffect(() => { load(); }, []);
 
+  // Build unique option lists from loaded products
+  const brandOptions = [...new Set(products.map((p) => p.product_brand).filter(Boolean))].sort();
+  const catOptions   = [...new Set(products.map((p) => p.product_category).filter(Boolean))].sort();
+  const rankOptions  = [...new Set(products.map((p) => String(p.rank_by ?? "")).filter(Boolean))].sort();
+
   const filtered = products.filter((p) => {
     const q = search.toLowerCase();
-    return (
+    const matchSearch = !q || (
       p.product_name?.toLowerCase().includes(q) ||
       p.product_brand?.toLowerCase().includes(q) ||
       String(p.product_ean_id  || "").includes(q) ||
       String(p.product_code    || "").includes(q)
     );
+    const matchBrand = !brandFilter || p.product_brand === brandFilter;
+    const matchCat   = !catFilter   || p.product_category === catFilter;
+    const matchRank  = !rankFilter  || String(p.rank_by ?? "") === rankFilter;
+    return matchSearch && matchBrand && matchCat && matchRank;
   });
 
   return (
@@ -329,14 +445,9 @@ export default function Products() {
 
         {/* Filters Row */}
         <div className="flex flex-wrap gap-4">
-          {["Brand", "Category", "Price Rank"].map((filter) => (
-            <div key={filter} className="flex-1 min-w-[150px] max-w-[200px]">
-              <p className="mb-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide">{filter}</p>
-              <select className="w-full appearance-none rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 shadow-sm outline-none focus:border-blue-300">
-                <option>All {filter.replace(" Rank", "s")}</option>
-              </select>
-            </div>
-          ))}
+          <FilterSelect label="Brand"    options={brandOptions} value={brandFilter} onChange={setBrandFilter} />
+          <FilterSelect label="Category" options={catOptions}   value={catFilter}   onChange={setCatFilter}   />
+          <FilterSelect label="Rank"     options={rankOptions}  value={rankFilter}  onChange={setRankFilter}  />
         </div>
 
         {/* Tabs */}
