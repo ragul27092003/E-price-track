@@ -295,6 +295,58 @@ function FilterSelect({ label, options, value, onChange }) {
   );
 }
 
+// ── Pagination ─────────────────────────────────────────────────────────────────
+
+const ITEMS_PER_PAGE = 5;
+
+function Pagination({ currentPage, totalPages, onPageChange }) {
+  if (totalPages <= 1) return null;
+
+  const pages = [];
+  for (let i = 1; i <= totalPages; i++) pages.push(i);
+
+  return (
+    <div className="flex items-center justify-between border-t border-slate-100 bg-white px-5 py-3">
+      <p className="text-xs text-slate-500">
+        Page {currentPage} of {totalPages}
+      </p>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+        </button>
+        {pages.map((p) => (
+          <button
+            key={p}
+            onClick={() => onPageChange(p)}
+            className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-semibold transition-colors ${
+              p === currentPage
+                ? "bg-[#2B86C5] text-white border border-[#2B86C5]"
+                : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {p}
+          </button>
+        ))}
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Tabs ───────────────────────────────────────────────────────────────────────
 
 const TABS = [
@@ -357,6 +409,59 @@ function PriceCell({ product }) {
   );
 }
 
+// ── CSV Export ────────────────────────────────────────────────────────────────
+
+function exportToCSV(products) {
+  const headers = [
+    "Product Name",
+    "Item Code",
+    "Ranking Position",
+    "Competing With",
+    "Price",
+    "SAP Price",
+    "Store Price",
+    "Item Groups",
+    "Competitor Detail",
+  ];
+
+  const escape = (val) => {
+    const s = String(val ?? "");
+    return s.includes(",") || s.includes('"') || s.includes("\n")
+      ? `"${s.replace(/"/g, '""')}"`
+      : s;
+  };
+
+  const rows = products.map((p) => {
+    const compDetail = (p.competitor_prices || [])
+      .map((c) => {
+        const outOfStock = c.price === null || c.price === undefined || c.stock === 0;
+        return outOfStock ? `${c.name} : Out Of Stock` : `${c.name} : ${c.price}`;
+      })
+      .join(" | ");
+
+    return [
+      p.product_name || "",
+      p.product_code || p.product_ean_id || "",
+      p.user_notification_data?.rank_pos || p.rank_by || "",
+      p.user_notification_data?.Competing_with ?? "",
+      p.product_price ?? "",
+      p.product_sap_price ?? "",
+      p.product_store_price ?? "",
+      p.product_item_group || p.product_category || "",
+      compDetail,
+    ].map(escape).join(",");
+  });
+
+  const csv = "﻿" + [headers.map(escape).join(","), ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = `products_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function Products() {
@@ -372,6 +477,7 @@ export default function Products() {
   const [brandFilter,   setBrandFilter]   = useState("");
   const [catFilter,     setCatFilter]     = useState("");
   const [rankFilter,    setRankFilter]    = useState("");
+  const [currentPage,   setCurrentPage]   = useState(1);
 
   const load = async () => {
     setProductsLoading(true);
@@ -379,6 +485,7 @@ export default function Products() {
     try {
       const data = await fetchProducts();
       setProducts(data);
+      console.log(data,'tserin data')
     } catch (err) {
       setProductsError(err.response?.data?.message || err.message);
     } finally {
@@ -407,6 +514,11 @@ export default function Products() {
     return matchSearch && matchBrand && matchCat && matchRank;
   });
 
+  useEffect(() => { setCurrentPage(1); }, [search, brandFilter, catFilter, rankFilter, activeTab]);
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginated  = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
   return (
     <div className="min-h-screen bg-white text-slate-800 font-sans">
       <div className="mx-auto flex max-w-[1400px] flex-col gap-5 px-6 py-6">
@@ -432,7 +544,10 @@ export default function Products() {
               </svg>
               Filter
             </button>
-            <button className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors">
+            <button
+              onClick={() => exportToCSV(filtered)}
+              className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors"
+            >
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="7 10 12 15 17 10" />
@@ -498,7 +613,7 @@ export default function Products() {
                           </td>
                         </tr>
                       ) : (
-                        filtered.map((p) => (
+                        paginated.map((p) => (
                           <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
                             <td className="px-5 py-4"><ProductCell product={p} /></td>
                             <td className="px-5 py-4"><PriceCell product={p} /></td>
@@ -528,6 +643,7 @@ export default function Products() {
                       )}
                     </tbody>
                   </table>
+                  <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
                 </div>
               )}
 
@@ -552,7 +668,7 @@ export default function Products() {
                           </td>
                         </tr>
                       ) : (
-                        filtered.map((p) => {
+                        paginated.map((p) => {
                           const { low, avg, high } = marketStats(p);
                           const active          = (p.competitor_prices || []).filter((c) => c.price !== null);
                           return (
@@ -595,6 +711,7 @@ export default function Products() {
                       )}
                     </tbody>
                   </table>
+                  <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
                 </div>
               )}
 
@@ -623,7 +740,7 @@ export default function Products() {
                           </td>
                         </tr>
                       ) : (
-                        filtered.map((p) => {
+                        paginated.map((p) => {
                           const gap = priceGap(p);
                           return (
                             <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
@@ -657,6 +774,7 @@ export default function Products() {
                       )}
                     </tbody>
                   </table>
+                  <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
                 </div>
               )}
             </>

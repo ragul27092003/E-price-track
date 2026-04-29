@@ -7,6 +7,27 @@ function toPrice(raw) {
   return isNaN(n) ? null : n;
 }
 
+// Helper: normalise competitor stock from numeric product_stock OR string product_stock_status.
+// Returns: 0 = out of stock, positive number = in stock (count when available), null = unknown.
+function resolveStock(doc) {
+  if (!doc) return null;
+
+  // Numeric field takes priority (0, 1, 2, ...)
+  if (doc.product_stock !== null && doc.product_stock !== undefined) {
+    const n = parseInt(doc.product_stock, 10);
+    if (!isNaN(n)) return n;
+  }
+
+  // String status field
+  if (typeof doc.product_stock_status === 'string') {
+    const s = doc.product_stock_status.toLowerCase().trim();
+    if (s === 'out of stock' || s === 'out_of_stock' || s === '0' || s === 'no result') return 0;
+    if (s === 'in stock'     || s === 'in_stock'     || s === 'instock'                ) return 1;
+  }
+
+  return null;
+}
+
 exports.getAll = async (req, res) => {
   try {
     const db = req.tenantDb;
@@ -55,6 +76,7 @@ exports.getAll = async (req, res) => {
                   competitor_product_code: 1,
                   product_price:           1,
                   product_url:             1,
+                  product_stock:           1,
                   product_stock_status:    1,
                   product_image:           1,
               }}
@@ -124,12 +146,12 @@ exports.getAll = async (req, res) => {
         const compPrice = toPrice(cd?.product_price);
         return {
           slug,
-          name:       comp.competitor_name || slug,
-          price:      compPrice,
-          price_gap:  compPrice !== null && ourPrice !== null ? compPrice - ourPrice : null,
-          url:        cd?.product_url          || null,
-          stock:      cd?.product_stock_status || null,
-          image:      cd?.product_image        || null,
+          name:      comp.competitor_name || slug,
+          price:     compPrice,
+          price_gap: compPrice !== null && ourPrice !== null ? compPrice - ourPrice : null,
+          url:       cd?.product_url  || null,
+          stock:     resolveStock(cd),
+          image:     cd?.product_image || null,
         };
       });
 

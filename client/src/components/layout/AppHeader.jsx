@@ -5,15 +5,24 @@ import { Button } from "@/components/ui/button";
 import { useStore, selectIsSuperAdmin } from "@/store";
 import { fetchProfile } from "@/services/settingsService";
 import { fetchAllStores } from "@/services/authService";
+import { fetchProducts } from "@/services/productsService";
+import { fetchCompetitors } from "@/services/competitorsService";
 
 export function AppHeader({ onMenuToggle }) {
-  const user          = useStore((s) => s.user);
-  const profile       = useStore((s) => s.profile);
-  const setProfile    = useStore((s) => s.setProfile);
-  const logout        = useStore((s) => s.logout);
-  const switchStore   = useStore((s) => s.switchStore);
-  const activeShopName = useStore((s) => s.activeShopName);
-  const isSuperAdmin  = useStore(selectIsSuperAdmin);
+  const user                 = useStore((s) => s.user);
+  const profile              = useStore((s) => s.profile);
+  const setProfile           = useStore((s) => s.setProfile);
+  const logout               = useStore((s) => s.logout);
+  const switchStore          = useStore((s) => s.switchStore);
+  const activeShopName       = useStore((s) => s.activeShopName);
+  const activeStoreId        = useStore((s) => s.activeStoreId);
+  const isSuperAdmin         = useStore(selectIsSuperAdmin);
+  const setProducts          = useStore((s) => s.setProducts);
+  const setProductsLoading   = useStore((s) => s.setProductsLoading);
+  const setProductsError     = useStore((s) => s.setProductsError);
+  const setCompetitors       = useStore((s) => s.setCompetitors);
+  const setCompetitorsLoading = useStore((s) => s.setCompetitorsLoading);
+  const setCompetitorsError  = useStore((s) => s.setCompetitorsError);
 
   const [darkMode,     setDarkMode]     = useState(false);
   const [stores,       setStores]       = useState([]);
@@ -38,6 +47,28 @@ export function AppHeader({ onMenuToggle }) {
       })
       .catch(console.error);
   }, [isSuperAdmin]);
+
+  useEffect(() => {
+    if (!activeStoreId) return;
+
+    setProductsLoading(true);
+    setProductsError(null);
+    fetchProducts()
+      .then(setProducts)
+      .catch((err) => setProductsError(err.response?.data?.message || err.message))
+      .finally(() => setProductsLoading(false));
+
+    setCompetitorsLoading(true);
+    setCompetitorsError(null);
+    fetchCompetitors()
+      .then(setCompetitors)
+      .catch((err) => setCompetitorsError(err.response?.data?.message || err.message))
+      .finally(() => setCompetitorsLoading(false));
+
+    fetchProfile()
+      .then(setProfile)
+      .catch(console.error);
+  }, [activeStoreId]);
 
   const toggleDarkMode = () => {
     setDarkMode(!darkMode);
