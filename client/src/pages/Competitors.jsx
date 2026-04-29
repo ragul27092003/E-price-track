@@ -10,8 +10,6 @@ import RefreshIcon   from '@mui/icons-material/Refresh';
 import { useStore }  from '../store';
 import { fetchCompetitors, createCompetitor, toggleCompetitorSync } from '../services/competitorsService';
 
-// ─── Dynamic 7-day sparkline ─────────────────────────────────────────────────
-// Seeded from productsTracked + avgPriceDelta so each competitor looks different
 const generateTrend = (seed, delta) => {
   const base  = (seed || 20) % 50 || 20;
   const isNeg = String(delta).includes('-');
@@ -49,12 +47,10 @@ const Sparkline = ({ productsTracked, avgPriceDelta }) => {
   );
 };
 
-// ─── Single competitor row ────────────────────────────────────────────────────
 const CompetitorRow = ({ data, onToggleSync }) => {
   const [isActive,  setIsActive]  = useState(data.isActive);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Sync local state when parent data updates (e.g. after refresh)
   useEffect(() => { setIsActive(data.isActive); }, [data.isActive]);
 
   const handleToggle = async (e) => {
@@ -72,7 +68,6 @@ const CompetitorRow = ({ data, onToggleSync }) => {
       display: 'flex', alignItems: 'center', p: 1.5,
       border: '1px solid #90caf9', borderRadius: 2, mb: 1.5, bgcolor: '#ffffff',
     }}>
-      {/* Logo + Name */}
       <Stack direction="row" alignItems="center" spacing={2} sx={{ width: '20%' }}>
         <Box sx={{
           width: 40, height: 40, bgcolor: data.color || '#475e77',
@@ -82,7 +77,7 @@ const CompetitorRow = ({ data, onToggleSync }) => {
         }}>
           {data.logo ? (
             <img
-              src={`http://localhost:5100${data.logo}`}
+              src={`http://localhost:5100${data.logo.startsWith('/') ? '' : '/'}${data.logo}`}
               alt={data.name}
               style={{ width: '100%', objectFit: 'contain' }}
               onError={(e) => { e.target.style.display = 'none'; }}
@@ -96,7 +91,6 @@ const CompetitorRow = ({ data, onToggleSync }) => {
         <Typography variant="body2" fontWeight="500" color="#333">{data.name}</Typography>
       </Stack>
 
-      {/* Status + last sync */}
       <Box sx={{ width: '20%' }}>
         {isSyncing ? (
           <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -115,26 +109,22 @@ const CompetitorRow = ({ data, onToggleSync }) => {
         <Typography variant="caption" color="text.secondary">{data.lastSync || 'Never'}</Typography>
       </Box>
 
-      {/* Avg price delta — real value from DB */}
       <Box sx={{ width: '15%' }}>
         <Typography variant="body2" sx={{ color: isNegDelta ? '#d32f2f' : '#4caf50', fontWeight: 'bold' }}>
           {isNegDelta ? '▼' : '▲'} {data.avgPriceDelta || '+0.0%'}
         </Typography>
       </Box>
 
-      {/* Products tracked — real count from ept_dashbaord_statics */}
       <Box sx={{ width: '15%' }}>
         <Typography variant="body2" fontWeight="500" color="#333">
           {data.productsTracked ?? 0}
         </Typography>
       </Box>
 
-      {/* 7-day trend — driven by real productsTracked + avgPriceDelta */}
       <Box sx={{ width: '20%' }}>
         <Sparkline productsTracked={data.productsTracked} avgPriceDelta={data.avgPriceDelta} />
       </Box>
 
-      {/* Toggle */}
       <Box sx={{ width: '10%', display: 'flex', justifyContent: 'flex-end' }}>
         <Switch checked={isActive} onChange={handleToggle} color="success" disabled={isSyncing} />
       </Box>
@@ -142,7 +132,6 @@ const CompetitorRow = ({ data, onToggleSync }) => {
   );
 };
 
-// ─── Section wrapper ──────────────────────────────────────────────────────────
 const CompetitorSection = ({ title, items, onToggleSync }) => (
   <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden', mb: 4, borderColor: '#cfd8dc' }}>
     <Box sx={{ bgcolor: '#475e77', color: '#fff', p: 1.5, px: 2 }}>
@@ -168,7 +157,6 @@ const CompetitorSection = ({ title, items, onToggleSync }) => (
   </Paper>
 );
 
-// ─── MAIN ─────────────────────────────────────────────────────────────────────
 const Competitors = () => {
   const competitors           = useStore((s) => s.competitors);
   const setCompetitors        = useStore((s) => s.setCompetitors);
@@ -176,7 +164,7 @@ const Competitors = () => {
   const toggleCompetitor      = useStore((s) => s.toggleCompetitor);
   const competitorsLoading    = useStore((s) => s.competitorsLoading);
   const setCompetitorsLoading = useStore((s) => s.setCompetitorsLoading);
-  
+
   const [searchTerm,    setSearchTerm]    = useState('');
   const [isRefreshing,  setIsRefreshing]  = useState(false);
   const [isModalOpen,   setIsModalOpen]   = useState(false);
@@ -184,7 +172,6 @@ const Competitors = () => {
     name: '', website: '', searchUrl: '', color: '#000000', mappingType: 'EAN',
   });
 
-  // Load on mount
   const loadCompetitors = async (isRefresh = false) => {
     if (isRefresh) setIsRefreshing(true);
     else setCompetitorsLoading(true);
@@ -199,12 +186,25 @@ const Competitors = () => {
     }
   };
 
-  useEffect(() => { loadCompetitors(); }, []);
+  useEffect(() => {
+    loadCompetitors();
+
+    // SAFE LISTENER: Only refreshes when explicitly told to by the Header
+    const handleForceRefresh = () => {
+      loadCompetitors(true);
+    };
+
+    window.addEventListener('force-tenant-refresh', handleForceRefresh);
+
+    return () => {
+      window.removeEventListener('force-tenant-refresh', handleForceRefresh);
+    };
+  }, []);
 
   const handleToggleSync = async (id, isActive) => {
     try {
       await toggleCompetitorSync(id, isActive);
-      toggleCompetitor(id, isActive);   // updates Zustand store → updates UI
+      toggleCompetitor(id, isActive);
     } catch (err) {
       console.error('Failed to toggle sync:', err);
     }
@@ -222,7 +222,6 @@ const Competitors = () => {
     }
   };
 
-  // Filter + split EAN / NON-EAN
   const filtered    = competitors.filter((c) =>
     c.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -239,8 +238,6 @@ const Competitors = () => {
 
   return (
     <Box sx={{ p: 3, bgcolor: '#ffffff', minHeight: '100vh' }}>
-
-      {/* Top bar */}
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
         <TextField
           placeholder="Search competitors..." size="small"
@@ -276,10 +273,22 @@ const Competitors = () => {
         </Stack>
       </Stack>
 
-      <CompetitorSection title="EAN Based Competitor Listings"     items={eanList}    onToggleSync={handleToggleSync} />
-      <CompetitorSection title="NON EAN Based Competitor Listings" items={nonEanList} onToggleSync={handleToggleSync} />
+      {/* CONDITIONAL RENDERING APPLIED HERE */}
+      {eanList.length > 0 && (
+        <CompetitorSection title="EAN Based Competitor Listings" items={eanList} onToggleSync={handleToggleSync} />
+      )}
+      
+      {nonEanList.length > 0 && (
+        <CompetitorSection title="NON EAN Based Competitor Listings" items={nonEanList} onToggleSync={handleToggleSync} />
+      )}
 
-      {/* Add Competitor Modal */}
+      {/* Fallback if both are empty (e.g., search returns no results) */}
+      {eanList.length === 0 && nonEanList.length === 0 && (
+        <Typography variant="body1" color="text.secondary" textAlign="center" sx={{ mt: 5 }}>
+          No competitors match your search.
+        </Typography>
+      )}
+
       <Dialog open={isModalOpen} onClose={() => setIsModalOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ borderBottom: '1px solid #eee' }}>
           <Typography fontWeight="bold">Add Competitor</Typography>

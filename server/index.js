@@ -5,6 +5,7 @@ const { connectDB } = require('./config/db');
 // const { initAllCrons } = require('./services/cronService');
 const cronRoutes       = require('./routes/cronRoutes');
 const auditRoutes = require('./routes/auditRoutes');
+const path = require('path');
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));

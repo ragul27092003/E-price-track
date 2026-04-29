@@ -5,12 +5,19 @@ import { fetchCompetitors } from '../services/competitorsService';
 
 const CompetitorRow = ({ data }) => {
   const isNegativeDelta = data.avgPriceDelta?.toString().includes('-');
+
+  const getLogoUrl = (logoPath) => {
+    if (!logoPath) return '';
+    if (logoPath.startsWith('http')) return logoPath;
+    return `http://localhost:5100${logoPath.startsWith('/') ? '' : '/'}${logoPath}`;
+  };
+
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', p: 1.5, border: '1px solid #90caf9', borderRadius: 2, mb: 1.5, bgcolor: '#ffffff', cursor: 'pointer', '&:hover': { boxShadow: 1 } }}>
       <Stack direction="row" alignItems="center" spacing={2} sx={{ width: '50%' }}>
         <Box sx={{ width: 40, height: 40, bgcolor: data.color || '#f5f5f5', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '1px solid #eee' }}>
           {data.logo
-            ? <img src={data.logo} alt={data.name} style={{ width: '100%', objectFit: 'contain' }} />
+            ? <img src={getLogoUrl(data.logo)} alt={data.name} style={{ width: '100%', objectFit: 'contain' }} />
             : <Typography variant="caption" fontWeight="bold" color={data.color ? '#fff' : 'text.secondary'}>{data.name.substring(0, 2).toUpperCase()}</Typography>
           }
         </Box>
@@ -34,25 +41,37 @@ const MarketCompetitor = () => {
   const competitorsLoading    = useStore((s) => s.competitorsLoading);
   const setCompetitorsLoading = useStore((s) => s.setCompetitorsLoading);
 
+  const loadCompetitors = async (forceRefresh = false) => {
+    if (!forceRefresh && competitors.length > 0) return; 
+    setCompetitorsLoading(true);
+    try {
+      const data = await fetchCompetitors();
+      setCompetitors(data);
+    } catch {
+      setCompetitors([
+        { id: 1, name: 'Amazon',       logo: 'https://logo.clearbit.com/amazon.com', color: '#f59e0b', avgPriceDelta: '+2.5%', productsTracked: 335 },
+        { id: 2, name: 'Croma',        logo: '',                                     color: '#0d9488', avgPriceDelta: '+2.5%', productsTracked: 335 },
+        { id: 3, name: 'Vasanth & Co', logo: '',                                     color: '#dc2626', avgPriceDelta: '-1.2%', productsTracked: 335 },
+      ]);
+    } finally {
+      setCompetitorsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (competitors.length > 0) return; // already loaded by Competitors page
-    const load = async () => {
-      setCompetitorsLoading(true);
-      try {
-        const data = await fetchCompetitors();
-        setCompetitors(data);
-      } catch {
-        setCompetitors([
-          { id: 1, name: 'Amazon',       logo: 'https://logo.clearbit.com/amazon.com', color: '#f59e0b', avgPriceDelta: '+2.5%', productsTracked: 335 },
-          { id: 2, name: 'Croma',        logo: '',                                      color: '#0d9488', avgPriceDelta: '+2.5%', productsTracked: 335 },
-          { id: 3, name: 'Vasanth & Co', logo: '',                                      color: '#dc2626', avgPriceDelta: '-1.2%', productsTracked: 335 },
-        ]);
-      } finally {
-        setCompetitorsLoading(false);
-      }
+    loadCompetitors();
+
+    // SAFE LISTENER: Only refreshes when explicitly told to by the Header
+    const handleForceRefresh = () => {
+      loadCompetitors(true);
     };
-    load();
-  }, []);
+
+    window.addEventListener('force-tenant-refresh', handleForceRefresh);
+
+    return () => {
+      window.removeEventListener('force-tenant-refresh', handleForceRefresh);
+    };
+  }, []); 
 
   if (competitorsLoading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}><CircularProgress /></Box>;
 
