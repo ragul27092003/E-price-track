@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useStore } from "../store";
 import { fetchProducts } from "../services/productsService";
 
@@ -13,7 +13,7 @@ function parsePrice(raw) {
 
 function marketStats(product) {
   const prices = (product.price_history_30days || [])
-    .map((h) => (typeof h.product_price === 'number' ? h.product_price : parseFloat(h.product_price)))
+    .map((h) => (typeof h.product_price === "number" ? h.product_price : parseFloat(h.product_price)))
     .filter((v) => !isNaN(v) && v !== null);
 
   if (!prices.length) return { low: null, avg: null, high: null };
@@ -65,6 +65,7 @@ function ProductImage({ src, alt }) {
   );
 }
 
+// Shows actual logo image if available, falls back to colored text badge
 function CompetitorLogo({ name = "", slug = "", logo = "" }) {
   const [imgErr, setImgErr] = useState(false);
   const bg    = slugColor(slug || name);
@@ -111,11 +112,11 @@ function Sparkline({ data, width = 50, height = 20, color = "#3b82f6" }) {
 function StockStatus({ stock }) {
   const qty = parseInt(stock, 10);
   const { label, dot } = isNaN(qty)
-    ? { label: "Unknown",      dot: "bg-slate-300"   }
+    ? { label: "Unknown",            dot: "bg-slate-300"    }
     : qty === 0
-    ? { label: "Out of Stock", dot: "bg-rose-500"    }
+    ? { label: "Out of Stock",       dot: "bg-rose-500"     }
     : qty < 10
-    ? { label: `Low Stock (${qty})`, dot: "bg-amber-400" }
+    ? { label: `Low Stock (${qty})`, dot: "bg-amber-400"   }
     : { label: `In Stock (${qty})`,  dot: "bg-emerald-500" };
   return (
     <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
@@ -151,7 +152,10 @@ function MarketCap({ low, avg, high }) {
   const fmt = (v) => (v !== null ? `₹${v.toLocaleString("en-IN")}` : "—");
   return (
     <div className="flex items-center gap-8">
-      <div><span className="text-[11px] text-slate-500">Low</span><br /><span className="font-bold text-slate-800">{fmt(low)}</span></div>
+      <div>
+        <span className="text-[11px] text-slate-500">Low</span><br />
+        <span className="font-bold text-slate-800">{fmt(low)}</span>
+      </div>
       <div className="relative">
         <span className="text-[11px] text-slate-500">Average</span><br />
         <span className="font-bold text-slate-800">{avg !== null ? `Avg: ₹${avg.toLocaleString("en-IN")}` : "—"}</span>
@@ -162,7 +166,10 @@ function MarketCap({ low, avg, high }) {
           </>
         )}
       </div>
-      <div><span className="text-[11px] text-slate-500">High</span><br /><span className="font-bold text-slate-800">{fmt(high)}</span></div>
+      <div>
+        <span className="text-[11px] text-slate-500">High</span><br />
+        <span className="font-bold text-slate-800">{fmt(high)}</span>
+      </div>
     </div>
   );
 }
@@ -177,7 +184,7 @@ function CompetitorPrices({ product, competitorMeta }) {
   return (
     <div className="flex items-center gap-6 flex-wrap">
       {active.map((c) => {
-        const meta = competitorMeta[c.slug] || {};
+        const meta = competitorMeta?.[c.slug] || {};
         return (
           <div key={c.slug} className="flex items-center gap-2">
             <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
@@ -186,7 +193,7 @@ function CompetitorPrices({ product, competitorMeta }) {
             </span>
             <Sparkline data={trendFor(product, c.slug)} color="#0ea5e9" />
           </div>
-        )
+        );
       })}
     </div>
   );
@@ -207,10 +214,10 @@ function FilterSelect({ label, options, value, onChange }) {
 
   const handleKey = (e) => {
     if (!open) { setOpen(true); return; }
-    if (e.key === "ArrowDown") { e.preventDefault(); setCursor((c) => Math.min(c + 1, matched.length - 1)); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); setCursor((c) => Math.max(c - 1, 0)); }
-    else if (e.key === "Enter") { e.preventDefault(); if (cursor >= 0) commit(matched[cursor]); }
-    else if (e.key === "Escape") { setOpen(false); setQuery(""); }
+    if (e.key === "ArrowDown")  { e.preventDefault(); setCursor((c) => Math.min(c + 1, matched.length - 1)); }
+    else if (e.key === "ArrowUp")   { e.preventDefault(); setCursor((c) => Math.max(c - 1, 0)); }
+    else if (e.key === "Enter")     { e.preventDefault(); if (cursor >= 0) commit(matched[cursor]); }
+    else if (e.key === "Escape")    { setOpen(false); setQuery(""); }
   };
 
   const displayValue = open ? query : (value || "");
@@ -223,23 +230,47 @@ function FilterSelect({ label, options, value, onChange }) {
         className={`flex items-center gap-2 rounded-lg border bg-white px-3 py-2.5 shadow-sm cursor-text ${open ? "border-blue-300 ring-2 ring-blue-100" : "border-slate-200"}`}
         onClick={() => { setOpen(true); inputRef.current?.focus(); }}
       >
-        <input ref={inputRef} value={displayValue} placeholder={placeholder} onChange={(e) => { setQuery(e.target.value); setCursor(-1); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={handleKey} className="w-full border-0 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 min-w-0" />
+        <input
+          ref={inputRef}
+          value={displayValue}
+          placeholder={placeholder}
+          onChange={(e) => { setQuery(e.target.value); setCursor(-1); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={handleKey}
+          className="w-full border-0 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 min-w-0"
+        />
         {value && (
           <button onMouseDown={(e) => { e.stopPropagation(); commit(""); }} className="shrink-0 text-slate-400 hover:text-slate-600">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
         )}
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}><path d="m6 9 6 6 6-6" /></svg>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"
+          className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
       </div>
+
       {open && (
         <>
           <div className="fixed inset-0 z-20" onMouseDown={() => { setOpen(false); setQuery(""); }} />
           <div className="absolute left-0 top-full z-30 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg py-1">
-            {matched.length === 0 ? <p className="px-3 py-2 text-sm text-slate-400">No matches</p> : matched.map((opt, i) => (
-              <button key={opt || "__all__"} onMouseDown={(e) => { e.preventDefault(); commit(opt); }} className={`w-full text-left px-3 py-2 text-sm transition-colors ${i === cursor ? "bg-blue-50 text-blue-700" : opt === value ? "bg-slate-50 font-medium text-slate-800" : "text-slate-700 hover:bg-slate-50"}`}>
-                {opt || ALL_LABEL}
-              </button>
-            ))}
+            {matched.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-slate-400">No matches</p>
+            ) : (
+              matched.map((opt, i) => (
+                <button
+                  key={opt || "__all__"}
+                  onMouseDown={(e) => { e.preventDefault(); commit(opt); }}
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                    i === cursor ? "bg-blue-50 text-blue-700"
+                    : opt === value ? "bg-slate-50 font-medium text-slate-800"
+                    : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {opt || ALL_LABEL}
+                </button>
+              ))
+            )}
           </div>
         </>
       )}
@@ -260,17 +291,39 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
     <div className="flex items-center justify-between border-t border-slate-100 bg-white px-5 py-3">
       <p className="text-xs text-slate-500">Page {currentPage} of {totalPages}</p>
       <div className="flex items-center gap-1">
-        <button onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1} className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" /></svg></button>
+        <button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" /></svg>
+        </button>
         {pages.map((p) => (
-          <button key={p} onClick={() => onPageChange(p)} className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-semibold transition-colors ${p === currentPage ? "bg-[#2B86C5] text-white border border-[#2B86C5]" : "border border-slate-200 text-slate-600 hover:bg-slate-50"}`}>{p}</button>
+          <button
+            key={p}
+            onClick={() => onPageChange(p)}
+            className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-semibold transition-colors ${
+              p === currentPage
+                ? "bg-[#2B86C5] text-white border border-[#2B86C5]"
+                : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {p}
+          </button>
         ))}
-        <button onClick={() => onPageChange(currentPage + 1)} disabled={currentPage === totalPages} className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m9 18 6-6-6-6" /></svg></button>
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m9 18 6-6-6-6" /></svg>
+        </button>
       </div>
     </div>
   );
 }
 
-// ── Shared UI & Exports ────────────────────────────────────────────────────────
+// ── Shared UI ──────────────────────────────────────────────────────────────────
 
 const TABS = [
   { key: "analysis", label: "Price Analysis" },
@@ -279,14 +332,20 @@ const TABS = [
 ];
 
 function LoadingState() {
-  return <div className="flex min-h-[400px] items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-500" /></div>;
+  return (
+    <div className="flex min-h-[400px] items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-500" />
+    </div>
+  );
 }
 
 function ErrorState({ message, onRetry }) {
   return (
     <div className="flex min-h-[400px] flex-col items-center justify-center gap-3 text-center">
       <p className="text-sm font-medium text-rose-600">{message || "Failed to load products"}</p>
-      <button onClick={onRetry} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">Retry</button>
+      <button onClick={onRetry} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">
+        Retry
+      </button>
     </div>
   );
 }
@@ -297,7 +356,10 @@ function ProductCell({ product }) {
       <ProductImage src={product.product_image} alt={product.product_name} />
       <div>
         <p className="font-bold text-slate-800 text-[13px]">{product.product_name || "Unnamed Product"}</p>
-        <p className="text-[11px] text-slate-500 mt-0.5">{product.product_brand && <span>{product.product_brand} · </span>}{product.product_ean_id || product.product_code || product._id}</p>
+        <p className="text-[11px] text-slate-500 mt-0.5">
+          {product.product_brand && <span>{product.product_brand} · </span>}
+          {product.product_ean_id || product.product_code || product._id}
+        </p>
       </div>
     </div>
   );
@@ -306,33 +368,42 @@ function ProductCell({ product }) {
 function PriceCell({ product }) {
   const price = parsePrice(product.product_price);
   return price !== null ? (
-    <span className="inline-block rounded-md bg-emerald-50 border border-emerald-100 px-3 py-1.5 text-[13px] font-bold text-emerald-600">₹{price.toLocaleString("en-IN")}</span>
-  ) : <span className="text-slate-400 text-sm">—</span>;
+    <span className="inline-block rounded-md bg-emerald-50 border border-emerald-100 px-3 py-1.5 text-[13px] font-bold text-emerald-600">
+      ₹{price.toLocaleString("en-IN")}
+    </span>
+  ) : (
+    <span className="text-slate-400 text-sm">—</span>
+  );
 }
 
 function exportToCSV(products) {
-  const headers = ["Product Name", "Item Code", "Ranking Position", "Competing With", "Price", "SAP Price", "Store Price", "Item Groups", "Competitor Detail"];
-  const escape = (val) => { const s = String(val ?? ""); return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s; };
+  const headers = ["Product Name","Item Code","Ranking Position","Competing With","Price","SAP Price","Store Price","Item Groups","Competitor Detail"];
+  const escape  = (val) => { const s = String(val ?? ""); return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s; };
   const rows = products.map((p) => {
     const compDetail = (p.competitor_prices || []).map((c) => {
       const outOfStock = c.price === null || c.price === undefined || c.stock === 0;
       return outOfStock ? `${c.name} : Out Of Stock` : `${c.name} : ${c.price}`;
     }).join(" | ");
     return [
-      p.product_name || "", p.product_code || p.product_ean_id || "", p.user_notification_data?.rank_pos || p.rank_by || "", p.user_notification_data?.Competing_with ?? "", p.product_price ?? "", p.product_sap_price ?? "", p.product_store_price ?? "", p.product_item_group || p.product_category || "", compDetail,
+      p.product_name || "", p.product_code || p.product_ean_id || "",
+      p.user_notification_data?.rank_pos || p.rank_by || "",
+      p.user_notification_data?.Competing_with ?? "",
+      p.product_price ?? "", p.product_sap_price ?? "", p.product_store_price ?? "",
+      p.product_item_group || p.product_category || "", compDetail,
     ].map(escape).join(",");
   });
-  const csv = "﻿" + [headers.map(escape).join(","), ...rows].join("\n");
+  const csv  = "﻿" + [headers.map(escape).join(","), ...rows].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
-  a.href     = url; a.download = `products_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.href = url; a.download = `products_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click(); URL.revokeObjectURL(url);
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function Products() {
+  const navigate       = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const competitorSlug = searchParams.get("competitor") || "";
   const competitorName = searchParams.get("name")       || "";
@@ -346,19 +417,19 @@ export default function Products() {
   const competitors        = useStore((s) => s.competitors);
   const activeStoreId      = useStore((s) => s.activeStoreId);
 
-  // Build meta map for logos and online status
+  // Build meta map for logos
   const competitorMeta = {};
   competitors.forEach((c) => {
     competitorMeta[c.slug] = { isActive: c.isActive, logo: c.logo || "", name: c.name };
   });
   const onlineSlugs = new Set(competitors.filter((c) => c.isActive).map((c) => c.slug));
 
-  const [activeTab,     setActiveTab]     = useState("analysis");
-  const [search,        setSearch]        = useState("");
-  const [brandFilter,   setBrandFilter]   = useState("");
-  const [catFilter,     setCatFilter]     = useState("");
-  const [rankFilter,    setRankFilter]    = useState("");
-  const [currentPage,   setCurrentPage]   = useState(1);
+  const [activeTab,   setActiveTab]   = useState("analysis");
+  const [search,      setSearch]      = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
+  const [catFilter,   setCatFilter]   = useState("");
+  const [rankFilter,  setRankFilter]  = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const load = async () => {
     setProductsLoading(true);
@@ -383,10 +454,13 @@ export default function Products() {
     .filter((p) => {
       const q = search.toLowerCase();
       const matchSearch = !q || (
-        p.product_name?.toLowerCase().includes(q) || p.product_brand?.toLowerCase().includes(q) || String(p.product_ean_id  || "").includes(q) || String(p.product_code    || "").includes(q)
+        p.product_name?.toLowerCase().includes(q)  ||
+        p.product_brand?.toLowerCase().includes(q) ||
+        String(p.product_ean_id || "").includes(q) ||
+        String(p.product_code   || "").includes(q)
       );
-      const matchBrand = !brandFilter || p.product_brand === brandFilter;
-      const matchCat   = !catFilter   || p.product_category === catFilter;
+      const matchBrand = !brandFilter || p.product_brand      === brandFilter;
+      const matchCat   = !catFilter   || p.product_category   === catFilter;
       const matchRank  = !rankFilter  || String(p.rank_by ?? "") === rankFilter;
       return matchSearch && matchBrand && matchCat && matchRank;
     })
@@ -397,6 +471,7 @@ export default function Products() {
       ),
     }));
 
+  // Reset to page 1 whenever filters/tab/competitor changes
   useEffect(() => { setCurrentPage(1); }, [search, brandFilter, catFilter, rankFilter, activeTab, competitorSlug]);
 
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
@@ -417,7 +492,7 @@ export default function Products() {
                   src={`http://localhost:5100${competitorMeta[competitorSlug].logo}`}
                   alt={competitorName}
                   className="w-full h-full object-contain"
-                  onError={(e) => { e.target.style.display = 'none'; }}
+                  onError={(e) => { e.target.style.display = "none"; }}
                 />
               </div>
             ) : (
@@ -428,7 +503,10 @@ export default function Products() {
             <p className="text-sm font-medium text-blue-800 flex-1">
               Showing products sold by <strong>{competitorName || competitorSlug}</strong>
             </p>
-            <button onClick={clearCompetitorFilter} className="text-xs font-semibold text-blue-600 hover:text-blue-800 border border-blue-300 rounded-lg px-3 py-1.5 hover:bg-blue-100 transition-colors">
+            <button
+              onClick={clearCompetitorFilter}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-800 border border-blue-300 rounded-lg px-3 py-1.5 hover:bg-blue-100 transition-colors"
+            >
               ✕ Clear filter
             </button>
           </div>
@@ -440,14 +518,31 @@ export default function Products() {
             <svg className="text-slate-400" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
             </svg>
-            <input type="text" placeholder="Search by name, brand or EAN…" value={search} onChange={(e) => setSearch(e.target.value)} className="w-full border-0 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by name, brand or EAN…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full border-0 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
+            />
           </div>
           <div className="flex items-center gap-3">
             <button className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" /></svg> Filter
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
+              </svg>
+              Filter
             </button>
-            <button onClick={() => exportToCSV(filtered)} className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg> Export
+            <button
+              onClick={() => exportToCSV(filtered)}
+              className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Export
             </button>
           </div>
         </div>
@@ -462,15 +557,28 @@ export default function Products() {
         {/* Tabs */}
         <div className="flex gap-6 border-b border-slate-200 mt-2">
           {TABS.map((tab) => (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`pb-3 text-sm font-semibold transition-all relative ${activeTab === tab.key ? "text-slate-800" : "text-slate-400 hover:text-slate-600"}`}>
-              {tab.label} {activeTab === tab.key && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-[#2B86C5] rounded-t-full" />}
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`pb-3 text-sm font-semibold transition-all relative ${
+                activeTab === tab.key ? "text-slate-800" : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              {tab.label}
+              {activeTab === tab.key && (
+                <span className="absolute bottom-0 left-0 w-full h-0.5 bg-[#2B86C5] rounded-t-full" />
+              )}
             </button>
           ))}
         </div>
 
         {/* Content */}
         <div className="mt-2">
-          {productsLoading ? <LoadingState /> : productsError ? <ErrorState message={productsError} onRetry={load} /> : (
+          {productsLoading ? (
+            <LoadingState />
+          ) : productsError ? (
+            <ErrorState message={productsError} onRetry={load} />
+          ) : (
             <>
               {/* ── BRAND PRODUCTS ── */}
               {activeTab === "brand" && (
@@ -487,23 +595,34 @@ export default function Products() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filtered.length === 0 ? <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr> : paginated.map((p) => (
-                        <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="px-5 py-4"><ProductCell product={p} /></td>
-                          <td className="px-5 py-4"><PriceCell product={p} /></td>
-                          <td className="px-5 py-4"><StockStatus stock={p.product_stock} /></td>
-                          <td className="px-5 py-4"><PriceGapBadge value={priceGap(p)} /></td>
-                          <td className="px-5 py-4"><CompetitorPrices product={p} competitorMeta={competitorMeta} /></td>
-                          <td className="px-5 py-4 text-right align-middle">
-                            <div className="flex flex-col items-end gap-1.5">
-                              <div className="flex items-center gap-2">
-                                <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">View Details</button>
-                                <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">Quick Sync</button>
+                      {filtered.length === 0 ? (
+                        <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr>
+                      ) : (
+                        paginated.map((p) => (
+                          <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="px-5 py-4"><ProductCell product={p} /></td>
+                            <td className="px-5 py-4"><PriceCell product={p} /></td>
+                            <td className="px-5 py-4"><StockStatus stock={p.product_stock} /></td>
+                            <td className="px-5 py-4"><PriceGapBadge value={priceGap(p)} /></td>
+                            <td className="px-5 py-4"><CompetitorPrices product={p} competitorMeta={competitorMeta} /></td>
+                            <td className="px-5 py-4 text-right align-middle">
+                              <div className="flex flex-col items-end gap-1.5">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => navigate(`/product-history?ean=${p.product_ean_id}`)}
+                                    className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm"
+                                  >
+                                    View Details
+                                  </button>
+                                  <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">
+                                    Quick Sync
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                   <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
@@ -524,39 +643,54 @@ export default function Products() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filtered.length === 0 ? <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr> : paginated.map((p) => {
-                        const { low, avg, high } = marketStats(p);
-                        const active = (p.competitor_prices || []).filter((c) => c.price !== null);
-                        return (
-                          <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="px-5 py-4"><ProductCell product={p} /></td>
-                            <td className="px-5 py-4"><PriceCell product={p} /></td>
-                            <td className="px-5 py-4">
-                              {active.length === 0 ? <span className="text-sm text-slate-400">No competitor data</span> : (
-                                <div className="flex items-center gap-6 flex-wrap">
-                                  {active.map((c) => {
-                                    const meta = competitorMeta[c.slug] || {};
-                                    return (
-                                      <div key={c.slug} className="flex items-center gap-2">
-                                        <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
-                                        <span className="font-bold text-slate-800 text-[13px]">₹{c.price.toLocaleString("en-IN")}</span>
-                                        <Sparkline data={trendFor(p, c.slug)} color="#0ea5e9" />
-                                      </div>
-                                    )
-                                  })}
+                      {filtered.length === 0 ? (
+                        <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr>
+                      ) : (
+                        paginated.map((p) => {
+                          const { low, avg, high } = marketStats(p);
+                          const active = (p.competitor_prices || []).filter((c) => c.price !== null);
+                          return (
+                            <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="px-5 py-4"><ProductCell product={p} /></td>
+                              <td className="px-5 py-4"><PriceCell product={p} /></td>
+                              <td className="px-5 py-4">
+                                {active.length === 0 ? (
+                                  <span className="text-sm text-slate-400">No competitor data</span>
+                                ) : (
+                                  <div className="flex items-center gap-6 flex-wrap">
+                                    {active.map((c) => {
+                                      const meta = competitorMeta?.[c.slug] || {};
+                                      return (
+                                        <div key={c.slug} className="flex items-center gap-2">
+                                          <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
+                                          <span className="font-bold text-slate-800 text-[13px]">
+                                            ₹{c.price.toLocaleString("en-IN")}
+                                          </span>
+                                          <Sparkline data={trendFor(p, c.slug)} color="#0ea5e9" />
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-5 py-4"><MarketCap low={low} avg={avg} high={high} /></td>
+                              <td className="px-5 py-4 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    onClick={() => navigate(`/product-history?ean=${p.product_ean_id}`)}
+                                    className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm"
+                                  >
+                                    View Details
+                                  </button>
+                                  <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">
+                                    Quick Sync
+                                  </button>
                                 </div>
-                              )}
-                            </td>
-                            <td className="px-5 py-4"><MarketCap low={low} avg={avg} high={high} /></td>
-                            <td className="px-5 py-4 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">View Details</button>
-                                <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">Quick Sync</button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                   <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
@@ -569,7 +703,9 @@ export default function Products() {
                   <table className="w-full min-w-[1000px] border-collapse text-sm">
                     <thead>
                       <tr className="border-b border-slate-100 bg-slate-50/50">
-                        <th className="w-12 px-5 py-4"><input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" /></th>
+                        <th className="w-12 px-5 py-4">
+                          <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                        </th>
                         <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Product</th>
                         <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price</th>
                         <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Stock Status</th>
@@ -579,10 +715,14 @@ export default function Products() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {filtered.length === 0 ? <tr><td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr> : paginated.map((p) => {
-                        return (
+                      {filtered.length === 0 ? (
+                        <tr><td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr>
+                      ) : (
+                        paginated.map((p) => (
                           <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="px-5 py-4"><input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" /></td>
+                            <td className="px-5 py-4">
+                              <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                            </td>
                             <td className="px-5 py-4"><ProductCell product={p} /></td>
                             <td className="px-5 py-4"><PriceCell product={p} /></td>
                             <td className="px-5 py-4"><StockStatus stock={p.product_stock} /></td>
@@ -590,13 +730,20 @@ export default function Products() {
                             <td className="px-5 py-4"><CompetitorPrices product={p} competitorMeta={competitorMeta} /></td>
                             <td className="px-5 py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
-                                <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">View Details</button>
-                                <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">Quick Sync</button>
+                                <button
+                                  onClick={() => navigate(`/product-history?ean=${p.product_ean_id}`)}
+                                  className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm"
+                                >
+                                  View Details
+                                </button>
+                                <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">
+                                  Quick Sync
+                                </button>
                               </div>
                             </td>
                           </tr>
-                        );
-                      })}
+                        ))
+                      )}
                     </tbody>
                   </table>
                   <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />

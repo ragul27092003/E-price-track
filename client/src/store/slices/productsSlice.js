@@ -5,6 +5,7 @@ export const createProductsSlice = (set) => ({
   productsError:   null,
   productsSearch:  '',
   productsPage:    1,
+  lastViewedEan:   null,   // tracks last product viewed in ProductHistory
 
   // ── Actions ────────────────────────────────────────────────────────
   setProducts:        (products) => set({ products }),
@@ -13,4 +14,5 @@ export const createProductsSlice = (set) => ({
   setProductsSearch:  (productsSearch)  => set({ productsSearch, productsPage: 1 }),
   setProductsPage:    (productsPage)    => set({ productsPage }),
   clearProducts:      () => set({ products: [], productsError: null }),
+  setLastViewedEan:   (ean) => set({ lastViewedEan: ean }),
 });
