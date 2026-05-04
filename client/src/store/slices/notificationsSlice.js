@@ -1,9 +1,8 @@
 export const createNotificationsSlice = (set) => ({
-  // ── State ──────────────────────────────────────────────────────────
+  // ── Toast / badge notifications ────────────────────────────────────
   notifications: [],
   unreadCount:   0,
 
-  // ── Actions ────────────────────────────────────────────────────────
   addNotification: (notification) =>
     set((state) => ({
       notifications: [{ ...notification, id: Date.now(), createdAt: new Date() }, ...state.notifications],
@@ -16,4 +15,13 @@ export const createNotificationsSlice = (set) => ({
     set((state) => ({ notifications: state.notifications.filter((n) => n.id !== id) })),
 
   clearNotifications: () => set({ notifications: [], unreadCount: 0 }),
+
+  // ── Alert products (Notifications page) ───────────────────────────
+  alertProducts:        [],
+  alertProductsLoading: false,
+  alertProductsError:   null,
+
+  setAlertProducts:        (alertProducts)        => set({ alertProducts }),
+  setAlertProductsLoading: (alertProductsLoading) => set({ alertProductsLoading }),
+  setAlertProductsError:   (alertProductsError)   => set({ alertProductsError }),
 });

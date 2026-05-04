@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useStore } from "../store";
-import { fetchProducts } from "../services/productsService";
+import { fetchProducts, configureProduct } from "../services/productsService";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -400,6 +400,103 @@ function exportToCSV(products) {
   a.click(); URL.revokeObjectURL(url);
 }
 
+// ── Configure Modal ────────────────────────────────────────────────────────────
+
+function ConfigureModal({ product, currentUserId, onClose, onSaved }) {
+  const groupNameDefault = product?.product_category
+    ? product.product_category.split(">")[0].trim()
+    : "";
+
+  const [groupName, setGroupName] = useState(product?.group_name || groupNameDefault);
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState("");
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const existingIds = Array.isArray(product?.user_alert_id) ? product.user_alert_id : [];
+      const userAlertId = currentUserId && !existingIds.includes(currentUserId)
+        ? [...existingIds, currentUserId]
+        : existingIds.length > 0 ? existingIds : (currentUserId ? [currentUserId] : []);
+      await configureProduct(product._id, { group_name: groupName, user_alert_id: userAlertId });
+      onSaved(product._id, groupName, userAlertId);
+      onClose();
+    } catch {
+      setError("Failed to save. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Configure Product</p>
+            <h2 className="font-bold text-slate-800 text-sm mt-0.5 line-clamp-1">
+              {product?.product_name || "Product"}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-6 py-5 flex flex-col gap-4">
+          {/* Group Name */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">
+              Group Name
+            </label>
+            <input
+              type="text"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+              placeholder="e.g. Air Conditioner"
+            />
+            {product?.product_category && (
+              <p className="mt-1 text-[11px] text-slate-400">
+                From category: <span className="font-medium">{product.product_category}</span>
+              </p>
+            )}
+          </div>
+
+          {error && <p className="text-sm text-rose-600">{error}</p>}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2 text-sm font-medium text-white hover:bg-[#226fa3] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+          >
+            {saving && (
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white inline-block" />
+            )}
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function Products() {
@@ -416,6 +513,7 @@ export default function Products() {
   const setProductsError   = useStore((s) => s.setProductsError);
   const competitors        = useStore((s) => s.competitors);
   const activeStoreId      = useStore((s) => s.activeStoreId);
+  const currentUserId      = useStore((s) => s.user?.userId);
 
   // Build meta map for logos
   const competitorMeta = {};
@@ -424,12 +522,13 @@ export default function Products() {
   });
   const onlineSlugs = new Set(competitors.filter((c) => c.isActive).map((c) => c.slug));
 
-  const [activeTab,   setActiveTab]   = useState("analysis");
-  const [search,      setSearch]      = useState("");
-  const [brandFilter, setBrandFilter] = useState("");
-  const [catFilter,   setCatFilter]   = useState("");
-  const [rankFilter,  setRankFilter]  = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [activeTab,      setActiveTab]      = useState("analysis");
+  const [search,         setSearch]         = useState("");
+  const [brandFilter,    setBrandFilter]    = useState("");
+  const [catFilter,      setCatFilter]      = useState("");
+  const [rankFilter,     setRankFilter]     = useState("");
+  const [currentPage,    setCurrentPage]    = useState(1);
+  const [configProduct,  setConfigProduct]  = useState(null); // product being configured
 
   const load = async () => {
     setProductsLoading(true);
@@ -479,7 +578,16 @@ export default function Products() {
 
   const clearCompetitorFilter = () => setSearchParams({});
 
+  const handleConfigSaved = (productId, groupName, userAlertId) => {
+    setProducts(
+      products.map((p) =>
+        p._id === productId ? { ...p, group_name: groupName, user_alert_id: userAlertId } : p
+      )
+    );
+  };
+
   return (
+    <>
     <div className="min-h-screen bg-white text-slate-800 font-sans">
       <div className="mx-auto flex max-w-[1400px] flex-col gap-5 px-6 py-6">
 
@@ -721,7 +829,13 @@ export default function Products() {
                         paginated.map((p) => (
                           <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
                             <td className="px-5 py-4">
-                              <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                              <input
+                                type="checkbox"
+                                checked={!!(p.group_name || (p.user_alert_id && p.user_alert_id.length > 0))}
+                                onChange={() => setConfigProduct(p)}
+                                className="h-4 w-4 cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                title="Configure group & user alerts"
+                              />
                             </td>
                             <td className="px-5 py-4"><ProductCell product={p} /></td>
                             <td className="px-5 py-4"><PriceCell product={p} /></td>
@@ -754,5 +868,15 @@ export default function Products() {
         </div>
       </div>
     </div>
+
+    {configProduct && (
+      <ConfigureModal
+        product={configProduct}
+        currentUserId={currentUserId}
+        onClose={() => setConfigProduct(null)}
+        onSaved={handleConfigSaved}
+      />
+    )}
+    </>
   );
 }

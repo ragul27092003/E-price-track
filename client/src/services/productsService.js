@@ -17,3 +17,9 @@ export const updateProduct = (id, data) =>
 
 export const deleteProduct = (id) =>
   API.delete(`/products/${id}`).then((r) => r.data);
+
+export const fetchAdminUsers = () =>
+  API.get('/products/admin-users').then((r) => r.data);
+
+export const configureProduct = (id, data) =>
+  API.patch(`/products/${id}/configure`, data).then((r) => r.data);
