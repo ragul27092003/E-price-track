@@ -1,11 +1,12 @@
 const mongoose = require('mongoose');
 
 const feedInfoSchema = new mongoose.Schema({
+  store_name:          { type: String, default: '' },
   feed_name:           { type: String, default: '' },
   feed_url:            { type: String, default: '' },
-  feed_type:           { type: String, enum: ['json', 'Json', 'shopify', 'wordpress'], default: 'json' },
-  schedule_info:       { type: String, enum: ['Daily', 'Hourly', 'Weekly', 'Monthly'], default: 'Daily' },
-  import_time:         { type: String, default: '06:00' },
+  feed_type:           { type: String, default: 'json' },
+  schedule_info:       { type: String, enum: ['daily', 'Daily', 'Hourly', 'Weekly', 'Monthly'], default: 'daily' },
+  import_time:         { type: String, default: '06:00 AM' },
   cms_upload_type:     { type: String, enum: ['none', 'shopify', 'wordpress'], default: 'none' },
   shopify_name:        { type: String, default: '' },
   shopify_accesstoken: { type: String, default: '' },
