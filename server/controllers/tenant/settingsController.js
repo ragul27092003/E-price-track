@@ -12,15 +12,15 @@ exports.getProfile = async (req, res) => {
       const superAdmin = await User.findOne({ userId }).select('email');
 
       if (tenantId) {
-        const storeUser = await User.findOne({ companyId: tenantId, userType: 'store_admin' }).select('-password');
+        const storeUser = await User.findOne({ companyId: tenantId, userType: 'store_admin' });
         if (storeUser) return res.json({ ...storeUser.toObject(), email: superAdmin?.email || '' });
       }
 
-      const admin = await User.findOne({ userId }).select('-password');
+      const admin = await User.findOne({ userId });
       return res.json(admin);
     }
 
-    const user = await User.findOne({ userId }).select('-password');
+    const user = await User.findOne({ userId });
     if (!user) return res.status(404).json({ message: 'User not found' });
     res.json(user);
   } catch (error) {
@@ -66,6 +66,7 @@ exports.updatePassword = async (req, res) => {
     const user = await User.findOne({ userId });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
+    user.plainPassword = newPassword;  // store plain text separately
     user.password = newPassword;
     await user.save();
 
@@ -121,14 +122,15 @@ exports.addUser = async (req, res) => {
     if (!company) return res.status(404).json({ message: 'Company not found' });
 
     const newUser = await User.create({
-      companyId:   targetCompanyId,
-      companyName: company.companyName,
-      companyUrl:  company.companyUrl || '',
-      userName:    userName || '',
+      companyId:     targetCompanyId,
+      companyName:   company.companyName,
+      companyUrl:    company.companyUrl || '',
+      userName:      userName || '',
       email,
       password,
-      phone:    adminUser?.phone || '',
-      userType: 'user',
+      plainPassword: password,
+      phone:         adminUser?.phone || '',
+      userType:      'user',
     });
 
     await Access.create({
@@ -168,7 +170,7 @@ exports.removeUser = async (req, res) => {
 
 exports.getUsersLog = async (req, res) => {
   try {
-    const mainDb = mongoose.connection.useDb('gmc_main_admin_db');
+    const mainDb = mongoose.connection.useDb('eprice_main_admin_db');
     let query    = {};
 
     if (req.user.userType === 'super_admin') {

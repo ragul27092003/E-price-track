@@ -20,9 +20,13 @@ export const createAuthSlice = (set) => ({
     set({
       token: data.token,
       user: {
-        userId:    decoded?.userId,
-        userType:  decoded?.userType,
-        companyId: decoded?.companyId,
+        userId:      decoded?.userId,
+        userType:    decoded?.userType,
+        companyId:   decoded?.companyId,
+        // Store these from the API response — JWT does NOT encode them
+        companyName: data.companyName || '',
+        companyUrl:  data.companyUrl  || '',
+        email:       data.email       || '',
       },
     });
   },
