@@ -12,10 +12,10 @@ export const createCompetitorsSlice = (set, get) => ({
   addCompetitor: (competitor) =>
     set((state) => ({ competitors: [...state.competitors, competitor] })),
 
-  toggleCompetitor: (id, isActive) =>
+  toggleCompetitor: (id, isActive, lastSync) =>
     set((state) => ({
       competitors: state.competitors.map((c) =>
-        c.id === id ? { ...c, isActive, lastSync: new Date().toLocaleString() } : c
+        String(c.id) === String(id) ? { ...c, isActive, lastSync: lastSync ?? c.lastSync } : c
       ),
     })),
 });

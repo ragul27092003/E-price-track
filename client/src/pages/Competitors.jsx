@@ -64,7 +64,12 @@ const CompetitorRow = ({ data, onToggleSync }) => {
     setIsSyncing(false);
   };
 
-  if (!data) return null;
+  const formatSync = (raw) => {
+    if (!raw || raw === 'Never') return 'Never';
+    const date = new Date(raw.replace(' ', 'T') + 'Z'); // treat as UTC
+    if (isNaN(date)) return raw;
+    return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
+  };
   const isNegDelta = String(data.avgPriceDelta || '').includes('-');
   const safeName = data.name || 'Unknown';
 
@@ -92,7 +97,7 @@ const CompetitorRow = ({ data, onToggleSync }) => {
           ) : (
             <span className="text-gray-400 font-bold text-sm">○ Offline</span>
           )}
-          <p className="text-[11px] text-gray-500 mt-0.5">{data.lastSync || 'Never'}</p>
+          <p className="text-[11px] text-gray-500 mt-0.5">{formatSync(data.lastSync)}</p>
         </div>
       </div>
 
@@ -183,8 +188,8 @@ const Competitors = () => {
 
   const handleToggleSync = async (id, isActive) => {
     try {
-      await toggleCompetitorSync(id, isActive);
-      toggleCompetitor(id, isActive);
+      const result = await toggleCompetitorSync(id, isActive);
+      toggleCompetitor(id, isActive, result.lastSync);
     } catch (err) { console.error(err); }
   };
 
