@@ -17,9 +17,9 @@ function marketStats(product) {
     .filter((v) => !isNaN(v) && v !== null);
 
   if (!prices.length) return { low: null, avg: null, high: null };
-  const low  = Math.min(...prices);
+  const low = Math.min(...prices);
   const high = Math.max(...prices);
-  const avg  = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
+  const avg = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
   return { low, avg, high };
 }
 
@@ -32,12 +32,12 @@ function trendFor(product, slug) {
 
 function priceGap(product) {
   const ourPrice = parsePrice(product.product_price);
-  const { avg }  = marketStats(product);
+  const { avg } = marketStats(product);
   if (avg === null || ourPrice === null) return null;
   return parseFloat(((ourPrice - avg) / avg * 100).toFixed(1));
 }
 
-const BRAND_COLORS = ["#1e40af","#065f46","#7c2d12","#4c1d95","#064e3b","#1c1917"];
+const BRAND_COLORS = ["#1e40af", "#065f46", "#7c2d12", "#4c1d95", "#064e3b", "#1c1917"];
 function slugColor(slug = "") {
   let h = 0;
   for (let i = 0; i < slug.length; i++) h = (h * 31 + slug.charCodeAt(i)) & 0xffff;
@@ -68,7 +68,7 @@ function ProductImage({ src, alt }) {
 // Shows actual logo image if available, falls back to colored text badge
 function CompetitorLogo({ name = "", slug = "", logo = "" }) {
   const [imgErr, setImgErr] = useState(false);
-  const bg    = slugColor(slug || name);
+  const bg = slugColor(slug || name);
   const label = (name || slug).slice(0, 8).toLowerCase();
 
   if (logo && !imgErr) {
@@ -96,9 +96,9 @@ function CompetitorLogo({ name = "", slug = "", logo = "" }) {
 
 function Sparkline({ data, width = 50, height = 20, color = "#3b82f6" }) {
   if (!data || data.length < 2) return null;
-  const min    = Math.min(...data);
-  const max    = Math.max(...data);
-  const range  = max - min || 1;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
   const points = data
     .map((v, i) => `${(i / (data.length - 1)) * width},${height - ((v - min) / range) * height}`)
     .join(" ");
@@ -109,19 +109,25 @@ function Sparkline({ data, width = 50, height = 20, color = "#3b82f6" }) {
   );
 }
 
-function StockStatus({ stock }) {
-  const qty = parseInt(stock, 10);
-  const { label, dot } = isNaN(qty)
-    ? { label: "Unknown",            dot: "bg-slate-300"    }
-    : qty === 0
-    ? { label: "Out of Stock",       dot: "bg-rose-500"     }
-    : qty < 10
-    ? { label: `Low Stock (${qty})`, dot: "bg-amber-400"   }
-    : { label: `In Stock (${qty})`,  dot: "bg-emerald-500" };
+function RankBadge({ product }) {
+  const rank = product.user_notification_data?.rank_pos || product.rank_by;
+  if (!rank) return <span className="text-slate-400 text-sm">—</span>;
+
+  let displayRank = rank;
+  if (!String(rank).includes('/')) {
+    const active = (product.competitor_prices || []).filter((c) => c.price !== null).length;
+    displayRank = `${rank}/${active + 1}`;
+  }
+
+  const numRank = parseInt(rank, 10);
+  let colorClass = "bg-slate-100 text-slate-700";
+  if (numRank === 1) colorClass = "bg-emerald-100 text-emerald-700";
+  else if (numRank === 2) colorClass = "bg-blue-100 text-blue-700";
+  else if (numRank > 2) colorClass = "bg-rose-100 text-rose-700";
+
   return (
-    <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-      <span className={`inline-block h-2 w-2 rounded-full ${dot}`} />
-      {label}
+    <span className={`inline-flex items-center justify-center rounded-md px-2 py-1 text-xs font-bold ${colorClass}`}>
+      {displayRank}
     </span>
   );
 }
@@ -130,9 +136,9 @@ function PriceGapBadge({ value }) {
   if (value === null || value === undefined) {
     return <span className="text-xs text-slate-400">No data</span>;
   }
-  const isNeg      = value < 0;
+  const isNeg = value < 0;
   const baseColors = isNeg ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700";
-  const barColor   = isNeg ? "bg-emerald-500" : "bg-amber-500";
+  const barColor = isNeg ? "bg-emerald-500" : "bg-amber-500";
   return (
     <div className={`relative inline-flex items-center gap-1 rounded-full pr-3 pl-2 py-1 text-[11px] font-bold ${baseColors}`}>
       <svg
@@ -174,6 +180,66 @@ function MarketCap({ low, avg, high }) {
   );
 }
 
+function MarketGapCell({ product, competitorMeta }) {
+  const ourPrice = parsePrice(product.product_price);
+  if (ourPrice === null) return <span className="text-slate-300 text-xs">—</span>;
+
+  const active = (product.competitor_prices || [])
+    .map((c) => ({ ...c, price: parsePrice(c.price) }))
+    .filter((c) => c.price !== null);
+
+  if (!active.length) return <span className="text-slate-300 text-xs">—</span>;
+
+  const lowest = active.reduce((min, c) => (c.price < min.price ? c : min));
+  const meta = competitorMeta?.[lowest.slug] || {};
+  const compName = meta.name || lowest.name || lowest.slug;
+  const gap = ourPrice - lowest.price;
+  const fmtAmt = (v) => `₹${Math.abs(v).toLocaleString("en-IN")}`;
+
+  if (gap === 0) {
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="inline-flex items-center text-[11px] font-bold text-slate-500 bg-slate-100 rounded-full px-2.5 py-1 w-fit">
+          Same price
+        </span>
+        <span className="text-[10px] text-slate-400 mt-0.5">
+          {fmtAmt(lowest.price)} ({compName}) = {fmtAmt(ourPrice)} mine
+        </span>
+      </div>
+    );
+  }
+
+  if (gap > 0) {
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-rose-600 bg-rose-50 rounded-full px-2.5 py-1 w-fit">
+          <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 19V5M5 12l7-7 7 7" />
+          </svg>
+          {fmtAmt(gap)} higher
+        </span>
+        <span className="text-[10px] text-slate-400 mt-0.5">
+          {fmtAmt(lowest.price)} ({compName}) vs {fmtAmt(ourPrice)} mine
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 bg-emerald-50 rounded-full px-2.5 py-1 w-fit">
+        <svg className="w-3 h-3 rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 19V5M5 12l7-7 7 7" />
+        </svg>
+        {fmtAmt(-gap)} cheaper
+      </span>
+      <span className="text-[10px] text-slate-400 mt-0.5">
+        {fmtAmt(lowest.price)} ({compName}) vs {fmtAmt(ourPrice)} mine
+      </span>
+    </div>
+  );
+}
+
 function CompetitorPrices({ product, competitorMeta }) {
   const active = (product.competitor_prices || []).filter((c) => c.price !== null);
   const { low, avg, high } = marketStats(product);
@@ -202,8 +268,8 @@ function CompetitorPrices({ product, competitorMeta }) {
 // ── Searchable filter dropdown ─────────────────────────────────────────────────
 
 function FilterSelect({ label, options, value, onChange }) {
-  const [open,   setOpen]   = useState(false);
-  const [query,  setQuery]  = useState("");
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(-1);
   const inputRef = useRef(null);
 
@@ -214,17 +280,17 @@ function FilterSelect({ label, options, value, onChange }) {
 
   const handleKey = (e) => {
     if (!open) { setOpen(true); return; }
-    if (e.key === "ArrowDown")  { e.preventDefault(); setCursor((c) => Math.min(c + 1, matched.length - 1)); }
-    else if (e.key === "ArrowUp")   { e.preventDefault(); setCursor((c) => Math.max(c - 1, 0)); }
-    else if (e.key === "Enter")     { e.preventDefault(); if (cursor >= 0) commit(matched[cursor]); }
-    else if (e.key === "Escape")    { setOpen(false); setQuery(""); }
+    if (e.key === "ArrowDown") { e.preventDefault(); setCursor((c) => Math.min(c + 1, matched.length - 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setCursor((c) => Math.max(c - 1, 0)); }
+    else if (e.key === "Enter") { e.preventDefault(); if (cursor >= 0) commit(matched[cursor]); }
+    else if (e.key === "Escape") { setOpen(false); setQuery(""); }
   };
 
   const displayValue = open ? query : (value || "");
-  const placeholder  = value ? value : ALL_LABEL;
+  const placeholder = value ? value : ALL_LABEL;
 
   return (
-    <div className="relative flex-1 min-w-[160px] max-w-[220px]">
+    <div className="relative flex-1 min-w-[140px] sm:min-w-[160px] max-w-full sm:max-w-[220px]">
       <p className="mb-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide">{label}</p>
       <div
         className={`flex items-center gap-2 rounded-lg border bg-white px-3 py-2.5 shadow-sm cursor-text ${open ? "border-blue-300 ring-2 ring-blue-100" : "border-slate-200"}`}
@@ -261,11 +327,10 @@ function FilterSelect({ label, options, value, onChange }) {
                 <button
                   key={opt || "__all__"}
                   onMouseDown={(e) => { e.preventDefault(); commit(opt); }}
-                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                    i === cursor ? "bg-blue-50 text-blue-700"
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${i === cursor ? "bg-blue-50 text-blue-700"
                     : opt === value ? "bg-slate-50 font-medium text-slate-800"
-                    : "text-slate-700 hover:bg-slate-50"
-                  }`}
+                      : "text-slate-700 hover:bg-slate-50"
+                    }`}
                 >
                   {opt || ALL_LABEL}
                 </button>
@@ -302,11 +367,10 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
           <button
             key={p}
             onClick={() => onPageChange(p)}
-            className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-semibold transition-colors ${
-              p === currentPage
-                ? "bg-[#2B86C5] text-white border border-[#2B86C5]"
-                : "border border-slate-200 text-slate-600 hover:bg-slate-50"
-            }`}
+            className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-semibold transition-colors ${p === currentPage
+              ? "bg-[#2B86C5] text-white border border-[#2B86C5]"
+              : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
           >
             {p}
           </button>
@@ -327,8 +391,8 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
 
 const TABS = [
   { key: "analysis", label: "Price Analysis" },
-  { key: "brand",    label: "Brand Products" },
-  { key: "compare",  label: "Compare" },
+  // { key: "brand", label: "Brand Products" },
+  // { key: "compare", label: "Compare" },
 ];
 
 function LoadingState() {
@@ -366,19 +430,33 @@ function ProductCell({ product }) {
 }
 
 function PriceCell({ product }) {
-  const price = parsePrice(product.product_price);
-  return price !== null ? (
-    <span className="inline-block rounded-md bg-emerald-50 border border-emerald-100 px-3 py-1.5 text-[13px] font-bold text-emerald-600">
-      ₹{price.toLocaleString("en-IN")}
-    </span>
-  ) : (
-    <span className="text-slate-400 text-sm">—</span>
+  const web = parsePrice(product.product_price);
+  const store = parsePrice(product.product_store_price);
+  const sap = parsePrice(product.product_sap_price);
+
+  const fmt = (v) => v !== null ? `₹${v.toLocaleString("en-IN")}` : "—";
+
+  return (
+    <div className="flex flex-col gap-1.5 min-w-[110px]">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Web</span>
+        <span className="text-[12px] font-bold text-emerald-600">{fmt(web)}</span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Store</span>
+        <span className="text-[12px] font-bold text-blue-600">{fmt(store)}</span>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">SAP</span>
+        <span className="text-[12px] font-bold text-slate-700">{fmt(sap)}</span>
+      </div>
+    </div>
   );
 }
 
 function exportToCSV(products) {
-  const headers = ["Product Name","Item Code","Ranking Position","Competing With","Price","SAP Price","Store Price","Item Groups","Competitor Detail"];
-  const escape  = (val) => { const s = String(val ?? ""); return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s; };
+  const headers = ["Product Name", "Item Code", "Ranking Position", "Competing With", "Price", "SAP Price", "Store Price", "Item Groups", "Competitor Detail"];
+  const escape = (val) => { const s = String(val ?? ""); return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s; };
   const rows = products.map((p) => {
     const compDetail = (p.competitor_prices || []).map((c) => {
       const outOfStock = c.price === null || c.price === undefined || c.stock === 0;
@@ -392,10 +470,10 @@ function exportToCSV(products) {
       p.product_item_group || p.product_category || "", compDetail,
     ].map(escape).join(",");
   });
-  const csv  = "﻿" + [headers.map(escape).join(","), ...rows].join("\n");
+  const csv = "﻿" + [headers.map(escape).join(","), ...rows].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
   a.href = url; a.download = `products_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click(); URL.revokeObjectURL(url);
 }
@@ -408,8 +486,8 @@ function ConfigureModal({ product, currentUserId, onClose, onSaved }) {
     : "";
 
   const [groupName, setGroupName] = useState(product?.group_name || groupNameDefault);
-  const [saving,    setSaving]    = useState(false);
-  const [error,     setError]     = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSave = async () => {
     setSaving(true);
@@ -497,23 +575,42 @@ function ConfigureModal({ product, currentUserId, onClose, onSaved }) {
   );
 }
 
+// ── Sort icon ─────────────────────────────────────────────────────────────────
+
+function SortIcon({ active, direction }) {
+  if (!active) {
+    return (
+      <svg className="shrink-0 text-slate-300" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 3v18M5 10l7-7 7 7M5 14l7 7 7-7" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="shrink-0 text-[#2B86C5]" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      {direction === "asc"
+        ? <path d="M12 19V5M5 12l7-7 7 7" />
+        : <path d="M12 5v14M5 12l7 7 7-7" />}
+    </svg>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function Products() {
-  const navigate       = useNavigate();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const competitorSlug = searchParams.get("competitor") || "";
-  const competitorName = searchParams.get("name")       || "";
+  const competitorName = searchParams.get("name") || "";
 
-  const products           = useStore((s) => s.products);
-  const productsLoading    = useStore((s) => s.productsLoading);
-  const productsError      = useStore((s) => s.productsError);
-  const setProducts        = useStore((s) => s.setProducts);
+  const products = useStore((s) => s.products);
+  const productsLoading = useStore((s) => s.productsLoading);
+  const productsError = useStore((s) => s.productsError);
+  const setProducts = useStore((s) => s.setProducts);
   const setProductsLoading = useStore((s) => s.setProductsLoading);
-  const setProductsError   = useStore((s) => s.setProductsError);
-  const competitors        = useStore((s) => s.competitors);
-  const activeStoreId      = useStore((s) => s.activeStoreId);
-  const currentUserId      = useStore((s) => s.user?.userId);
+  const setProductsError = useStore((s) => s.setProductsError);
+  const competitors = useStore((s) => s.competitors);
+  const activeStoreId = useStore((s) => s.activeStoreId);
+  const currentUserId = useStore((s) => s.user?.userId);
 
   // Build meta map for logos
   const competitorMeta = {};
@@ -522,13 +619,24 @@ export default function Products() {
   });
   const onlineSlugs = new Set(competitors.filter((c) => c.isActive).map((c) => c.slug));
 
-  const [activeTab,      setActiveTab]      = useState("analysis");
-  const [search,         setSearch]         = useState("");
-  const [brandFilter,    setBrandFilter]    = useState("");
-  const [catFilter,      setCatFilter]      = useState("");
-  const [rankFilter,     setRankFilter]     = useState("");
-  const [currentPage,    setCurrentPage]    = useState(1);
-  const [configProduct,  setConfigProduct]  = useState(null); // product being configured
+  const [activeTab, setActiveTab] = useState("analysis");
+  const [search, setSearch] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
+  const [catFilter, setCatFilter] = useState("");
+  const [rankFilter, setRankFilter] = useState("");
+  const [itemGroupFilter, setItemGroupFilter] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [configProduct, setConfigProduct] = useState(null); // product being configured
+  const [sortConfig, setSortConfig] = useState({ column: null, direction: "asc" });
+
+  const handleSort = (column) => {
+    setSortConfig((prev) =>
+      prev.column === column
+        ? { column, direction: prev.direction === "asc" ? "desc" : "asc" }
+        : { column, direction: "asc" }
+    );
+    setCurrentPage(1);
+  };
 
   const load = async () => {
     setProductsLoading(true);
@@ -546,22 +654,25 @@ export default function Products() {
   useEffect(() => { load(); }, [activeStoreId, competitorSlug]);
 
   const brandOptions = [...new Set(products.map((p) => p.product_brand).filter(Boolean))].sort();
-  const catOptions   = [...new Set(products.map((p) => p.product_category).filter(Boolean))].sort();
-  const rankOptions  = [...new Set(products.map((p) => String(p.rank_by ?? "")).filter(Boolean))].sort();
+  const catOptions = [...new Set(products.map((p) => p.product_category).filter(Boolean))].sort();
+  const rankOptions = [...new Set(products.map((p) => String(p.rank_by ?? "")).filter(Boolean))].sort();
+  const itemGroupOptions = [...new Set(products.map((p) => p.product_category ? p.product_category.split(">")[0].trim() : "").filter(Boolean))].sort();
 
   const filtered = products
     .filter((p) => {
       const q = search.toLowerCase();
       const matchSearch = !q || (
-        p.product_name?.toLowerCase().includes(q)  ||
+        p.product_name?.toLowerCase().includes(q) ||
         p.product_brand?.toLowerCase().includes(q) ||
         String(p.product_ean_id || "").includes(q) ||
-        String(p.product_code   || "").includes(q)
+        String(p.product_code || "").includes(q)
       );
-      const matchBrand = !brandFilter || p.product_brand      === brandFilter;
-      const matchCat   = !catFilter   || p.product_category   === catFilter;
-      const matchRank  = !rankFilter  || String(p.rank_by ?? "") === rankFilter;
-      return matchSearch && matchBrand && matchCat && matchRank;
+      const matchBrand = !brandFilter || p.product_brand === brandFilter;
+      const matchCat = !catFilter || p.product_category === catFilter;
+      const matchRank = !rankFilter || String(p.rank_by ?? "") === rankFilter;
+      const pGroup = p.product_category ? p.product_category.split(">")[0].trim() : "";
+      const matchGroup = !itemGroupFilter || pGroup === itemGroupFilter;
+      return matchSearch && matchBrand && matchCat && matchRank && matchGroup;
     })
     .map((p) => ({
       ...p,
@@ -571,10 +682,24 @@ export default function Products() {
     }));
 
   // Reset to page 1 whenever filters/tab/competitor changes
-  useEffect(() => { setCurrentPage(1); }, [search, brandFilter, catFilter, rankFilter, activeTab, competitorSlug]);
+  useEffect(() => { setCurrentPage(1); }, [search, brandFilter, catFilter, rankFilter, itemGroupFilter, activeTab, competitorSlug]);
 
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-  const paginated  = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const sorted = [...filtered].sort((a, b) => {
+    if (!sortConfig.column) return 0;
+    if (sortConfig.column === "name") {
+      const cmp = (a.product_name || "").toLowerCase().localeCompare((b.product_name || "").toLowerCase());
+      return sortConfig.direction === "asc" ? cmp : -cmp;
+    }
+    if (sortConfig.column === "rank") {
+      const aRank = parseInt(a.user_notification_data?.rank_pos ?? a.rank_by ?? 9999, 10);
+      const bRank = parseInt(b.user_notification_data?.rank_pos ?? b.rank_by ?? 9999, 10);
+      return sortConfig.direction === "asc" ? aRank - bRank : bRank - aRank;
+    }
+    return 0;
+  });
+
+  const totalPages = Math.ceil(sorted.length / ITEMS_PER_PAGE);
+  const paginated = sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const clearCompetitorFilter = () => setSearchParams({});
 
@@ -588,200 +713,274 @@ export default function Products() {
 
   return (
     <>
-    <div className="min-h-screen bg-white text-slate-800 font-sans">
-      <div className="mx-auto flex max-w-[1400px] flex-col gap-5 px-6 py-6">
+      <div className="min-h-screen bg-white text-slate-800 font-sans">
+        <div className="mx-auto flex max-w-[1400px] flex-col gap-5 px-3 py-4 md:px-6 md:py-6">
 
-        {/* ── Competitor filter banner ── */}
-        {competitorSlug && (
-          <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-            {competitorMeta[competitorSlug]?.logo ? (
-              <div className="flex h-7 w-7 items-center justify-center rounded overflow-hidden border border-blue-200 bg-white shrink-0">
-                <img
-                  src={`http://localhost:5100${competitorMeta[competitorSlug].logo}`}
-                  alt={competitorName}
-                  className="w-full h-full object-contain"
-                  onError={(e) => { e.target.style.display = "none"; }}
-                />
-              </div>
-            ) : (
-              <div className="flex h-7 w-7 items-center justify-center rounded bg-blue-500 text-white text-[10px] font-bold shrink-0">
-                {competitorName.substring(0, 2).toUpperCase()}
-              </div>
-            )}
-            <p className="text-sm font-medium text-blue-800 flex-1">
-              Showing products sold by <strong>{competitorName || competitorSlug}</strong>
-            </p>
-            <button
-              onClick={clearCompetitorFilter}
-              className="text-xs font-semibold text-blue-600 hover:text-blue-800 border border-blue-300 rounded-lg px-3 py-1.5 hover:bg-blue-100 transition-colors"
-            >
-              ✕ Clear filter
-            </button>
-          </div>
-        )}
+          {/* ── Competitor filter banner ── */}
+          {competitorSlug && (
+            <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+              {competitorMeta[competitorSlug]?.logo ? (
+                <div className="flex h-7 w-7 items-center justify-center rounded overflow-hidden border border-blue-200 bg-white shrink-0">
+                  <img
+                    src={`http://localhost:5100${competitorMeta[competitorSlug].logo}`}
+                    alt={competitorName}
+                    className="w-full h-full object-contain"
+                    onError={(e) => { e.target.style.display = "none"; }}
+                  />
+                </div>
+              ) : (
+                <div className="flex h-7 w-7 items-center justify-center rounded bg-blue-500 text-white text-[10px] font-bold shrink-0">
+                  {competitorName.substring(0, 2).toUpperCase()}
+                </div>
+              )}
+              <p className="text-sm font-medium text-blue-800 flex-1">
+                Showing products sold by <strong>{competitorName || competitorSlug}</strong>
+              </p>
+              <button
+                onClick={clearCompetitorFilter}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-800 border border-blue-300 rounded-lg px-3 py-1.5 hover:bg-blue-100 transition-colors"
+              >
+                ✕ Clear filter
+              </button>
+            </div>
+          )}
 
-        {/* Top Header Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex w-full max-w-sm items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-blue-100">
-            <svg className="text-slate-400" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search by name, brand or EAN…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full border-0 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors">
+          {/* Top Header Actions */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="flex w-full sm:max-w-sm items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-blue-100">
+              <svg className="text-slate-400" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search by name, brand or EAN…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full border-0 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
+              />
+            </div>
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+              {/* <button className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
               </svg>
               Filter
-            </button>
-            <button
-              onClick={() => exportToCSV(filtered)}
-              className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors"
-            >
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              Export
-            </button>
+            </button> */}
+              <button
+                onClick={() => exportToCSV(filtered)}
+                className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors"
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Export
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Filters Row */}
-        <div className="flex flex-wrap gap-4">
-          <FilterSelect label="Brand"    options={brandOptions} value={brandFilter} onChange={setBrandFilter} />
-          <FilterSelect label="Category" options={catOptions}   value={catFilter}   onChange={setCatFilter}   />
-          <FilterSelect label="Rank"     options={rankOptions}  value={rankFilter}  onChange={setRankFilter}  />
-        </div>
+          {/* Filters Row */}
+          <div className="flex flex-wrap gap-3">
+            <FilterSelect label="Item Group" options={itemGroupOptions} value={itemGroupFilter} onChange={setItemGroupFilter} />
+            <FilterSelect label="Brand" options={brandOptions} value={brandFilter} onChange={setBrandFilter} />
+            <FilterSelect label="Category" options={catOptions} value={catFilter} onChange={setCatFilter} />
+            <FilterSelect label="Rank" options={rankOptions} value={rankFilter} onChange={setRankFilter} />
+          </div>
 
-        {/* Tabs */}
-        <div className="flex gap-6 border-b border-slate-200 mt-2">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`pb-3 text-sm font-semibold transition-all relative ${
-                activeTab === tab.key ? "text-slate-800" : "text-slate-400 hover:text-slate-600"
-              }`}
-            >
-              {tab.label}
-              {activeTab === tab.key && (
-                <span className="absolute bottom-0 left-0 w-full h-0.5 bg-[#2B86C5] rounded-t-full" />
-              )}
-            </button>
-          ))}
-        </div>
+          {/* Tabs */}
+          <div className="flex gap-6 border-b border-slate-200 mt-2">
+            {TABS.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`pb-3 text-sm font-semibold transition-all relative ${activeTab === tab.key ? "text-slate-800" : "text-slate-400 hover:text-slate-600"
+                  }`}
+              >
+                {tab.label}
+                {activeTab === tab.key && (
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-[#2B86C5] rounded-t-full" />
+                )}
+              </button>
+            ))}
+          </div>
 
-        {/* Content */}
-        <div className="mt-2">
-          {productsLoading ? (
-            <LoadingState />
-          ) : productsError ? (
-            <ErrorState message={productsError} onRetry={load} />
-          ) : (
-            <>
-              {/* ── BRAND PRODUCTS ── */}
-              {activeTab === "brand" && (
-                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-                  <table className="w-full min-w-[900px] border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-100 bg-slate-50/50">
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Product</th>
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price</th>
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Stock Status</th>
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price Gap</th>
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Competitor Price Trends</th>
-                        <th className="px-5 py-4 text-right text-xs font-semibold text-slate-500">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filtered.length === 0 ? (
-                        <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr>
-                      ) : (
-                        paginated.map((p) => (
-                          <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="px-5 py-4"><ProductCell product={p} /></td>
-                            <td className="px-5 py-4"><PriceCell product={p} /></td>
-                            <td className="px-5 py-4"><StockStatus stock={p.product_stock} /></td>
-                            <td className="px-5 py-4"><PriceGapBadge value={priceGap(p)} /></td>
-                            <td className="px-5 py-4"><CompetitorPrices product={p} competitorMeta={competitorMeta} /></td>
-                            <td className="px-5 py-4 text-right align-middle">
-                              <div className="flex flex-col items-end gap-1.5">
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => navigate(`/product-history?ean=${p.product_ean_id}`)}
-                                    className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm"
-                                  >
-                                    View Details
-                                  </button>
-                                  <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">
-                                    Quick Sync
-                                  </button>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                  <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
-                </div>
-              )}
-
-              {/* ── COMPARE ── */}
-              {activeTab === "compare" && (
-                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-                  <table className="w-full min-w-[800px] border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-100 bg-slate-50/50">
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Product</th>
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price</th>
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Competitor Prices</th>
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Market Range</th>
-                        <th className="px-5 py-4 text-right text-xs font-semibold text-slate-500">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filtered.length === 0 ? (
-                        <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr>
-                      ) : (
-                        paginated.map((p) => {
-                          const { low, avg, high } = marketStats(p);
-                          const active = (p.competitor_prices || []).filter((c) => c.price !== null);
-                          return (
+          {/* Content */}
+          <div className="mt-2">
+            {productsLoading ? (
+              <LoadingState />
+            ) : productsError ? (
+              <ErrorState message={productsError} onRetry={load} />
+            ) : (
+              <>
+                {/* ── BRAND PRODUCTS ── */}
+                {activeTab === "brand" && (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <table className="w-full min-w-[900px] border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100 bg-slate-50/50">
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Product</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Rank</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price Gap</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Competitor Price Trends</th>
+                          <th className="px-5 py-4 text-right text-xs font-semibold text-slate-500">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filtered.length === 0 ? (
+                          <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr>
+                        ) : (
+                          paginated.map((p) => (
                             <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
                               <td className="px-5 py-4"><ProductCell product={p} /></td>
                               <td className="px-5 py-4"><PriceCell product={p} /></td>
-                              <td className="px-5 py-4">
-                                {active.length === 0 ? (
-                                  <span className="text-sm text-slate-400">No competitor data</span>
-                                ) : (
-                                  <div className="flex items-center gap-6 flex-wrap">
-                                    {active.map((c) => {
-                                      const meta = competitorMeta?.[c.slug] || {};
-                                      return (
-                                        <div key={c.slug} className="flex items-center gap-2">
-                                          <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
-                                          <span className="font-bold text-slate-800 text-[13px]">
-                                            ₹{c.price.toLocaleString("en-IN")}
-                                          </span>
-                                          <Sparkline data={trendFor(p, c.slug)} color="#0ea5e9" />
-                                        </div>
-                                      );
-                                    })}
+                              <td className="px-5 py-4"><RankBadge product={p} /></td>
+                              <td className="px-5 py-4"><PriceGapBadge value={priceGap(p)} /></td>
+                              <td className="px-5 py-4"><CompetitorPrices product={p} competitorMeta={competitorMeta} /></td>
+                              <td className="px-5 py-4 text-right align-middle">
+                                <div className="flex flex-col items-end gap-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => navigate(`/product-history?ean=${p.product_ean_id}`)}
+                                      className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm"
+                                    >
+                                      View Details
+                                    </button>
+                                    <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">
+                                      Quick Sync
+                                    </button>
                                   </div>
-                                )}
+                                </div>
                               </td>
-                              <td className="px-5 py-4"><MarketCap low={low} avg={avg} high={high} /></td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                    <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+                  </div>
+                )}
+
+                {/* ── COMPARE ── */}
+                {activeTab === "compare" && (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <table className="w-full min-w-[800px] border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100 bg-slate-50/50">
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Product</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Competitor Prices</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Market Range</th>
+                          <th className="px-5 py-4 text-right text-xs font-semibold text-slate-500">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filtered.length === 0 ? (
+                          <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr>
+                        ) : (
+                          paginated.map((p) => {
+                            const { low, avg, high } = marketStats(p);
+                            const active = (p.competitor_prices || []).filter((c) => c.price !== null);
+                            return (
+                              <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
+                                <td className="px-5 py-4"><ProductCell product={p} /></td>
+                                <td className="px-5 py-4"><PriceCell product={p} /></td>
+                                <td className="px-5 py-4">
+                                  {active.length === 0 ? (
+                                    <span className="text-sm text-slate-400">No competitor data</span>
+                                  ) : (
+                                    <div className="flex items-center gap-6 flex-wrap">
+                                      {active.map((c) => {
+                                        const meta = competitorMeta?.[c.slug] || {};
+                                        return (
+                                          <div key={c.slug} className="flex items-center gap-2">
+                                            <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
+                                            <span className="font-bold text-slate-800 text-[13px]">
+                                              ₹{c.price.toLocaleString("en-IN")}
+                                            </span>
+                                            <Sparkline data={trendFor(p, c.slug)} color="#0ea5e9" />
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-5 py-4"><MarketCap low={low} avg={avg} high={high} /></td>
+                                <td className="px-5 py-4 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button
+                                      onClick={() => navigate(`/product-history?ean=${p.product_ean_id}`)}
+                                      className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm"
+                                    >
+                                      View Details
+                                    </button>
+                                    <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">
+                                      Quick Sync
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                    <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+                  </div>
+                )}
+
+                {/* ── PRICE ANALYSIS ── */}
+                {activeTab === "analysis" && (
+                  <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+                    <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+                    <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">
+                    <table className="w-full min-w-[1000px] border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-100 bg-slate-50/50">
+                          <th className="w-12 px-5 py-4">
+                            <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                          </th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">
+                            <button onClick={() => handleSort("name")} className="flex items-center gap-1.5 hover:text-slate-800 transition-colors">
+                              Product
+                              <SortIcon active={sortConfig.column === "name"} direction={sortConfig.direction} />
+                            </button>
+                          </th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">
+                            <button onClick={() => handleSort("rank")} className="flex items-center gap-1.5 hover:text-slate-800 transition-colors">
+                              Rank
+                              <SortIcon active={sortConfig.column === "rank"} direction={sortConfig.direction} />
+                            </button>
+                          </th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price Gap</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Competitor Prices</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Market</th>
+                          <th className="px-5 py-4 text-right text-xs font-semibold text-slate-500">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {sorted.length === 0 ? (
+                          <tr><td colSpan={8} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr>
+                        ) : (
+                          paginated.map((p) => (
+                            <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="px-5 py-4">
+                                <input
+                                  type="checkbox"
+                                  checked={!!(p.group_name || (p.user_alert_id && p.user_alert_id.length > 0))}
+                                  onChange={() => setConfigProduct(p)}
+                                  className="h-4 w-4 cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                  title="Configure group & user alerts"
+                                />
+                              </td>
+                              <td className="px-5 py-4"><ProductCell product={p} /></td>
+                              <td className="px-5 py-4"><PriceCell product={p} /></td>
+                              <td className="px-5 py-4"><RankBadge product={p} /></td>
+                              <td className="px-5 py-4"><PriceGapBadge value={priceGap(p)} /></td>
+                              <td className="px-5 py-4"><CompetitorPrices product={p} competitorMeta={competitorMeta} /></td>
+                              <td className="px-5 py-4"><MarketGapCell product={p} competitorMeta={competitorMeta} /></td>
                               <td className="px-5 py-4 text-right">
                                 <div className="flex items-center justify-end gap-2">
                                   <button
@@ -796,87 +995,28 @@ export default function Products() {
                                 </div>
                               </td>
                             </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                  <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
-                </div>
-              )}
-
-              {/* ── PRICE ANALYSIS ── */}
-              {activeTab === "analysis" && (
-                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-                  <table className="w-full min-w-[1000px] border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-100 bg-slate-50/50">
-                        <th className="w-12 px-5 py-4">
-                          <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                        </th>
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Product</th>
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price</th>
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Stock Status</th>
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price Gap</th>
-                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Competitor Prices</th>
-                        <th className="px-5 py-4 text-right text-xs font-semibold text-slate-500">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filtered.length === 0 ? (
-                        <tr><td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr>
-                      ) : (
-                        paginated.map((p) => (
-                          <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="px-5 py-4">
-                              <input
-                                type="checkbox"
-                                checked={!!(p.group_name || (p.user_alert_id && p.user_alert_id.length > 0))}
-                                onChange={() => setConfigProduct(p)}
-                                className="h-4 w-4 cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                title="Configure group & user alerts"
-                              />
-                            </td>
-                            <td className="px-5 py-4"><ProductCell product={p} /></td>
-                            <td className="px-5 py-4"><PriceCell product={p} /></td>
-                            <td className="px-5 py-4"><StockStatus stock={p.product_stock} /></td>
-                            <td className="px-5 py-4"><PriceGapBadge value={priceGap(p)} /></td>
-                            <td className="px-5 py-4"><CompetitorPrices product={p} competitorMeta={competitorMeta} /></td>
-                            <td className="px-5 py-4 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() => navigate(`/product-history?ean=${p.product_ean_id}`)}
-                                  className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm"
-                                >
-                                  View Details
-                                </button>
-                                <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">
-                                  Quick Sync
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                  <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
-                </div>
-              )}
-            </>
-          )}
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                    </div>
+                    <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
 
-    {configProduct && (
-      <ConfigureModal
-        product={configProduct}
-        currentUserId={currentUserId}
-        onClose={() => setConfigProduct(null)}
-        onSaved={handleConfigSaved}
-      />
-    )}
+      {configProduct && (
+        <ConfigureModal
+          product={configProduct}
+          currentUserId={currentUserId}
+          onClose={() => setConfigProduct(null)}
+          onSaved={handleConfigSaved}
+        />
+      )}
     </>
   );
 }
