@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useStore } from "../store";
 import { fetchProducts } from "../services/productsService";
@@ -27,34 +27,24 @@ function CompetitorLogo({ competitor, size = 28, showName = false }) {
   return (
     <div className="flex items-center gap-2">
       <div
-        style={{
-          width:           size,
-          height:          size,
-          borderRadius:    5,
-          backgroundColor: bg,
-          display:         "flex",
-          alignItems:      "center",
-          justifyContent:  "center",
-          overflow:        "hidden",
-          flexShrink:      0,
-          border:          "1px solid #e2e8f0",
-        }}
+        className="flex shrink-0 items-center justify-center overflow-hidden rounded-[5px] border border-slate-200"
+        style={{ width: size, height: size, backgroundColor: bg }}
       >
         {imgSrc && !imgErr ? (
           <img
             src={imgSrc}
             alt={competitor.name}
-            style={{ width: "100%", height: "100%", objectFit: "contain" }}
+            className="h-full w-full object-contain"
             onError={() => setImgErr(true)}
           />
         ) : (
-          <span style={{ fontSize: size * 0.32, fontWeight: 700, color: "#fff", letterSpacing: "0.03em" }}>
+          <span style={{ fontSize: size * 0.32 }} className="font-bold tracking-wider text-white">
             {initials}
           </span>
         )}
       </div>
       {showName && (
-        <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
+        <span className="whitespace-nowrap text-[11px] font-semibold text-gray-700 dark:text-gray-300">
           {competitor.name}
         </span>
       )}
@@ -62,20 +52,22 @@ function CompetitorLogo({ competitor, size = 28, showName = false }) {
   );
 }
 
-// ── SVG Price Chart ───────────────────────────────────────────────────────────
+// ── Interactive Business Analytics Graph ──────────────────────────────────────
 
-function PriceChart({ product, competitors, visibleSlugs }) {
-  const history = product.price_history_30days || [];
-  if (!history.length) {
+function PriceChart({ history, competitors, visibleSlugs }) {
+  const [hoverIdx, setHoverIdx] = useState(null);
+  const chartRef = useRef(null);
+
+  if (!history || !history.length) {
     return (
-      <div className="flex h-[220px] items-center justify-center text-sm text-gray-400">
+      <div className="flex h-[280px] items-center justify-center text-sm font-medium text-gray-400">
         No price history available
       </div>
     );
   }
 
-  const svgW = 700, svgH = 240;
-  const pad  = { top: 10, right: 20, bottom: 55, left: 60 };
+  const svgW = 750, svgH = 290;
+  const pad  = { top: 25, right: 20, bottom: 80, left: 65 }; 
   const plotW = svgW - pad.left - pad.right;
   const plotH = svgH - pad.top - pad.bottom;
 
@@ -92,26 +84,30 @@ function PriceChart({ product, competitors, visibleSlugs }) {
 
   if (!allPrices.length) {
     return (
-      <div className="flex h-[220px] items-center justify-center text-sm text-gray-400">
+      <div className="flex h-[280px] items-center justify-center text-sm font-medium text-gray-400">
         No price data in history
       </div>
     );
   }
 
-  const dataMin  = Math.min(...allPrices);
-  const dataMax  = Math.max(...allPrices);
-  const range    = dataMax - dataMin || 1;
-  const chartMin = dataMin - range * 0.1;
+  let dataMin = Math.min(...allPrices);
+  let dataMax = Math.max(...allPrices);
+  if (dataMin === dataMax) {
+    dataMin = dataMin * 0.95;
+    dataMax = dataMax * 1.05;
+  }
+
+  const range    = dataMax - dataMin;
+  const chartMin = Math.max(0, dataMin - range * 0.1); 
   const chartMax = dataMax + range * 0.1;
   const span     = chartMax - chartMin;
 
   const getX = (i) => pad.left + (plotW / Math.max(history.length - 1, 1)) * i;
   const getY = (v) => pad.top + ((chartMax - v) / span) * plotH;
 
-  const yTickCount = 5;
-  const yTicks = Array.from({ length: yTickCount + 1 }, (_, i) =>
-    Math.round(chartMin + (span / yTickCount) * i)
-  );
+  const yTickCount = 4;
+  const rawTicks = Array.from({ length: yTickCount }, (_, i) => chartMin + (span / (yTickCount - 1)) * i);
+  const yTicks = [...new Set(rawTicks.map(t => Math.round(t)))];
 
   const series = [
     {
@@ -119,16 +115,16 @@ function PriceChart({ product, competitors, visibleSlugs }) {
       name:   "Our Price",
       color:  "#2563eb",
       values: history.map((h) => parsePrice(h.product_price)),
-      comp:   null,
+      isMain: true,
     },
     ...competitors
       .filter((c) => c.isActive !== false && visibleSlugs.has(c.slug))
       .map((c) => ({
         slug:   c.slug,
         name:   c.name,
-        color:  c.color || "#888",
+        color:  c.color || "#94a3b8",
         values: history.map((h) => parsePrice(h.competitors?.[c.slug])),
-        comp:   c,
+        isMain: false,
       })),
   ];
 
@@ -142,50 +138,171 @@ function PriceChart({ product, competitors, visibleSlugs }) {
     return d.trim();
   };
 
-  const dateStep   = Math.max(1, Math.floor(history.length / 8));
-  const dateLabels = history
-    .map((h, i) => ({ label: h.display_date || "", i }))
-    .filter((_, i) => i % dateStep === 0 || i === history.length - 1);
+  const buildAreaPath = (values) => {
+    let d = "";
+    let firstX = null, lastX = null;
+    values.forEach((v, i) => {
+      if (v === null) return;
+      const x = getX(i);
+      const y = getY(v);
+      if (firstX === null) firstX = x;
+      lastX = x;
+      const cmd = d === "" ? "M" : "L";
+      d += `${cmd}${x},${y} `;
+    });
+    if (d && firstX !== null) {
+      d += `L${lastX},${pad.top + plotH} L${firstX},${pad.top + plotH} Z`;
+    }
+    return d.trim();
+  };
+
+  const handleMouseMove = (e) => {
+    if (!chartRef.current) return;
+    const rect = chartRef.current.getBoundingClientRect();
+    const scaleX = svgW / rect.width;
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+    const mouseX = (clientX - rect.left) * scaleX;
+    
+    const stepX = plotW / Math.max(history.length - 1, 1);
+    let index = Math.round((mouseX - pad.left) / stepX);
+    index = Math.max(0, Math.min(index, history.length - 1));
+    
+    setHoverIdx(index);
+  };
 
   return (
-    <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full" style={{ display: "block" }} preserveAspectRatio="xMidYMid meet">
-      {yTicks.map((tick) => (
-        <g key={tick}>
+    <div className="relative w-full select-none" onMouseLeave={() => setHoverIdx(null)}>
+      <svg 
+        ref={chartRef}
+        viewBox={`0 0 ${svgW} ${svgH}`} 
+        className="w-full h-auto" 
+        style={{ display: "block" }} 
+        preserveAspectRatio="xMidYMid meet"
+        onMouseMove={handleMouseMove}
+        onTouchMove={handleMouseMove}
+      >
+        <defs>
+          <linearGradient id="mainAreaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#2563eb" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {yTicks.map((tick) => (
+          <g key={tick}>
+            <line
+              x1={pad.left} y1={getY(tick)}
+              x2={pad.left + plotW} y2={getY(tick)}
+              stroke="#e2e8f0" className="dark:stroke-gray-800" strokeWidth="1" strokeDasharray="4 4"
+            />
+            <text x={pad.left - 10} y={getY(tick) + 4} textAnchor="end" fontSize="11" fill="#64748b" className="dark:fill-gray-500 font-semibold">
+              {fmt(tick)}
+            </text>
+          </g>
+        ))}
+
+        {history.map((h, i) => {
+          if (!h.display_date) return null;
+          const step = history.length > 31 ? Math.ceil(history.length / 15) : 1;
+          if (i % step !== 0 && i !== history.length - 1 && i !== 0) return null;
+          
+          return (
+            <text
+              key={i}
+              transform={`translate(${getX(i)},${pad.top + plotH + 18}) rotate(40)`}
+              textAnchor="start" fontSize="10" fill="#64748b" className="dark:fill-gray-400 font-semibold"
+            >
+              {h.display_date}
+            </text>
+          );
+        })}
+
+        {series.map((s) => {
+          const dLine = buildPath(s.values);
+          const dArea = s.isMain ? buildAreaPath(s.values) : "";
+          if (!dLine) return null;
+
+          return (
+            <g key={s.slug}>
+              {s.isMain && dArea && (
+                <path d={dArea} fill="url(#mainAreaGrad)" className="transition-opacity duration-300" />
+              )}
+              <path
+                d={dLine}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={s.isMain ? 3 : 2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={s.isMain ? 1 : 0.6}
+              />
+              {hoverIdx !== null && s.values[hoverIdx] !== null && (
+                <circle
+                  cx={getX(hoverIdx)}
+                  cy={getY(s.values[hoverIdx])}
+                  r={s.isMain ? 5 : 4}
+                  fill={s.isMain ? "#ffffff" : s.color}
+                  stroke={s.color}
+                  strokeWidth={2.5}
+                />
+              )}
+            </g>
+          );
+        })}
+
+        {hoverIdx !== null && (
           <line
-            x1={pad.left} y1={getY(tick)}
-            x2={pad.left + plotW} y2={getY(tick)}
-            stroke="#e2e8f0" strokeDasharray="4 3"
+            x1={getX(hoverIdx)} y1={pad.top}
+            x2={getX(hoverIdx)} y2={pad.top + plotH}
+            stroke="#94a3b8"
+            className="dark:stroke-gray-600"
+            strokeWidth="1.5"
+            strokeDasharray="4 4"
+            pointerEvents="none"
           />
-          <text x={pad.left - 8} y={getY(tick) + 4} textAnchor="end" fontSize="10" fill="#94a3b8">
-            {Number(tick).toLocaleString("en-IN")}
-          </text>
-        </g>
-      ))}
-      {dateLabels.map(({ label, i }) => (
-        <text
-          key={i}
-          transform={`translate(${getX(i)},${pad.top + plotH + 22}) rotate(35)`}
-          textAnchor="start" fontSize="9" fill="#94a3b8"
+        )}
+        <rect x={pad.left} y={pad.top} width={plotW} height={plotH} fill="transparent" />
+      </svg>
+
+      {hoverIdx !== null && (
+        <div 
+          className="pointer-events-none absolute z-10 rounded-lg border border-gray-200 bg-white/95 p-2 md:p-3 shadow-xl backdrop-blur-md dark:border-gray-700 dark:bg-[#151a2a]/95"
+          style={{
+            left: hoverIdx > history.length / 2 ? 'auto' : `${(getX(hoverIdx) / svgW) * 100}%`,
+            right: hoverIdx > history.length / 2 ? `${100 - (getX(hoverIdx) / svgW) * 100}%` : 'auto',
+            top: '0px',
+            marginLeft: hoverIdx > history.length / 2 ? '0' : '10px',
+            marginRight: hoverIdx > history.length / 2 ? '10px' : '0',
+            minWidth: '140px'
+          }}
         >
-          {label}
-        </text>
-      ))}
-      {series.map((s) => {
-        const d = buildPath(s.values);
-        if (!d) return null;
-        return (
-          <path
-            key={s.slug}
-            d={d}
-            fill="none"
-            stroke={s.slug === "our_price" ? "#2563eb" : s.color}
-            strokeWidth={s.slug === "our_price" ? 2.5 : 2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        );
-      })}
-    </svg>
+          <div className="mb-2 border-b border-gray-100 pb-1 dark:border-gray-700">
+            <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">
+              {history[hoverIdx]?.display_date || "Date"}
+            </span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {series.map((s) => {
+              const val = s.values[hoverIdx];
+              if (val === null || val === undefined) return null;
+              return (
+                <div key={s.slug} className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-1.5 overflow-hidden">
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
+                    <span className={`text-[10px] truncate ${s.isMain ? 'font-bold text-gray-900 dark:text-white' : 'font-medium text-gray-600 dark:text-gray-400'}`}>
+                      {s.name}
+                    </span>
+                  </div>
+                  <span className={`text-[10px] shrink-0 ${s.isMain ? 'font-black text-blue-600 dark:text-blue-400' : 'font-bold text-gray-800 dark:text-gray-200'}`}>
+                    {fmt(val)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -202,16 +319,16 @@ export default function ProductHistory() {
   const setLastViewedEan   = useStore((s) => s.setLastViewedEan);
 
   const [loading,       setLoading]       = useState(false);
-  const [searchQuery,   setSearchQuery]   = useState("");   // single source of truth — live as-you-type
-  const [userSearched,  setUserSearched]  = useState(false); // true once the user has actively typed/searched
+  const [searchQuery,   setSearchQuery]   = useState("");
+  const [userSearched,  setUserSearched]  = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [visibleSlugs,  setVisibleSlugs]  = useState(new Set());
   const [imgErrors,     setImgErrors]     = useState({});
+  const [daysRange,     setDaysRange]     = useState(30);
 
   const [searchParams] = useSearchParams();
   const eanFromUrl = searchParams.get("ean") || "";
 
-  // Load products + competitors if not already in store
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -234,7 +351,6 @@ export default function ProductHistory() {
     load();
   }, [activeStoreId]);
 
-  // ── FIXED: live filter as the user types ─────────────────────────────────────
   const filteredProducts = useMemo(() => {
     if (!searchQuery.trim()) return storeProducts;
     const q = searchQuery.toLowerCase();
@@ -246,11 +362,6 @@ export default function ProductHistory() {
     );
   }, [storeProducts, searchQuery]);
 
-  // ── FIXED: product selection priority ────────────────────────────────────────
-  // • If user is actively searching → use filtered results[selectedIndex]
-  // • Else if ?ean= in URL → find that product
-  // • Else if lastViewedEan saved → find that product
-  // • Else → first product
   const selectedProduct = useMemo(() => {
     if (userSearched) {
       return filteredProducts[selectedIndex] ?? filteredProducts[0] ?? null;
@@ -263,25 +374,27 @@ export default function ProductHistory() {
     return storeProducts[0] ?? null;
   }, [userSearched, filteredProducts, selectedIndex, eanFromUrl, lastViewedEan, storeProducts]);
 
-  // Persist the currently viewed EAN
   useEffect(() => {
     if (selectedProduct?.product_ean_id) {
       setLastViewedEan(String(selectedProduct.product_ean_id));
     }
   }, [selectedProduct?.product_ean_id]);
 
-  // Reset selectedIndex when query changes so we always show the top match
   useEffect(() => {
     setSelectedIndex(0);
   }, [searchQuery]);
 
   const onlineCompetitors = storeCompetitors.filter((c) => c.isActive !== false);
 
+  const activeHistory = useMemo(() => {
+    const full = selectedProduct?.price_history_30days || [];
+    return full.slice(0, daysRange); 
+  }, [selectedProduct, daysRange]);
+
   const stats = useMemo(() => {
-    if (!selectedProduct) return { min: null, max: null, avgDev: null };
-    const history    = selectedProduct.price_history_30days || [];
+    if (!selectedProduct || activeHistory.length === 0) return { min: null, max: null, avgDev: null };
     const compPrices = [];
-    history.forEach((h) => {
+    activeHistory.forEach((h) => {
       onlineCompetitors.forEach((c) => {
         const p = parsePrice(h.competitors?.[c.slug]);
         if (p !== null) compPrices.push(p);
@@ -293,9 +406,7 @@ export default function ProductHistory() {
     const avg      = compPrices.length ? compPrices.reduce((a, b) => a + b, 0) / compPrices.length : null;
     const avgDev   = avg !== null && ourPrice !== null ? Math.abs(Math.round(ourPrice - avg)) : null;
     return { min, max, avgDev };
-  }, [selectedProduct, onlineCompetitors]);
-
-  const tableHistory = selectedProduct?.price_history_30days?.slice(0, 30) ?? [];
+  }, [selectedProduct, activeHistory, onlineCompetitors]);
 
   const toggleSlug = (slug) => {
     setVisibleSlugs((prev) => {
@@ -305,19 +416,16 @@ export default function ProductHistory() {
     });
   };
 
-  // Called when user types — immediately filter live
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
-    setUserSearched(true); // user is actively searching, override URL/lastViewed priority
+    setUserSearched(true);
   };
 
-  // Called on Enter or clicking Search button — no change needed, already live
   const handleSearchSubmit = () => {
     setUserSearched(true);
     setSelectedIndex(0);
   };
 
-  // Clear search — go back to URL/lastViewed priority
   const handleClearSearch = () => {
     setSearchQuery("");
     setUserSearched(false);
@@ -333,40 +441,43 @@ export default function ProductHistory() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#0b101e] text-gray-900 dark:text-gray-100 font-sans pb-12 transition-colors duration-200">
-
+    <div className="min-h-screen bg-white font-sans text-gray-900 transition-colors duration-200 dark:bg-[#0b101e] dark:text-gray-100 pb-12">
+      
       {/* Page Header */}
-      <div className="bg-white dark:bg-[#151a2a] px-6 py-4 border-b border-gray-200 dark:border-[#262c3d]">
+      <div className="border-b border-gray-200 bg-white px-4 md:px-6 py-4 dark:border-[#262c3d] dark:bg-[#151a2a]">
         <div className="mx-auto max-w-[1280px]">
-          <h1 className="text-xl font-bold text-gray-800 dark:text-white">Manage Product History</h1>
+          <h1 className="text-lg md:text-xl font-bold text-gray-800 dark:text-white">Manage Product History</h1>
         </div>
       </div>
 
       <div className="mx-auto flex max-w-[1280px] flex-col gap-6 px-4 pt-6">
 
-        {/* Search & Filter */}
-        <div className="flex flex-wrap items-end gap-4 rounded-lg border border-gray-200 dark:border-[#262c3d] bg-white dark:bg-[#151a2a] p-5 shadow-sm">
-          <div className="flex items-center gap-3">
+        {/* Search & Filter Top Bar */}
+        <div className="flex flex-col md:flex-row md:items-end gap-4 rounded-lg border border-gray-200 bg-white p-4 md:p-5 shadow-sm dark:border-[#262c3d] dark:bg-[#151a2a]">
+          <div className="flex flex-col gap-2 w-full md:w-auto">
             <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Date Range</label>
-            <select className="h-10 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b101e] px-3 text-sm text-gray-700 dark:text-gray-200 outline-none focus:ring-1 focus:ring-teal-500">
-              <option>Last 30 Days</option>
-              <option>Last 60 Days</option>
+            <select 
+              value={daysRange}
+              onChange={(e) => setDaysRange(Number(e.target.value))}
+              className="h-10 w-full md:w-40 rounded border border-gray-300 bg-white px-3 text-sm text-gray-700 outline-none focus:ring-1 focus:ring-teal-500 dark:border-gray-700 dark:bg-[#0b101e] dark:text-gray-200"
+            >
+              <option value={7}>Last 7 Days</option>
+              <option value={30}>Last 30 Days</option>
             </select>
           </div>
 
-          <div className="flex flex-1 items-center gap-3 min-w-[280px]">
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
+          <div className="flex flex-col gap-2 flex-1 w-full">
+            <label className="whitespace-nowrap text-sm font-medium text-gray-600 dark:text-gray-400">
               Search Product
             </label>
-            {/* ── FIXED: single input, live onChange, with clear button ── */}
-            <div className="relative flex-1 max-w-md">
+            <div className="relative w-full">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={handleSearchChange}
                 onKeyDown={(e) => e.key === "Enter" && handleSearchSubmit()}
                 placeholder="Name, brand or EAN…"
-                className="h-10 w-full rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b101e] px-3 pr-8 text-sm text-gray-700 dark:text-gray-200 outline-none focus:ring-1 focus:ring-teal-500"
+                className="h-10 w-full rounded border border-gray-300 bg-white px-3 pr-8 text-sm text-gray-700 outline-none focus:ring-1 focus:ring-teal-500 dark:border-gray-700 dark:bg-[#0b101e] dark:text-gray-200"
               />
               {searchQuery && (
                 <button
@@ -384,7 +495,7 @@ export default function ProductHistory() {
 
           <button
             onClick={handleSearchSubmit}
-            className="ml-auto inline-flex h-10 items-center justify-center gap-2 rounded bg-teal-500 px-6 text-sm font-medium text-white shadow-sm hover:bg-teal-600 transition-colors"
+            className="w-full md:w-auto md:mt-0 inline-flex h-10 items-center justify-center gap-2 rounded bg-teal-500 px-6 text-sm font-medium text-white shadow-sm transition-colors hover:bg-teal-600"
           >
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
@@ -393,39 +504,39 @@ export default function ProductHistory() {
           </button>
         </div>
 
-        {/* Result count note */}
+        {/* Search Results Feedback */}
         {userSearched && searchQuery && filteredProducts.length > 1 && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 -mt-2">
-            {filteredProducts.length} products matched — showing the first result. Refine your search to find a specific product.
+          <p className="-mt-2 text-[11px] md:text-xs text-gray-500 dark:text-gray-400">
+            {filteredProducts.length} products matched — showing the first result.
           </p>
         )}
         {userSearched && searchQuery && filteredProducts.length === 0 && (
-          <p className="text-xs text-rose-500 -mt-2">
+          <p className="-mt-2 text-xs text-rose-500">
             No products matched "{searchQuery}".{" "}
             <button onClick={handleClearSearch} className="underline hover:no-underline">Clear search</button>
           </p>
         )}
 
         {!selectedProduct ? (
-          <div className="flex h-64 items-center justify-center rounded-xl border border-gray-200 dark:border-[#262c3d] bg-white dark:bg-[#151a2a] text-gray-400">
+          <div className="flex h-64 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 dark:border-[#262c3d] dark:bg-[#151a2a]">
             No products found
           </div>
         ) : (
           <>
-            {/* Stat Cards */}
-            <div className="grid gap-4 md:grid-cols-3">
+            {/* Stat Cards - Responsive Grid */}
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {[
                 { label: "Min Market Price",  value: fmt(stats.min),    icon: "trend", iconBg: "214 100% 97%", iconColor: "217 91% 50%" },
                 { label: "Max Market Price",  value: fmt(stats.max),    icon: "bars",  iconBg: "270 100% 97%", iconColor: "267 83% 60%" },
                 { label: "Average Deviation", value: stats.avgDev !== null ? fmt(stats.avgDev) : "—", icon: "pulse", iconBg: "214 100% 97%", iconColor: "217 91% 50%" },
               ].map((card) => (
-                <div key={card.label} className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-[#262c3d] bg-white dark:bg-[#151a2a] px-6 py-5 shadow-sm">
+                <div key={card.label} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-5 md:px-6 py-4 md:py-5 shadow-sm dark:border-[#262c3d] dark:bg-[#151a2a]">
                   <div>
-                    <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">{card.label}</p>
-                    <p className="text-3xl font-bold text-gray-900 dark:text-white">{card.value}</p>
+                    <p className="mb-1 text-[10px] md:text-xs font-medium text-gray-500 dark:text-gray-400">{card.label}</p>
+                    <p className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">{card.value}</p>
                   </div>
-                  <div className="grid h-12 w-12 place-items-center rounded-full" style={{ backgroundColor: `hsl(${card.iconBg})` }}>
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke={`hsl(${card.iconColor})`} strokeWidth="2.5" strokeLinecap="round">
+                  <div className="grid h-10 w-10 md:h-12 md:w-12 place-items-center rounded-full shrink-0" style={{ backgroundColor: `hsl(${card.iconBg})` }}>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke={`hsl(${card.iconColor})`} strokeWidth="2.5" strokeLinecap="round">
                       {card.icon === "trend" && <><path d="M5 7h10" /><path d="M9 11h6" /><path d="M13 15h2" /><path d="m15 9 4 4-4 4" /></>}
                       {card.icon === "bars"  && <><path d="M5 19V9" /><path d="M10 19V5" /><path d="M15 19v-7" /><path d="M20 19V3" /></>}
                       {card.icon === "pulse" && <path d="M4 13h4l2-6 4 12 2-6h4" />}
@@ -435,96 +546,93 @@ export default function ProductHistory() {
               ))}
             </div>
 
-            {/* Chart + Insights row */}
+            {/* Chart + Insights Layout */}
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
 
-              {/* Chart card */}
-              <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-[#262c3d] bg-white dark:bg-[#151a2a] shadow-sm flex flex-col">
-                <div className="bg-[#2a4365] py-2 text-center border-b border-[#1e3a5f]">
-                  <span className="text-sm font-semibold text-white">Price History (Last 30 Days)</span>
+              {/* Chart Section */}
+              <div className="flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-[#262c3d] dark:bg-[#151a2a]">
+                <div className="border-b border-[#1e3a5f] bg-[#2a4365] py-2 text-center">
+                  <span className="text-sm font-semibold text-white">Price History (Last {daysRange} Days)</span>
                 </div>
 
-                <div className="flex flex-col md:flex-row p-4 flex-1">
-                  {/* Product info panel */}
-                  <div className="w-[200px] flex-shrink-0 flex flex-col items-center justify-center border-r border-gray-100 dark:border-[#262c3d] pr-4">
-                    <div className="mb-3 flex h-28 w-28 items-center justify-center overflow-hidden rounded-lg border border-gray-100 dark:border-[#262c3d] bg-gray-50 dark:bg-[#0b101e]">
-                      {selectedProduct.product_image && !imgErrors[selectedProduct._id] ? (
-                        <img
-                          src={selectedProduct.product_image}
-                          alt={selectedProduct.product_name}
-                          className="h-full w-full object-contain"
-                          onError={() => setImgErrors((e) => ({ ...e, [selectedProduct._id]: true }))}
-                        />
-                      ) : (
-                        <span className="text-4xl">📦</span>
+                <div className="flex flex-1 flex-col p-4">
+                  <div className="flex flex-col md:flex-row gap-6">
+                    {/* Left Product Info Panel */}
+                    <div className="flex md:w-[200px] shrink-0 flex-col items-center justify-center md:border-r border-gray-100 md:pr-4 dark:border-[#262c3d]">
+                      <div className="mb-3 flex h-24 w-24 md:h-28 md:w-28 items-center justify-center overflow-hidden rounded-lg border border-gray-100 bg-gray-50 dark:border-[#262c3d] dark:bg-[#0b101e]">
+                        {selectedProduct.product_image && !imgErrors[selectedProduct._id] ? (
+                          <img
+                            src={selectedProduct.product_image}
+                            alt={selectedProduct.product_name}
+                            className="h-full w-full object-contain"
+                            onError={() => setImgErrors((e) => ({ ...e, [selectedProduct._id]: true }))}
+                          />
+                        ) : (
+                          <span className="text-3xl md:text-4xl">📦</span>
+                        )}
+                      </div>
+                      <p className="text-center text-xs font-semibold leading-tight text-gray-800 dark:text-gray-200 max-w-[180px]">
+                        {selectedProduct.product_name}
+                      </p>
+                      {selectedProduct.product_brand && (
+                        <p className="mt-0.5 text-center text-[10px] text-gray-500 dark:text-gray-400">
+                          ({selectedProduct.product_brand})
+                        </p>
+                      )}
+                      <p className="mt-3 text-center text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
+                        {fmt(parsePrice(selectedProduct.product_price))}
+                      </p>
+                      {selectedProduct.product_ean_id && (
+                        <p className="mt-1 text-center text-[10px] text-gray-400">EAN: {selectedProduct.product_ean_id}</p>
                       )}
                     </div>
-                    <p className="text-center text-xs font-semibold text-gray-800 dark:text-gray-200 leading-tight">
-                      {selectedProduct.product_name}
-                    </p>
-                    {selectedProduct.product_brand && (
-                      <p className="text-center text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
-                        ({selectedProduct.product_brand})
-                      </p>
-                    )}
-                    <p className="mt-3 text-center text-2xl font-bold text-gray-900 dark:text-white">
-                      {fmt(parsePrice(selectedProduct.product_price))}
-                    </p>
-                    {selectedProduct.product_ean_id && (
-                      <p className="mt-1 text-center text-[10px] text-gray-400">EAN: {selectedProduct.product_ean_id}</p>
-                    )}
-                  </div>
 
-                  {/* Chart area */}
-                  <div className="flex-1 pl-4 flex flex-col">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-bold text-gray-800 dark:text-gray-200">Price History (Last 30 Days)</span>
-                    </div>
-
-                    {/* Legend */}
-                    <div className="mb-3 flex flex-wrap gap-x-4 gap-y-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="inline-block h-3 w-3 rounded-[2px] flex-shrink-0" style={{ backgroundColor: "#2563eb" }} />
-                        <span className="text-[10px] text-gray-600 dark:text-gray-400 font-semibold">Our Price</span>
+                    {/* Right Chart Area */}
+                    <div className="flex flex-1 flex-col w-full overflow-hidden">
+                      {/* Legend Top Bar */}
+                      <div className="mb-3 flex flex-wrap gap-x-3 gap-y-2 justify-center md:justify-start">
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: "#2563eb" }} />
+                          <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-400">Our Price</span>
+                        </div>
+                        {onlineCompetitors.map((c) => (
+                          <button
+                            key={c.slug}
+                            onClick={() => toggleSlug(c.slug)}
+                            className={`flex items-center gap-1.5 rounded px-1 py-0.5 transition-opacity hover:opacity-80 ${
+                              visibleSlugs.has(c.slug) ? "opacity-100" : "opacity-40"
+                            }`}
+                          >
+                            <span
+                              className="inline-block h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                              style={{ backgroundColor: c.color || "#475e77" }}
+                            />
+                            <span className="whitespace-nowrap text-[10px] font-medium text-gray-600 dark:text-gray-400">
+                              {c.name}
+                            </span>
+                          </button>
+                        ))}
                       </div>
-                      {onlineCompetitors.map((c) => (
-                        <button
-                          key={c.slug}
-                          onClick={() => toggleSlug(c.slug)}
-                          className={`flex items-center gap-1.5 rounded px-1 py-0.5 transition-opacity ${
-                            visibleSlugs.has(c.slug) ? "opacity-100" : "opacity-30"
-                          }`}
-                          title={visibleSlugs.has(c.slug) ? `Hide ${c.name}` : `Show ${c.name}`}
-                        >
-                          <span
-                            className="inline-block h-3 w-3 rounded-[2px] flex-shrink-0"
-                            style={{ backgroundColor: c.color || "#475e77" }}
-                          />
-                          <span className="text-[10px] text-gray-600 dark:text-gray-400 font-medium whitespace-nowrap">
-                            {c.name}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
 
-                    <div className="w-full">
-                      <PriceChart
-                        product={selectedProduct}
-                        competitors={onlineCompetitors}
-                        visibleSlugs={visibleSlugs}
-                      />
+                      <div className="w-full flex-1">
+                        <PriceChart
+                          history={activeHistory}
+                          competitors={onlineCompetitors}
+                          visibleSlugs={visibleSlugs}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Insights */}
-              <div className="rounded-xl border border-gray-200 dark:border-[#262c3d] bg-white dark:bg-[#151a2a] p-5 shadow-sm">
-                <h3 className="mb-5 text-base font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-[#262c3d] pb-2">
+              {/* Insights Sidebar */}
+              <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-[#262c3d] dark:bg-[#151a2a]">
+                <h3 className="mb-5 border-b border-gray-100 pb-2 text-base font-bold text-gray-900 dark:border-[#262c3d] dark:text-white">
                   Insights
                 </h3>
 
-                {/* Lowest price competitor */}
+                {/* Lowest Price Alert */}
                 {(() => {
                   const competitorPrices = (selectedProduct.competitor_prices || [])
                     .filter((c) => c.price !== null)
@@ -533,18 +641,18 @@ export default function ProductHistory() {
                   const lowestComp = storeCompetitors.find((c) => c.slug === lowest?.slug);
 
                   return (
-                    <div className="mb-4 rounded border border-gray-200 dark:border-[#262c3d] p-3 shadow-sm">
+                    <div className="mb-4 rounded border border-gray-200 p-3 shadow-sm dark:border-[#262c3d]">
                       <p className="mb-2 text-[11px] font-semibold text-gray-600 dark:text-gray-400">Lowest Price Alert</p>
                       {lowest && lowestComp ? (
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <CompetitorLogo competitor={lowestComp} size={22} />
                             <div>
-                              <span className="text-xs font-semibold text-gray-800 dark:text-gray-300">{lowestComp.name} @ </span>
-                              <span className="text-xs font-bold text-[#2a4365] dark:text-blue-400">{fmt(lowest.price)}</span>
+                              <span className="text-xs font-semibold text-gray-800 dark:text-gray-300 truncate max-w-[80px] inline-block align-bottom">{lowestComp.name}</span>
+                              <span className="text-xs font-bold text-[#2a4365] dark:text-blue-400 ml-1">{fmt(lowest.price)}</span>
                             </div>
                           </div>
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400">
                             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                               <line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" />
                             </svg>
@@ -557,10 +665,10 @@ export default function ProductHistory() {
                   );
                 })()}
 
-                {/* All competitor current prices */}
-                <div className="rounded border border-gray-200 dark:border-[#262c3d] p-3 shadow-sm">
+                {/* Current Competitor Prices List */}
+                <div className="rounded border border-gray-200 p-3 shadow-sm dark:border-[#262c3d]">
                   <p className="mb-3 text-[11px] font-semibold text-gray-600 dark:text-gray-400">Current Competitor Prices</p>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-3 md:gap-2">
                     {(selectedProduct.competitor_prices || [])
                       .filter((c) => c.price !== null)
                       .sort((a, b) => a.price - b.price)
@@ -573,12 +681,12 @@ export default function ProductHistory() {
                           <div key={cp.slug} className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <CompetitorLogo competitor={comp} size={20} />
-                              <span className="text-[11px] font-medium text-gray-700 dark:text-gray-300">{comp.name}</span>
+                              <span className="text-[11px] font-medium text-gray-700 dark:text-gray-300 truncate max-w-[70px]">{comp.name}</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-bold text-gray-800 dark:text-white">{fmt(cp.price)}</span>
                               {diff !== null && diff !== 0 && (
-                                <span className={`text-[10px] font-semibold ${diff > 0 ? "text-emerald-600" : "text-rose-500"}`}>
+                                <span className={`text-[10px] font-semibold shrink-0 ${diff > 0 ? "text-emerald-600" : "text-rose-500"}`}>
                                   {diff > 0 ? "▲" : "▼"} {fmt(Math.abs(diff))}
                                 </span>
                               )}
@@ -592,17 +700,16 @@ export default function ProductHistory() {
                   </div>
                 </div>
 
-                {/* Price stability */}
-                <div className="mt-4 rounded border border-gray-200 dark:border-[#262c3d] p-3 shadow-sm">
-                  <p className="mb-3 text-[11px] font-semibold text-gray-600 dark:text-gray-400">Price Stability</p>
+                {/* Price Stability */}
+                <div className="mt-4 rounded border border-gray-200 p-3 shadow-sm dark:border-[#262c3d]">
+                  <p className="mb-3 text-[11px] font-semibold text-gray-600 dark:text-gray-400">Price Stability ({daysRange} Days)</p>
                   {(() => {
-                    const history    = selectedProduct.price_history_30days || [];
-                    const ourPrices  = history.map((h) => parsePrice(h.product_price)).filter((v) => v !== null);
+                    const ourPrices = activeHistory.map((h) => parsePrice(h.product_price)).filter((v) => v !== null);
                     if (ourPrices.length < 2) return <p className="text-xs text-gray-400">Not enough data</p>;
-                    const min        = Math.min(...ourPrices), max = Math.max(...ourPrices);
-                    const stability  = max > 0 ? Math.round((1 - (max - min) / max) * 100) : 100;
-                    const label      = stability >= 90 ? "High" : stability >= 70 ? "Medium" : "Low";
-                    const color      = stability >= 90 ? "text-green-600 dark:text-green-400" : stability >= 70 ? "text-amber-500" : "text-rose-500";
+                    const min         = Math.min(...ourPrices), max = Math.max(...ourPrices);
+                    const stability   = max > 0 ? Math.round((1 - (max - min) / max) * 100) : 100;
+                    const label       = stability >= 90 ? "High" : stability >= 70 ? "Medium" : "Low";
+                    const color       = stability >= 90 ? "text-green-600 dark:text-green-400" : stability >= 70 ? "text-amber-500" : "text-rose-500";
                     return (
                       <>
                         <div className="mb-2 flex items-center justify-between">
@@ -610,7 +717,7 @@ export default function ProductHistory() {
                           <span className="text-sm font-bold text-gray-800 dark:text-white">{stability}/100</span>
                         </div>
                         <div className="h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-700">
-                          <div className="h-full rounded-full bg-[#2a4365] dark:bg-blue-500" style={{ width: `${stability}%` }} />
+                          <div className="h-full rounded-full bg-[#2a4365] transition-all dark:bg-blue-500" style={{ width: `${stability}%` }} />
                         </div>
                       </>
                     );
@@ -619,19 +726,19 @@ export default function ProductHistory() {
               </div>
             </div>
 
-            {/* Price History Table */}
-            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-[#262c3d] bg-white dark:bg-[#151a2a] shadow-sm mt-2">
-              <table className="min-w-[800px] w-full border-collapse">
+            {/* Price History Data Table - Wrapped in Scroll Container */}
+            <div className="mt-2 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-[#262c3d] dark:bg-[#151a2a]">
+              <table className="w-full min-w-[700px] border-collapse">
                 <thead>
-                  <tr className="border-b border-gray-200 dark:border-[#262c3d] bg-gray-50 dark:bg-[#0b101e]">
-                    <th className="px-5 py-4 text-left text-xs font-bold text-gray-800 dark:text-gray-300 w-32">DATE</th>
+                  <tr className="border-b border-gray-200 bg-gray-50 dark:border-[#262c3d] dark:bg-[#0b101e]">
+                    <th className="w-32 px-4 py-4 text-left text-xs font-bold text-gray-800 dark:text-gray-300">DATE</th>
                     <th className="px-4 py-4 text-center text-xs font-bold text-gray-800 dark:text-gray-300">Our Price</th>
                     {onlineCompetitors.map((comp) => (
                       <th key={comp.slug} className="px-4 py-3 text-center">
                         <div className="flex flex-col items-center gap-1">
-                          <CompetitorLogo competitor={comp} size={26} />
+                          <CompetitorLogo competitor={comp} size={22} />
                           <span
-                            className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap"
+                            className="whitespace-nowrap text-[9px] font-bold uppercase tracking-wide"
                             style={{ color: comp.color || "#475e77" }}
                           >
                             {comp.name}
@@ -641,30 +748,28 @@ export default function ProductHistory() {
                     ))}
                   </tr>
                 </thead>
-                <tbody>
-                  {tableHistory.length === 0 ? (
+                <tbody className="divide-y divide-gray-100 dark:divide-[#262c3d]">
+                  {activeHistory.length === 0 ? (
                     <tr>
                       <td
                         colSpan={2 + onlineCompetitors.length}
                         className="px-5 py-10 text-center text-sm text-gray-400"
                       >
-                        No price history available for this product
+                        No price history available
                       </td>
                     </tr>
                   ) : (
-                    tableHistory.map((row, index) => {
+                    activeHistory.map((row, index) => {
                       const ourP = parsePrice(row.product_price);
                       return (
                         <tr
                           key={row.display_date || index}
-                          className={`${
-                            index === tableHistory.length - 1 ? "" : "border-b border-gray-100 dark:border-[#262c3d]"
-                          } hover:bg-gray-50 dark:hover:bg-[#1e293b] transition-colors`}
+                          className="transition-colors hover:bg-gray-50 dark:hover:bg-[#1e293b]"
                         >
-                          <td className="px-5 py-3 text-xs font-semibold text-gray-800 dark:text-gray-300">
+                          <td className="px-4 py-3 text-[11px] font-semibold text-gray-800 dark:text-gray-300">
                             {row.display_date || "—"}
                           </td>
-                          <td className="px-4 py-3 text-center text-xs font-bold text-blue-600 dark:text-blue-400">
+                          <td className="px-4 py-3 text-center text-[11px] font-bold text-blue-600 dark:text-blue-400">
                             {ourP !== null ? fmt(ourP) : <span className="text-gray-400">—</span>}
                           </td>
                           {onlineCompetitors.map((comp) => {
@@ -673,8 +778,8 @@ export default function ProductHistory() {
                             return (
                               <td key={comp.slug} className="px-4 py-3 text-center">
                                 {p !== null ? (
-                                  <div className="flex flex-col items-center gap-0.5">
-                                    <span className="text-xs font-bold text-green-600 dark:text-green-400">{fmt(p)}</span>
+                                  <div className="flex flex-col items-center gap-0">
+                                    <span className="text-[11px] font-bold text-green-600 dark:text-green-400">{fmt(p)}</span>
                                     {diff !== null && diff !== 0 && (
                                       <span className={`text-[9px] font-semibold ${diff > 0 ? "text-amber-500" : "text-rose-500"}`}>
                                         {diff > 0 ? "▲" : "▼"} {fmt(Math.abs(diff))}
@@ -682,7 +787,7 @@ export default function ProductHistory() {
                                     )}
                                   </div>
                                 ) : (
-                                  <span className="text-gray-400 dark:text-gray-600 text-xs">—</span>
+                                  <span className="text-xs text-gray-400 dark:text-gray-600">—</span>
                                 )}
                               </td>
                             );

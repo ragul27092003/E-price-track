@@ -1,4 +1,4 @@
-import { Moon, Sun, Menu, LogOut } from "lucide-react";
+import { Moon, Sun, LogOut } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { fetchAllStores } from "@/services/authService";
 import { fetchProducts } from "@/services/productsService";
 import { fetchCompetitors } from "@/services/competitorsService";
 
-export function AppHeader({ onMenuToggle }) {
+export function AppHeader() {
   const user                 = useStore((s) => s.user);
   const profile              = useStore((s) => s.profile);
   const setProfile           = useStore((s) => s.setProfile);
@@ -101,13 +101,6 @@ export function AppHeader({ onMenuToggle }) {
 
   return (
     <header className="flex items-center h-16 px-6 border-b border-border bg-card shrink-0">
-      <button
-        onClick={onMenuToggle}
-        className="mr-4 flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors lg:hidden"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
-
       <div className="ml-auto flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={toggleDarkMode} className="text-muted-foreground hover:text-foreground">
           {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}

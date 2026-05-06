@@ -1,56 +1,50 @@
 import { useState, useEffect } from 'react';
 import {
-  Box, Typography, Card, CardContent, Button, Grid, TextField,
-  Select, MenuItem, FormControl, Stack,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  CircularProgress, Snackbar, Alert, Chip,
-} from '@mui/material';
-import StorefrontIcon      from '@mui/icons-material/Storefront';
-import LanguageIcon        from '@mui/icons-material/Language';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import AccessTimeIcon      from '@mui/icons-material/AccessTime';
-import CheckCircleIcon     from '@mui/icons-material/CheckCircle';
-import CancelIcon          from '@mui/icons-material/Cancel';
-import SyncIcon            from '@mui/icons-material/Sync';
-import API                 from '../hooks/useApi';
+  Storefront as StorefrontIcon,
+  Language as LanguageIcon,
+  InsertDriveFile as InsertDriveFileIcon,
+  AccessTime as AccessTimeIcon,
+  CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon,
+  Sync as SyncIcon,
+} from '@mui/icons-material';
+import API from '../hooks/useApi';
 
 const ManageFeedSetup = () => {
-  const [isLoading,    setIsLoading]    = useState(true);
-  const [isSaving,     setIsSaving]     = useState(false);
-  const [logsLoading,  setLogsLoading]  = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [logsLoading, setLogsLoading] = useState(true);
   const [activityLogs, setActivityLogs] = useState([]);
-  const [snack,        setSnack]        = useState({ open: false, msg: '', severity: 'success' });
+  const [snack, setSnack] = useState({ open: false, msg: '', severity: 'success' });
 
   const [formData, setFormData] = useState({
-    store_name:          '',
-    cms_upload_type:     'none',
-    feed_type:           'JSON',
-    feed_url:            '',
-    shopify_name:        '',
+    store_name: '',
+    cms_upload_type: 'none',
+    feed_type: 'JSON',
+    feed_url: '',
+    shopify_name: '',
     shopify_accesstoken: '',
-    schedule_info:       'Daily',
-    import_time:         '12:00 PM',
+    schedule_info: 'Daily',
+    import_time: '12:00 PM',
   });
 
-  // ── Load feed config ──────────────────────────────────────────────────────
   useEffect(() => {
     const fetchConfig = async () => {
       try {
         const res = await API.get('/feeds');
-        const d   = res.data || {};
+        const d = res.data || {};
         setFormData((prev) => ({
           ...prev,
-          store_name:          d.store_name          || d.feed_name || '',
-          cms_upload_type:     d.cms_upload_type     || 'none',
-          feed_type:           d.feed_type           ? d.feed_type.toUpperCase() : 'JSON',
-          feed_url:            d.feed_url            || '',
-          shopify_name:        d.shopify_name        || '',
+          store_name: d.store_name || d.feed_name || '',
+          cms_upload_type: d.cms_upload_type || 'none',
+          feed_type: d.feed_type ? d.feed_type.toUpperCase() : 'JSON',
+          feed_url: d.feed_url || '',
+          shopify_name: d.shopify_name || '',
           shopify_accesstoken: d.shopify_accesstoken || '',
-          schedule_info:       d.schedule_info       || 'Daily',
-          import_time:         d.import_time         || '12:00 PM',
+          schedule_info: d.schedule_info || 'Daily',
+          import_time: d.import_time || '12:00 PM',
         }));
       } catch (err) {
-        console.error('Error fetching feed setup:', err);
         showSnack('Failed to load feed configuration', 'error');
       } finally {
         setIsLoading(false);
@@ -72,18 +66,22 @@ const ManageFeedSetup = () => {
     }
   };
 
-  const showSnack = (msg, severity = 'success') =>
+  const showSnack = (msg, severity = 'success') => {
     setSnack({ open: true, msg, severity });
+    setTimeout(() => setSnack({ open: false, msg: '', severity: 'success' }), 4000);
+  };
 
   const handleChange = (e) =>
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
-  // Clicking a card sets cms_upload_type; clicking the active card again resets to 'none'
   const handleCardSelect = (type) =>
     setFormData((prev) => ({
       ...prev,
       cms_upload_type: prev.cms_upload_type === type ? 'none' : type,
     }));
+
+  const isShopify = formData.cms_upload_type === 'shopify';
+  const isWordPress = formData.cms_upload_type === 'wordpress';
 
   const handleSave = async () => {
     if (isShopify) {
@@ -100,14 +98,8 @@ const ManageFeedSetup = () => {
     setIsSaving(true);
     try {
       await API.put('/feeds', {
-        store_name:          formData.store_name,
-        cms_upload_type:     formData.cms_upload_type,
-        feed_type:           formData.feed_type.toLowerCase(),
-        feed_url:            formData.feed_url,
-        shopify_name:        formData.shopify_name,
-        shopify_accesstoken: formData.shopify_accesstoken,
-        schedule_info:       formData.schedule_info,
-        import_time:         formData.import_time,
+        ...formData,
+        feed_type: formData.feed_type.toLowerCase(),
       });
       showSnack('Configuration saved successfully');
       loadActivityLog();
@@ -120,400 +112,288 @@ const ManageFeedSetup = () => {
 
   if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}>
-        <CircularProgress />
-      </Box>
+      <div className="flex justify-center p-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+      </div>
     );
   }
 
-  const isShopify   = formData.cms_upload_type === 'shopify';
-  const isWordPress = formData.cms_upload_type === 'wordpress';
-
-  // Card border highlight when active
-  const cardSx = (type) => ({
-    borderRadius: 2,
-    cursor: 'pointer',
-    borderColor: formData.cms_upload_type === type ? '#3b9d9d' : '#e0e0e0',
-    borderWidth: formData.cms_upload_type === type ? 2 : 1,
-    boxShadow:   formData.cms_upload_type === type ? '0 0 0 2px #3b9d9d22' : 'none',
-    transition:  'border-color 0.2s, box-shadow 0.2s',
-  });
-
   return (
-    <Box sx={{ p: 3, maxWidth: '100%', bgcolor: '#ffffff', color: '#333' }}>
-
-      {/* ── Description ── */}
-      <Typography variant="body2" sx={{ color: '#555', mb: 3 }}>
+    <div className="p-6 max-w-full bg-white text-gray-800 font-sans">
+      {/* Description */}
+      <p className="text-sm text-gray-600 mb-6">
         Please set the format, text encoding and upload product feed file for us to process.
-      </Typography>
+      </p>
 
-      {/* ── 3 source cards — clicking sets cms_upload_type ── */}
-      <Box mb={4}>
-        <Grid container spacing={2}>
+      {/* Source Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        {/* Shopify Card */}
+        <div 
+          onClick={() => handleCardSelect('shopify')}
+          className={`relative p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
+            isShopify ? 'border-teal-600 ring-2 ring-teal-600 ring-opacity-20' : 'border-gray-200'
+          }`}
+        >
+          <div className="flex items-center gap-4 mb-3">
+            <StorefrontIcon className="text-4xl text-[#96bf48]" />
+            <div className="flex-1">
+              <h4 className="text-sm font-bold">Shopify</h4>
+              <p className="text-xs text-gray-500 leading-tight">Connect your Shopify store for automatic sync.</p>
+            </div>
+            {isShopify && (
+              <span className="bg-teal-600 text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold">Active</span>
+            )}
+          </div>
+          <button 
+            className={`w-full py-1.5 rounded text-sm font-medium transition-colors ${
+              isShopify ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-transparent border border-gray-300 text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            {isShopify ? 'Connected' : 'Connect'}
+          </button>
+        </div>
 
-          {/* Shopify card */}
-          <Grid item xs={12} md={4}>
-            <Card
-              variant="outlined"
-              sx={cardSx('shopify')}
-              onClick={() => handleCardSelect('shopify')}
-            >
-              <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, pb: 1 }}>
-                <StorefrontIcon sx={{ fontSize: 40, color: '#96bf48' }} />
-                <Box>
-                  <Typography variant="subtitle2" fontWeight="bold">Shopify</Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }}>
-                    Connect your Shopify store for<br />automatic sync.
-                  </Typography>
-                </Box>
-                {isShopify && (
-                  <Chip label="Active" size="small" sx={{ ml: 'auto', bgcolor: '#3b9d9d', color: '#fff', fontSize: 10 }} />
-                )}
-              </CardContent>
-              <Box p={1.5} pt={0} sx={{ display: 'flex', justifyContent: 'center' }}>
-                <Button
-                  variant={isShopify ? 'contained' : 'outlined'}
-                  size="small"
-                  sx={{
-                    textTransform: 'none',
-                    minWidth: 100,
-                    color:        isShopify ? '#fff' : '#555',
-                    borderColor:  '#ccc',
-                    bgcolor:      isShopify ? '#3b9d9d' : 'transparent',
-                    '&:hover':    { bgcolor: isShopify ? '#2e8080' : undefined },
-                  }}
-                  onClick={(e) => { e.stopPropagation(); handleCardSelect('shopify'); }}
-                >
-                  {isShopify ? 'Connected' : 'Connect'}
-                </Button>
-              </Box>
-            </Card>
-          </Grid>
+        {/* WordPress Card */}
+        <div 
+          onClick={() => handleCardSelect('wordpress')}
+          className={`relative p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
+            isWordPress ? 'border-teal-600 ring-2 ring-teal-600 ring-opacity-20' : 'border-gray-200'
+          }`}
+        >
+          <div className="flex items-center gap-4 mb-3">
+            <LanguageIcon className="text-4xl text-[#21759b]" />
+            <div className="flex-1">
+              <h4 className="text-sm font-bold">WordPress</h4>
+              <p className="text-xs text-gray-500 leading-tight">Link your WooCommerce store for seamless integration.</p>
+            </div>
+            {isWordPress && (
+              <span className="bg-teal-600 text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold">Active</span>
+            )}
+          </div>
+          <button 
+            className={`w-full py-1.5 rounded text-sm font-medium transition-colors ${
+              isWordPress ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-transparent border border-gray-300 text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            {isWordPress ? 'Connected' : 'Connect'}
+          </button>
+        </div>
 
-          {/* WordPress card */}
-          <Grid item xs={12} md={4}>
-            <Card
-              variant="outlined"
-              sx={cardSx('wordpress')}
-              onClick={() => handleCardSelect('wordpress')}
-            >
-              <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, pb: 1 }}>
-                <LanguageIcon sx={{ fontSize: 40, color: '#21759b' }} />
-                <Box>
-                  <Typography variant="subtitle2" fontWeight="bold">WordPress</Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }}>
-                    Link your WooCommerce store for<br />seamless integration.
-                  </Typography>
-                </Box>
-                {isWordPress && (
-                  <Chip label="Active" size="small" sx={{ ml: 'auto', bgcolor: '#3b9d9d', color: '#fff', fontSize: 10 }} />
-                )}
-              </CardContent>
-              <Box p={1.5} pt={0} sx={{ display: 'flex', justifyContent: 'center' }}>
-                <Button
-                  variant={isWordPress ? 'contained' : 'outlined'}
-                  size="small"
-                  sx={{
-                    textTransform: 'none',
-                    minWidth: 100,
-                    color:        isWordPress ? '#fff' : '#555',
-                    borderColor:  '#ccc',
-                    bgcolor:      isWordPress ? '#3b9d9d' : 'transparent',
-                    '&:hover':    { bgcolor: isWordPress ? '#2e8080' : undefined },
-                  }}
-                  onClick={(e) => { e.stopPropagation(); handleCardSelect('wordpress'); }}
-                >
-                  {isWordPress ? 'Connected' : 'Connect'}
-                </Button>
-              </Box>
-            </Card>
-          </Grid>
+        {/* URL Feed Card */}
+        <div 
+          onClick={() => handleCardSelect('none')}
+          className={`relative p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
+            (!isShopify && !isWordPress) ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white'
+          }`}
+        >
+          <div className="flex items-center gap-4 mb-3">
+            <InsertDriveFileIcon className="text-4xl text-[#3b6eac]" />
+            <div className="flex-1">
+              <h4 className="text-sm font-bold">URL Feed</h4>
+              <p className="text-xs text-gray-500 leading-tight">Import a product feed via URL (CSV, XML, JSON).</p>
+            </div>
+            {(!isShopify && !isWordPress) && (
+              <span className="bg-[#3b6eac] text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold">Active</span>
+            )}
+          </div>
+          <button className="w-full py-1.5 bg-[#3b6eac] hover:bg-[#2d5a8e] text-white rounded text-sm font-medium transition-colors">
+            Import
+          </button>
+        </div>
+      </div>
 
-          {/* URL Feed card */}
-          <Grid item xs={12} md={4}>
-            <Card
-              variant="outlined"
-              sx={{
-                ...cardSx('none'),
-                borderColor: (!isShopify && !isWordPress) ? '#9bb8d9' : '#e0e0e0',
-                bgcolor:     (!isShopify && !isWordPress) ? '#eef3fb' : '#fff',
-              }}
-              onClick={() => handleCardSelect('none')}
-            >
-              <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, pb: 1 }}>
-                <InsertDriveFileIcon sx={{ fontSize: 40, color: '#3b6eac' }} />
-                <Box>
-                  <Typography variant="subtitle2" fontWeight="bold">URL Feed</Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.2 }}>
-                    Import a product feed via URL (CSV,<br />XML, JSON).
-                  </Typography>
-                </Box>
-                {(!isShopify && !isWordPress) && (
-                  <Chip label="Active" size="small" sx={{ ml: 'auto', bgcolor: '#3b6eac', color: '#fff', fontSize: 10 }} />
-                )}
-              </CardContent>
-              <Box p={1.5} pt={0} sx={{ display: 'flex', justifyContent: 'center' }}>
-                <Button
-                  variant="contained"
-                  size="small"
-                  sx={{ textTransform: 'none', minWidth: 100, bgcolor: '#3b6eac', boxShadow: 'none', '&:hover': { bgcolor: '#2d5a8e' } }}
-                  onClick={(e) => { e.stopPropagation(); handleCardSelect('none'); }}
-                >
-                  Import
-                </Button>
-              </Box>
-            </Card>
-          </Grid>
+      {/* Feed Name */}
+      <div className="flex items-center gap-4 mb-6">
+        <span className="text-sm text-gray-600 min-w-[110px]">Feed Name:</span>
+        <span className="text-base font-semibold text-red-600">{formData.store_name || '—'}</span>
+      </div>
 
-        </Grid>
-      </Box>
-
-      {/* ── Feed Name (read-only red label from store_name in DB) ── */}
-      <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 3 }}>
-        <Typography variant="body2" sx={{ color: '#555', minWidth: 110 }}>Feed Name:</Typography>
-        <Typography variant="body1" sx={{ color: '#d32f2f', fontWeight: 600 }}>
-          {formData.store_name || '—'}
-        </Typography>
-      </Stack>
-
-      {/* ── SHOPIFY: Store Name + Access Token + Get Products button ── */}
+      {/* Shopify Configuration Section */}
       {isShopify && (
-        <Box mb={3}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-            <Typography variant="subtitle1" fontWeight="bold">Shopify Configuration</Typography>
-            {/* Get Products only shows when Shopify is active */}
-            <Button
-              variant="contained"
-              startIcon={<SyncIcon />}
-              sx={{ bgcolor: '#3b9d9d', textTransform: 'none', '&:hover': { bgcolor: '#2e8080' } }}
+        <div className="mb-6 space-y-4 animate-fadeIn">
+          <div className="flex justify-between items-center">
+            <h3 className="text-md font-bold">Shopify Configuration</h3>
+            <button 
               onClick={loadActivityLog}
+              className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded text-sm transition-colors"
             >
-              Get Products
-            </Button>
-          </Stack>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <Typography variant="caption" fontWeight="bold" sx={{ mb: 0.5, display: 'block' }}>
-                Shopify Store Name:
-              </Typography>
-              <TextField
-                fullWidth size="small" variant="outlined"
-                placeholder="e.g. my-store.myshopify.com"
+              <SyncIcon fontSize="small" /> Get Products
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-xs font-bold mb-1">Shopify Store Name:</label>
+              <input 
                 name="shopify_name"
                 value={formData.shopify_name}
                 onChange={handleChange}
+                placeholder="e.g. my-store.myshopify.com"
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600"
               />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Typography variant="caption" fontWeight="bold" sx={{ mb: 0.5, display: 'block' }}>
-                Shopify Access Token:
-              </Typography>
-              <TextField
-                fullWidth size="small" variant="outlined"
-                placeholder="shpat_xxxxxxxxxxxxxxxx"
+            </div>
+            <div>
+              <label className="block text-xs font-bold mb-1">Shopify Access Token:</label>
+              <input 
                 name="shopify_accesstoken"
                 value={formData.shopify_accesstoken}
                 onChange={handleChange}
+                placeholder="shpat_xxxxxxxxxxxxxxxx"
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600"
               />
-            </Grid>
-          </Grid>
-        </Box>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* ── URL Feed / WordPress: original URL Feed Configuration form ── */}
+      {/* URL / Schedule Section */}
       {!isShopify && (
-        <Box mb={3}>
-          <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
-            URL Feed Configuration
-          </Typography>
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={3}>
-              <Typography variant="caption" fontWeight="bold" sx={{ mb: 0.5, display: 'block' }}>Feed Format</Typography>
-              <FormControl fullWidth size="small">
-                <Select name="feed_type" value={formData.feed_type} onChange={handleChange}>
-                  <MenuItem value="JSON">JSON</MenuItem>
-                  <MenuItem value="CSV">CSV</MenuItem>
-                  <MenuItem value="XML">XML</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={9}>
-              <Typography variant="caption" fontWeight="bold" sx={{ mb: 0.5, display: 'block' }}>URL for Import</Typography>
-              <TextField
-                fullWidth size="small" variant="outlined"
+        <div className="mb-6 space-y-4">
+          <h3 className="text-md font-bold">URL Feed Configuration</h3>
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <div className="md:col-span-3">
+              <label className="block text-xs font-bold mb-1">Feed Format</label>
+              <select 
+                name="feed_type" 
+                value={formData.feed_type} 
+                onChange={handleChange}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white"
+              >
+                <option value="JSON">JSON</option>
+                <option value="CSV">CSV</option>
+                <option value="XML">XML</option>
+              </select>
+            </div>
+            <div className="md:col-span-9">
+              <label className="block text-xs font-bold mb-1">URL for Import</label>
+              <input 
                 name="feed_url"
                 value={formData.feed_url}
                 onChange={handleChange}
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600"
               />
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="caption" fontWeight="bold" sx={{ mb: 0.5, display: 'block' }}>Import Schedule</Typography>
-                  <FormControl fullWidth size="small">
-                    <Select name="schedule_info" value={formData.schedule_info} onChange={handleChange}>
-                      <MenuItem value="Daily">Daily</MenuItem>
-                      <MenuItem value="Weekly">Weekly</MenuItem>
-                      <MenuItem value="Hourly">Hourly</MenuItem>
-                      <MenuItem value="Monthly">Monthly</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" sx={{ mb: 0.5, display: 'block', visibility: 'hidden' }}>At</Typography>
-                  <TextField
-                    fullWidth size="small"
-                    name="import_time"
-                    value={formData.import_time}
-                    onChange={handleChange}
-                    InputProps={{
-                      startAdornment: <AccessTimeIcon sx={{ color: 'action.active', mr: 1, fontSize: 20 }} />,
-                      sx: { bgcolor: '#f4f5f8' },
-                    }}
-                  />
-                </Grid>
-              </Grid>
-            </Grid>
-          </Grid>
-        </Box>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* ── Shopify: import schedule ── */}
-      {isShopify && (
-        <Box mb={3}>
-          <Grid container spacing={2}>
-            <Grid item xs={6} md={3}>
-              <Typography variant="caption" fontWeight="bold" sx={{ mb: 0.5, display: 'block' }}>Import Schedule</Typography>
-              <FormControl fullWidth size="small">
-                <Select name="schedule_info" value={formData.schedule_info} onChange={handleChange}>
-                  <MenuItem value="Daily">Daily</MenuItem>
-                  <MenuItem value="Weekly">Weekly</MenuItem>
-                  <MenuItem value="Hourly">Hourly</MenuItem>
-                  <MenuItem value="Monthly">Monthly</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6} md={3}>
-              <Typography variant="caption" sx={{ mb: 0.5, display: 'block', visibility: 'hidden' }}>At</Typography>
-              <TextField
-                fullWidth size="small"
+      {/* Common Import Schedule Section */}
+      <div className="mb-6 max-w-md">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold mb-1">Import Schedule</label>
+            <select 
+              name="schedule_info" 
+              value={formData.schedule_info} 
+              onChange={handleChange}
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white"
+            >
+              <option value="Daily">Daily</option>
+              <option value="Weekly">Weekly</option>
+              <option value="Hourly">Hourly</option>
+              <option value="Monthly">Monthly</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs invisible mb-1">At</label>
+            <div className="relative">
+              <AccessTimeIcon className="absolute left-3 top-2.5 text-gray-400 text-sm" />
+              <input 
                 name="import_time"
                 value={formData.import_time}
                 onChange={handleChange}
-                InputProps={{
-                  startAdornment: <AccessTimeIcon sx={{ color: 'action.active', mr: 1, fontSize: 20 }} />,
-                  sx: { bgcolor: '#f4f5f8' },
-                }}
+                className="w-full border border-gray-300 bg-gray-50 rounded pl-10 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600"
               />
-            </Grid>
-          </Grid>
-        </Box>
-      )}
+            </div>
+          </div>
+        </div>
+      </div>
 
-      {/* ── Save button ── */}
-      <Box mt={4} mb={5}>
-        <Button
-          variant="contained"
+      {/* Save Button */}
+      <div className="mt-8 mb-10">
+        <button 
           onClick={handleSave}
           disabled={isSaving}
-          startIcon={isSaving ? <CircularProgress size={14} color="inherit" /> : null}
-          sx={{ bgcolor: '#3b9d9d', textTransform: 'none', '&:hover': { bgcolor: '#2e8080' } }}
+          className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 text-white px-6 py-2 rounded text-sm font-medium transition-colors"
         >
-          {isSaving ? 'Saving...' : '→ Save'}
-        </Button>
-      </Box>
+          {isSaving ? (
+            <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></span>
+          ) : '→'} Save
+        </button>
+      </div>
 
-      {/* ── Activity Log ── */}
-      <Box mb={4}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
-          <Box>
-            <Typography variant="subtitle1" fontWeight="bold">Activity Log</Typography>
-            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-              Last sync attempts
-            </Typography>
-          </Box>
-          <Button
-            size="small"
-            startIcon={<SyncIcon fontSize="small" />}
-            onClick={loadActivityLog}
+      {/* Activity Log */}
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h3 className="text-md font-bold">Activity Log</h3>
+            <p className="text-[11px] text-gray-500">Last sync attempts</p>
+          </div>
+          <button 
+            onClick={loadActivityLog} 
             disabled={logsLoading}
-            sx={{ textTransform: 'none', color: '#3b9d9d' }}
+            className="text-teal-600 hover:text-teal-800 text-xs font-medium flex items-center gap-1"
           >
-            Refresh
-          </Button>
-        </Stack>
+            <SyncIcon fontSize="inherit" /> Refresh
+          </button>
+        </div>
 
-        <TableContainer sx={{ borderTop: '1px solid #eee' }}>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', borderBottom: '1px solid #eee', color: '#555', whiteSpace: 'nowrap' }}>
-                  Date &amp; Time
-                </TableCell>
-                <TableCell sx={{ fontWeight: 'bold', borderBottom: '1px solid #eee', color: '#555' }}>
-                  Status
-                </TableCell>
-                <TableCell sx={{ fontWeight: 'bold', borderBottom: '1px solid #eee', color: '#555' }}>
-                  Message
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
+        <div className="overflow-x-auto border-t border-gray-100">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="text-gray-500 text-xs uppercase font-bold">
+                <th className="py-3 border-b border-gray-100">Date & Time</th>
+                <th className="py-3 border-b border-gray-100">Status</th>
+                <th className="py-3 border-b border-gray-100">Message</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm">
               {logsLoading ? (
-                <TableRow>
-                  <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
-                    <CircularProgress size={22} />
-                  </TableCell>
-                </TableRow>
+                <tr>
+                  <td colSpan="3" className="py-10 text-center">
+                    <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-teal-600"></div>
+                  </td>
+                </tr>
               ) : activityLogs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={3} align="center" sx={{ py: 3, color: '#999', fontSize: '0.85rem' }}>
-                    No activity logs found
-                  </TableCell>
-                </TableRow>
+                <tr>
+                  <td colSpan="3" className="py-8 text-center text-gray-400 italic">No activity logs found</td>
+                </tr>
               ) : (
                 activityLogs.map((log, idx) => (
-                  <TableRow key={idx} sx={{ '& td': { borderBottom: '1px solid #f5f5f5' } }}>
-                    <TableCell sx={{ fontSize: '0.82rem', py: 1.5, color: '#333', whiteSpace: 'nowrap' }}>
-                      {log.date}
-                    </TableCell>
-                    <TableCell sx={{ py: 1.5 }}>
-                      <Stack direction="row" alignItems="center" spacing={0.5}>
-                        {log.status === 'Success'
-                          ? <CheckCircleIcon sx={{ color: '#2e7d32', fontSize: 18 }} />
-                          : <CancelIcon      sx={{ color: '#d32f2f', fontSize: 18 }} />
-                        }
-                        <Typography
-                          variant="body2"
-                          sx={{ fontSize: '0.82rem', color: log.status === 'Success' ? '#2e7d32' : '#d32f2f', fontWeight: 500 }}
-                        >
+                  <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                    <td className="py-3 border-b border-gray-50 whitespace-nowrap">{log.date}</td>
+                    <td className="py-3 border-b border-gray-50">
+                      <div className="flex items-center gap-1.5">
+                        {log.status === 'Success' ? (
+                          <CheckCircleIcon className="text-[#2e7d32] !text-lg" />
+                        ) : (
+                          <CancelIcon className="text-[#d32f2f] !text-lg" />
+                        )}
+                        <span className={`font-medium ${log.status === 'Success' ? 'text-green-700' : 'text-red-700'}`}>
                           {log.status}
-                        </Typography>
-                      </Stack>
-                    </TableCell>
-                    <TableCell sx={{ fontSize: '0.82rem', py: 1.5, color: '#555' }}>
-                      {log.message}
-                    </TableCell>
-                  </TableRow>
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3 border-b border-gray-50 text-gray-600">{log.message}</td>
+                  </tr>
                 ))
               )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Box>
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-      <Snackbar
-        open={snack.open}
-        autoHideDuration={4000}
-        onClose={() => setSnack((s) => ({ ...s, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert severity={snack.severity} onClose={() => setSnack((s) => ({ ...s, open: false }))} sx={{ width: '100%' }}>
-          {snack.msg}
-        </Alert>
-      </Snackbar>
-
-    </Box>
+      {/* Snackbar / Alert */}
+      {snack.open && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 min-w-[300px] shadow-lg animate-bounceIn">
+          <div className={`p-3 rounded-lg text-white text-sm flex justify-between items-center ${
+            snack.severity === 'error' ? 'bg-red-600' : 'bg-teal-700'
+          }`}>
+            <span>{snack.msg}</span>
+            <button onClick={() => setSnack({ ...snack, open: false })} className="ml-4 font-bold">×</button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

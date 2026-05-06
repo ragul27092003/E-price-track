@@ -1,111 +1,103 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Stack, Paper, CircularProgress, Tooltip } from '@mui/material';
 import { useStore } from '../store';
 import { fetchCompetitors } from '../services/competitorsService';
 
 // ─── Single competitor row ────────────────────────────────────────────────────
 const CompetitorRow = ({ data, onClick }) => {
   const isNegDelta = String(data.avgPriceDelta).includes('-');
-  const isOffline  = !data.isActive;
+  const isOffline = !data.isActive;
 
   return (
-    <Tooltip
-      title={isOffline ? 'This competitor is offline. Enable it in Competitors to view products.' : ''}
-      placement="top"
-      arrow
-    >
-      <Box
+    <div className="group relative">
+      <div
         onClick={() => !isOffline && onClick(data)}
-        sx={{
-          display: 'flex', alignItems: 'center', p: 1.5,
-          border: '1px solid #90caf9', borderRadius: 2, mb: 1.5,
-          bgcolor: isOffline ? '#f5f5f5' : '#ffffff',
-          cursor: isOffline ? 'not-allowed' : 'pointer',
-          opacity: isOffline ? 0.55 : 1,
-          transition: 'box-shadow 0.15s, background 0.15s',
-          '&:hover': !isOffline ? { boxShadow: 3, bgcolor: '#f0f7ff' } : {},
-        }}
+        className={`flex flex-col sm:flex-row sm:items-center p-4 border rounded-lg mb-3 transition-all duration-150 shadow-sm gap-3 sm:gap-0
+          ${isOffline 
+            ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-60' 
+            : 'bg-white border-blue-200 cursor-pointer hover:shadow-md hover:bg-blue-50'
+          }`}
       >
         {/* Logo + Name */}
-        <Stack direction="row" alignItems="center" spacing={2} sx={{ width: '45%' }}>
-          <Box sx={{
-            width: 44, height: 44, bgcolor: data.color || '#475e77',
-            borderRadius: 1, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', overflow: 'hidden',
-            border: '1px solid #eee', flexShrink: 0,
-          }}>
+        <div className="flex items-center gap-4 w-full sm:w-[45%]">
+          <div 
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded border border-gray-200 flex items-center justify-center overflow-hidden shrink-0 shadow-sm"
+            style={{ backgroundColor: data.color || '#475e77' }}
+          >
             {data.logo ? (
               <img
                 src={`http://localhost:5100${data.logo}`}
                 alt={data.name}
-                style={{ width: '100%', objectFit: 'contain' }}
+                className="w-full h-full object-contain"
                 onError={(e) => { e.target.style.display = 'none'; }}
               />
             ) : (
-              <Typography variant="caption" fontWeight="bold" color="#fff" fontSize={13}>
+              <span className="text-[12px] font-bold text-white uppercase">
                 {data.name.substring(0, 2).toUpperCase()}
-              </Typography>
+              </span>
             )}
-          </Box>
-          <Box>
-            <Typography variant="body2" fontWeight="600" color={isOffline ? '#9e9e9e' : '#333'}>
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className={`text-sm font-bold truncate ${isOffline ? 'text-gray-400' : 'text-gray-800'}`}>
               {data.name}
-            </Typography>
-            {isOffline && (
-              <Typography variant="caption" sx={{
-                bgcolor: '#f5f5f5', color: '#9e9e9e', border: '1px solid #e0e0e0',
-                borderRadius: 1, px: 0.8, py: 0.2, fontSize: 10, fontWeight: 600,
-              }}>
-                OFFLINE
-              </Typography>
+            </span>
+            {isOffline ? (
+              <span className="mt-0.5 w-fit bg-gray-200 text-gray-500 rounded px-1.5 py-0.5 text-[9px] font-black uppercase">
+                Offline
+              </span>
+            ) : (
+              <span className="sm:hidden text-[10px] text-blue-500 font-medium">Tap to view products</span>
             )}
-          </Box>
-        </Stack>
+          </div>
+        </div>
 
-        {/* Avg Price Delta */}
-        <Box sx={{ width: '20%' }}>
-          <Typography variant="body2" sx={{
-            color: isOffline ? '#bdbdbd' : isNegDelta ? '#d32f2f' : '#4caf50',
-            fontWeight: 'bold',
-          }}>
-            {isNegDelta ? '▼' : '▲'} {data.avgPriceDelta || '+0.0%'}
-          </Typography>
-        </Box>
+        {/* Info Container for Mobile Layout */}
+        <div className="flex items-center justify-between sm:contents w-full border-t sm:border-none pt-2 sm:pt-0">
+          
+          {/* Avg Price Delta */}
+          <div className="sm:w-[20%] flex flex-col sm:block">
+            <span className="sm:hidden text-[10px] font-bold text-gray-400 uppercase mb-1">Avg Delta</span>
+            <span className={`text-sm font-black ${
+              isOffline ? 'text-gray-300' : isNegDelta ? 'text-red-600' : 'text-green-600'
+            }`}>
+              {isNegDelta ? '▼' : '▲'} {data.avgPriceDelta || '+0.0%'}
+            </span>
+          </div>
 
-        {/* Products Tracked */}
-        <Box sx={{ width: '20%' }}>
-          <Typography variant="body2" fontWeight="500" color={isOffline ? '#bdbdbd' : '#333'}>
-            {data.productsTracked ?? 0} products
-          </Typography>
-        </Box>
+          {/* Products Tracked */}
+          <div className="sm:w-[20%] flex flex-col sm:block text-right sm:text-left">
+            <span className="sm:hidden text-[10px] font-bold text-gray-400 uppercase mb-1">Tracking</span>
+            <span className={`text-sm font-bold sm:font-medium ${isOffline ? 'text-gray-300' : 'text-gray-800'}`}>
+              {data.productsTracked ?? 0} <span className="text-[10px] sm:text-sm uppercase sm:normal-case">Items</span>
+            </span>
+          </div>
 
-        {/* Arrow hint for online competitors */}
-        <Box sx={{ width: '15%', display: 'flex', justifyContent: 'flex-end', pr: 1 }}>
-          {!isOffline && (
-            <Typography variant="body2" sx={{ color: '#90caf9', fontSize: 18 }}>›</Typography>
-          )}
-        </Box>
-      </Box>
-    </Tooltip>
+          {/* Arrow hint (Desktop only) */}
+          <div className="hidden sm:flex sm:w-[15%] justify-end pr-2">
+            {!isOffline && (
+              <span className="text-blue-300 text-xl font-light group-hover:translate-x-1 transition-transform">›</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 const MarketCompetitor = () => {
-  const navigate              = useNavigate();
-  const competitors           = useStore((s) => s.competitors);
-  const setCompetitors        = useStore((s) => s.setCompetitors);
-  const competitorsLoading    = useStore((s) => s.competitorsLoading);
+  const navigate = useNavigate();
+  const competitors = useStore((s) => s.competitors);
+  const setCompetitors = useStore((s) => s.setCompetitors);
+  const competitorsLoading = useStore((s) => s.competitorsLoading);
   const setCompetitorsLoading = useStore((s) => s.setCompetitorsLoading);
-  // ── FIX: watch activeStoreId → re-fetch on tenant switch ──
-  const activeStoreId         = useStore((s) => s.activeStoreId);
+  const activeStoreId = useStore((s) => s.activeStoreId);
 
   const load = async () => {
     setCompetitorsLoading(true);
     try {
       const data = await fetchCompetitors();
-      setCompetitors(data);
+      setCompetitors(data || []);
     } catch (err) {
       console.error('MarketCompetitor: failed to fetch competitors', err);
     } finally {
@@ -113,53 +105,52 @@ const MarketCompetitor = () => {
     }
   };
 
-  // ── FIX: re-fetch when tenant switches ──
   useEffect(() => { load(); }, [activeStoreId]);
 
-  // Clicking a competitor → navigate to Products filtered by that competitor's slug
-  // Products page reads ?competitor= from URL and passes it to the backend
   const handleCompetitorClick = (comp) => {
     navigate(`/products?competitor=${comp.slug}&name=${encodeURIComponent(comp.name)}`);
   };
 
   if (competitorsLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}>
-        <CircularProgress />
-      </Box>
+      <div className="flex justify-center p-20 bg-white min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ p: 3, bgcolor: '#ffffff', minHeight: '100vh', display: 'flex', justifyContent: 'center' }}>
-      <Paper variant="outlined" sx={{
-        borderRadius: 2, overflow: 'hidden', mb: 4,
-        borderColor: '#cfd8dc', width: '100%', maxWidth: 1000, height: 'fit-content',
-      }}>
-        <Box sx={{ bgcolor: '#475e77', color: '#fff', p: 1.5, px: 2 }}>
-          <Typography variant="subtitle2" fontWeight="bold">
-            Competitor Listings — Click a competitor to view their products
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', px: 3.5, pt: 2, pb: 1, bgcolor: '#f8fafd' }}>
-          <Typography variant="caption" fontWeight="bold" color="text.secondary" sx={{ width: '45%' }}>Competitor</Typography>
-          <Typography variant="caption" fontWeight="bold" color="text.secondary" sx={{ width: '20%' }}>Avg. Price Delta</Typography>
-          <Typography variant="caption" fontWeight="bold" color="text.secondary" sx={{ width: '20%' }}>Products Tracked</Typography>
-          <Typography variant="caption" fontWeight="bold" color="text.secondary" sx={{ width: '15%' }} />
-        </Box>
-        <Box sx={{ px: 2, pb: 2, pt: 0.5, bgcolor: '#f8fafd' }}>
+    <div className="p-3 sm:p-6 bg-white min-h-screen flex justify-center font-sans">
+      <div className="w-full max-w-[1000px] h-fit border border-gray-200 bg-white rounded-xl overflow-hidden shadow-sm">
+        {/* Header */}
+        <div className="bg-[#475e77] text-white p-4 px-5">
+          <h2 className="text-xs sm:text-sm font-bold">
+            Competitor Listings <span className="hidden sm:inline">— Click a competitor to view their products</span>
+          </h2>
+        </div>
+        
+        {/* Table Headings - Hidden on mobile, shown on SM+ screens */}
+        <div className="hidden sm:flex px-8 pt-5 pb-2 bg-[#f8fafd] border-b border-gray-100">
+          <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest w-[45%]">Competitor</span>
+          <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest w-[20%]">Avg. Price Delta</span>
+          <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest w-[20%]">Products Tracked</span>
+          <span className="w-[15%]" />
+        </div>
+
+        {/* Competitor Rows Container */}
+        <div className="p-3 sm:p-6 bg-[#f8fafd]">
           {competitors.length === 0 ? (
-            <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 3 }}>
+            <div className="py-12 text-center text-sm text-gray-400 italic">
               No competitors found.
-            </Typography>
+            </div>
           ) : (
             competitors.map((item) => (
               <CompetitorRow key={item.id} data={item} onClick={handleCompetitorClick} />
             ))
           )}
-        </Box>
-      </Paper>
-    </Box>
+        </div>
+      </div>
+    </div>
   );
 };
 
