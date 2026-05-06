@@ -197,7 +197,7 @@ function StockBadge({ stock }) {
   );
 }
 
-function RankBadge({ rank }) {
+function RankBadge({ rank, total }) {
   if (rank === null || rank === undefined) return null;
   const colors =
     rank === 1
@@ -205,9 +205,10 @@ function RankBadge({ rank }) {
       : rank === 2
       ? "bg-blue-100 text-blue-700 ring-blue-200"
       : "bg-rose-100 text-rose-700 ring-rose-200";
+  const label = total ? `${rank}/${total}` : `#${rank}`;
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ${colors}`}>
-      #{rank}
+      {label}
     </span>
   );
 }
@@ -292,8 +293,10 @@ function smoothPath(pts) {
 }
 
 function HistoricalPriceChart({ product, days, competitorMeta }) {
-  const svgRef  = useRef(null);
+  const svgRef     = useRef(null);
+  const wrapperRef = useRef(null);
   const [hoverIdx, setHoverIdx] = useState(null);
+  const [hoverContainerY, setHoverContainerY] = useState(0);
 
   const history = useMemo(() => {
     if (!product?.price_history_30days) return [];
@@ -363,6 +366,8 @@ function HistoricalPriceChart({ product, days, competitorMeta }) {
     if (svgPt.x < PL || svgPt.x > W - PR) { setHoverIdx(null); return; }
     const idx = Math.round(((svgPt.x - PL) / PW) * (chartData.length - 1));
     setHoverIdx(Math.max(0, Math.min(chartData.length - 1, idx)));
+    const wrapperRect = wrapperRef.current?.getBoundingClientRect();
+    if (wrapperRect) setHoverContainerY(e.clientY - wrapperRect.top);
   };
 
   if (!history.length || !allVals.length) {
@@ -413,15 +418,16 @@ function HistoricalPriceChart({ product, days, competitorMeta }) {
       </div>
 
       {/* Chart wrapper */}
-      <div className="flex-1 relative w-full min-h-[180px]">
+      <div className="flex-1 relative w-full min-h-[180px]" ref={wrapperRef}>
 
-        {/* Hover tooltip (HTML overlay) */}
+        {/* Hover tooltip — positioned above cursor */}
         {hovered && (
           <div
             className="absolute z-20 pointer-events-none bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-[11px] min-w-[140px]"
             style={{
               left: `clamp(0px, calc(${tooltipLeftPct}% - 70px), calc(100% - 160px))`,
-              top: "4px",
+              top: `${hoverContainerY}px`,
+              transform: "translateY(calc(-100% - 8px))",
             }}
           >
             <p className="font-bold text-slate-600 mb-1.5 border-b border-slate-100 pb-1">{hovered.date}</p>
@@ -549,6 +555,11 @@ function HistoricalPriceChart({ product, days, competitorMeta }) {
 // ─── Price Gap History Chart ──────────────────────────────────────────────────
 
 function PriceGapChart({ product }) {
+  const svgRef     = useRef(null);
+  const wrapperRef = useRef(null);
+  const [hoverIdx, setHoverIdx] = useState(null);
+  const [hoverContainerY, setHoverContainerY] = useState(0);
+
   const data = useMemo(() => {
     return (product?.price_history_30days || []).map((h) => {
       const ourPrice = parsePrice(h.product_price);
@@ -565,34 +576,139 @@ function PriceGapChart({ product }) {
 
   if (!data.length) return <div className="flex items-center justify-center h-full text-slate-400 text-sm">No gap data</div>;
 
-  const W = 240;
-  const H = 80;
-  const maxAbs = Math.max(...data.map((d) => Math.abs(d.gap)), 1) * 1.1;
-  const midY = H / 2;
-  const getX = (i) => (i / Math.max(data.length - 1, 1)) * W;
-  const getY = (v) => midY - (v / maxAbs) * midY;
+  const PL = 48, PR = 12, PT = 16, PB = 20;
+  const W = 320;
+  const H = 120;
+  const PW = W - PL - PR;
+  const PH = H - PT - PB;
+
+  const rawMax = Math.max(...data.map((d) => Math.abs(d.gap)), 1);
+  const span = rawMax || 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(span)));
+  const step = Math.ceil(span / mag) * mag;
+  const maxAbs = step;
+
+  const midY = PT + PH / 2;
+  const getX = (i) => PL + (i / Math.max(data.length - 1, 1)) * PW;
+  const getY = (v) => midY - (v / maxAbs) * (PH / 2);
 
   const linePath = data.map((d, i) => `${i === 0 ? "M" : "L"}${getX(i)} ${getY(d.gap)}`).join(" ");
 
+  const yTicks = [maxAbs, 0, -maxAbs];
+
+  const handleMouseMove = (e) => {
+    const svg = svgRef.current;
+    if (!svg || !data.length) return;
+    const pt  = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+    if (svgPt.x < PL || svgPt.x > W - PR) { setHoverIdx(null); return; }
+    const idx = Math.round(((svgPt.x - PL) / PW) * (data.length - 1));
+    setHoverIdx(Math.max(0, Math.min(data.length - 1, idx)));
+    const wrapperRect = wrapperRef.current?.getBoundingClientRect();
+    if (wrapperRect) setHoverContainerY(e.clientY - wrapperRect.top);
+  };
+
+  const hovered = hoverIdx !== null ? data[hoverIdx] : null;
+  const tooltipSvgX = hoverIdx !== null ? getX(hoverIdx) : 0;
+  const tooltipLeftPct = (tooltipSvgX / W) * 100;
+
+  const areaPath = `${linePath} L${getX(data.length - 1)} ${midY} L${getX(0)} ${midY} Z`;
+
   return (
     <div className="flex flex-col h-full w-full">
-      <div className="flex-1 relative w-full">
-        <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-          <path
-            d={`${linePath} L${W} ${midY} L0 ${midY} Z`}
-            fill="rgba(239,246,255,0.8)"
-          />
-          <line x1={0} y1={midY} x2={W} y2={midY} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4,3" />
-          <path d={linePath} fill="none" stroke="#2B86C5" strokeWidth="2" />
+      <div className="flex-1 relative w-full h-full min-h-[120px]" ref={wrapperRef}>
+
+        {/* Tooltip — positioned above cursor */}
+        {hovered && (
+          <div
+            className="absolute z-20 pointer-events-none bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-[11px] min-w-[130px]"
+            style={{
+              left: `clamp(0px, calc(${tooltipLeftPct}% - 65px), calc(100% - 130px))`,
+              top: `${hoverContainerY}px`,
+              transform: "translateY(calc(-100% - 8px))",
+            }}
+          >
+            <p className="font-bold text-slate-600 mb-1.5 border-b border-slate-100 pb-1">{hovered.date}</p>
+            <div className="flex items-center justify-between gap-3 mt-0.5">
+              <span className="text-slate-500">Gap vs Avg</span>
+              <span className={`font-bold ${hovered.gap < 0 ? "text-emerald-600" : hovered.gap > 0 ? "text-rose-600" : "text-slate-600"}`}>
+                {hovered.gap > 0 ? "+" : ""}{fmt(hovered.gap)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${H}`}
+          className="absolute inset-0 w-full h-full"
+          preserveAspectRatio="none"
+          onMouseMove={handleMouseMove}
+          onMouseLeave={() => setHoverIdx(null)}
+        >
+          <defs>
+            {/* Clip to above zero line → red zone (cost higher than market) */}
+            <clipPath id="pgc-above-zero">
+              <rect x={PL} y={PT} width={PW} height={midY - PT} />
+            </clipPath>
+            {/* Clip to below zero line → green zone (cost cheaper than market) */}
+            <clipPath id="pgc-below-zero">
+              <rect x={PL} y={midY} width={PW} height={PT + PH - midY} />
+            </clipPath>
+          </defs>
+
+          {/* Y-axis grid lines — zero line drawn bold as market reference */}
+          {yTicks.map(v => (
+            <g key={v}>
+              <line
+                x1={PL} y1={getY(v)} x2={W - PR} y2={getY(v)}
+                stroke={v === 0 ? "#475569" : "#e2e8f0"}
+                strokeWidth={v === 0 ? 2.5 : 1}
+                strokeDasharray={v === 0 ? "" : "4,3"}
+              />
+              <text x={PL - 8} y={getY(v)} textAnchor="end" dominantBaseline="middle" fontSize="9.5" fill={v === 0 ? "#475569" : "#94a3b8"} fontFamily="system-ui,sans-serif" fontWeight={v === 0 ? "600" : "normal"}>
+                {v > 0 ? `+${fmtTick(v)}` : v < 0 ? `-${fmtTick(Math.abs(v))}` : "0"}
+              </text>
+            </g>
+          ))}
+
+          {/* Red shadow: our cost HIGHER than market (gap > 0, above zero) */}
+          <path d={areaPath} fill="rgba(239,68,68,0.18)" clipPath="url(#pgc-above-zero)" />
+
+          {/* Green shadow: our cost CHEAPER than market (gap < 0, below zero) */}
+          <path d={areaPath} fill="rgba(34,197,94,0.18)" clipPath="url(#pgc-below-zero)" />
+
+          {/* Price gap line */}
+          <path d={linePath} fill="none" stroke="#2B86C5" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+
           {data.map((d, i) => (
             <circle key={i} cx={getX(i)} cy={getY(d.gap)} r="2.5" fill="#2B86C5" stroke="#fff" strokeWidth="1" />
           ))}
+
+          {hoverIdx !== null && hovered && (
+            <g>
+              <line
+                x1={getX(hoverIdx)} y1={PT}
+                x2={getX(hoverIdx)} y2={PT + PH}
+                stroke="#94a3b8" strokeWidth="1" strokeDasharray="4,3"
+              />
+              <circle
+                cx={getX(hoverIdx)} cy={getY(hovered.gap)}
+                r="4.5" fill={hovered.gap < 0 ? "#16a34a" : hovered.gap > 0 ? "#dc2626" : "#2B86C5"} stroke="#fff" strokeWidth="2"
+              />
+            </g>
+          )}
+
+          {data.map((d, i) =>
+            i % Math.max(Math.ceil(data.length / 5), 1) === 0 ? (
+              <text key={i} x={getX(i)} y={H - 4} textAnchor="middle" fontSize="9.5" fill="#94a3b8" fontFamily="system-ui,sans-serif">
+                {d.date}
+              </text>
+            ) : null
+          )}
         </svg>
-      </div>
-      <div className="mt-1 flex justify-between text-[10px] text-slate-400">
-        {data.map((d, i) =>
-          i % Math.max(Math.ceil(data.length / 5), 1) === 0 ? <span key={i}>{d.date}</span> : null
-        )}
       </div>
     </div>
   );
@@ -727,7 +843,7 @@ function CompetitorTable({ product, tab, competitorMeta }) {
                 </td>
                 <td className="px-4 py-3 text-right font-bold text-slate-800">{fmt(entry.price)}</td>
                 <td className="px-4 py-3 text-center">
-                  <RankBadge rank={rankNum} />
+                  <RankBadge rank={rankNum} total={allEntries.length} />
                 </td>
                 <td className={`px-4 py-3 text-right text-xs font-semibold ${diffColor}`}>
                   {diffLabel}
@@ -746,6 +862,7 @@ function CompetitorTable({ product, tab, competitorMeta }) {
 function HeaderMetrics({ product, tab }) {
   const ourPrice = parsePrice(product.product_price);
   const rank = computeRank(product);
+  const rankTotal = getCompPrices(product).length + 1;
   const marketAvg = getMarketAvg(product);
   const lowestComp = getLowestComp(product);
   const { low, avg, high } = getOurPriceStats(product);
@@ -818,7 +935,7 @@ function HeaderMetrics({ product, tab }) {
       <div className="h-10 w-px bg-slate-200" />
       <div>
         <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1">Rank</p>
-        <RankBadge rank={rank} />
+        <RankBadge rank={rank} total={rankTotal} />
       </div>
       <div className="h-10 w-px bg-slate-200" />
       <div>
@@ -834,6 +951,7 @@ function HeaderMetrics({ product, tab }) {
 function SidebarProduct({ product, isSelected, onClick, tab }) {
   const ourPrice = parsePrice(product.product_price);
   const rank = computeRank(product);
+  const rankTotal = getCompPrices(product).length + 1;
   const sparkData = (product.price_history_30days || [])
     .map((h) => parsePrice(h.product_price))
     .filter((v) => v !== null)
@@ -853,13 +971,91 @@ function SidebarProduct({ product, isSelected, onClick, tab }) {
         </p>
         <div className="flex items-center gap-2 mt-0.5">
           <p className="text-[11px] text-slate-500">{product.product_ean_id}</p>
-          {rank && <RankBadge rank={rank} />}
+          {rank && <RankBadge rank={rank} total={rankTotal} />}
         </div>
         <p className="text-[12px] font-bold text-slate-700 mt-0.5">{fmt(ourPrice)}</p>
       </div>
       <Sparkline data={sparkData} color={isSelected ? "#2B86C5" : "#94a3b8"} />
     </button>
   );
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+
+function exportSmartReportCSV(products, tab, competitorMeta) {
+  const escape = (val) => {
+    const s = String(val ?? "");
+    return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const fmtNum = (v) => (v !== null && v !== undefined ? v : "");
+  const isNonComp = tab === "Non Competitors";
+  const gapColName = tab === "Negative Trend" ? "Higher By" : "Cheaper By";
+
+  // Column order mirrors Products export: Name → Item Code → Rank → Competing With → Price → SAP → Store → Gap → ...
+  const headers = isNonComp
+    ? ["Product Name", "Item Code", "Price", "Sap Price", "Store Price", "Brand", "Item Groups", "Market Low (30d)", "Market Avg (30d)", "Market High (30d)", "Stock"]
+    : ["Product Name", "Item Code", "Ranking Position", "Price", "Sap Price", "Store Price", gapColName, "Competitor Name", "Competitor Price", "Brand", "Item Groups", "Competitor Detail", "Stock"];
+
+  const rows = products.map((p) => {
+    const ourPrice = parsePrice(p.product_price);
+    const rank = computeRank(p);
+    const comps = getCompPrices(p);
+    const rankTotal = comps.length + 1;
+    const lowest = comps.length ? comps.reduce((min, c) => (c.price < min.price ? c : min)) : null;
+    const lowestMeta = lowest ? (competitorMeta?.[lowest.slug] || {}) : {};
+    const lowestName = lowest ? (lowestMeta.name || lowest.name || lowest.slug) : "";
+    const marketAvg = getMarketAvg(p);
+    const pGroup = p.product_category ? p.product_category.split(">")[0].trim() : "";
+    const sap = fmtNum(parsePrice(p.product_sap_price));
+    const store = fmtNum(parsePrice(p.product_store_price));
+
+    const compDetail = comps
+      .map((c) => {
+        const m = competitorMeta?.[c.slug] || {};
+        return `${m.name || c.name || c.slug}: ₹${c.price.toLocaleString("en-IN")}`;
+      })
+      .join(" | ");
+
+    let gapAmount = "";
+    if (lowest && ourPrice !== null) {
+      gapAmount = tab === "Negative Trend" ? ourPrice - lowest.price : lowest.price - ourPrice;
+    }
+
+    const { low, avg, high } = isNonComp ? marketStats(p) : {};
+
+    const row = isNonComp
+      ? [
+          p.product_name || "",
+          p.product_ean_id || p.product_code || "",
+          fmtNum(ourPrice), sap, store,
+          p.product_brand || "", pGroup,
+          fmtNum(low), fmtNum(avg), fmtNum(high),
+          p.product_stock ?? "",
+        ]
+      : [
+          p.product_name || "",
+          p.product_ean_id || p.product_code || "",
+          rank !== null ? `="${rank}/${rankTotal}"` : "",
+          fmtNum(ourPrice), sap, store,
+          fmtNum(gapAmount),
+          lowestName,
+          fmtNum(lowest?.price),
+          p.product_brand || "", pGroup,
+          compDetail,
+          p.product_stock ?? "",
+        ];
+
+    return row.map(escape).join(",");
+  });
+
+  const csv = "﻿" + [headers.map(escape).join(","), ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `smart_report_${tab.toLowerCase().replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -928,18 +1124,33 @@ export default function SmartReports() {
   );
 
   return (
-    <div className="min-h-screen bg-white text-slate-800 p-6 md:p-8">
+    <div className="min-h-screen bg-white text-slate-800 p-3 md:p-6 lg:p-8">
       <div className="mx-auto max-w-[1400px]">
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <h2 className="mb-5 text-2xl font-bold text-slate-800">Smart Reports</h2>
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-xl md:text-2xl font-bold text-slate-800">Smart Reports</h2>
+            {tabProducts.length > 0 && (
+              <button
+                onClick={() => exportSmartReportCSV(tabProducts, activeTab, competitorMeta)}
+                className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors"
+              >
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Export {activeTab}
+              </button>
+            )}
+          </div>
 
           {/* Tab Navigation */}
-          <div className="mb-8 flex flex-wrap gap-6 border-b border-slate-200">
+          <div className="mb-8 flex overflow-x-auto border-b border-slate-200 gap-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {TABS.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`pb-3 text-sm font-semibold transition-all relative flex items-center gap-2 ${
+                className={`pb-3 text-sm font-semibold transition-all relative flex shrink-0 items-center gap-2 mr-5 whitespace-nowrap ${
                   activeTab === tab ? "text-[#1e6191]" : "text-slate-400 hover:text-slate-600"
                 }`}
               >
@@ -983,7 +1194,7 @@ export default function SmartReports() {
               ) : (
                 <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
                   {/* Left: Product Sidebar */}
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-sm h-[680px] overflow-y-auto flex flex-col gap-1">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-sm h-[300px] md:h-[680px] overflow-y-auto flex flex-col gap-1">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">
                       {tabProducts.length} Product{tabProducts.length !== 1 ? "s" : ""}
                     </p>
@@ -1011,23 +1222,25 @@ export default function SmartReports() {
                       </div>
 
                       {/* Header Metrics */}
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 shadow-sm">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 md:p-5 shadow-sm">
                         <HeaderMetrics product={selectedProduct} tab={activeTab} />
                       </div>
 
                       {/* Competitor Table (not for Non Competitors tab) */}
                       {activeTab !== "Non Competitors" && getCompPrices(selectedProduct).length > 0 && (
+                        <div className="overflow-x-auto rounded-xl">
                         <CompetitorTable
                           product={selectedProduct}
                           tab={activeTab}
                           competitorMeta={competitorMeta}
                         />
+                        </div>
                       )}
 
                       {/* Charts Row */}
                       <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
                         {/* Historical Price Trends */}
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 shadow-sm flex flex-col min-h-[300px]">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 md:p-5 shadow-sm flex flex-col min-h-[260px] md:min-h-[300px]">
                           <div className="mb-4 flex items-center justify-between">
                             <h3 className="text-sm font-bold text-slate-800">Historical Price Trends</h3>
                             <select
@@ -1052,7 +1265,7 @@ export default function SmartReports() {
                         {/* Right column charts */}
                         <div className="flex flex-col gap-5">
                           {/* Inventory Forecast */}
-                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 shadow-sm flex flex-col min-h-[180px]">
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 md:p-5 shadow-sm flex flex-col min-h-[160px] md:min-h-[180px]">
                             <h3 className="mb-3 text-sm font-bold text-slate-800">Inventory Forecast</h3>
                             <div className="flex-1 relative w-full min-h-[100px]">
                               <InventoryForecast />
@@ -1060,7 +1273,7 @@ export default function SmartReports() {
                           </div>
 
                           {/* Price Gap History */}
-                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 shadow-sm flex flex-col min-h-[160px]">
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 md:p-5 shadow-sm flex flex-col min-h-[140px] md:min-h-[160px]">
                             <div className="flex items-center justify-between mb-3">
                               <h3 className="text-sm font-bold text-slate-800">Price Gap History</h3>
                               <span className="text-[10px] text-slate-400">30 days · vs avg competitor</span>

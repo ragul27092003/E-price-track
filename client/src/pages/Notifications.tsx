@@ -178,7 +178,7 @@ function Pagination({ currentPage, totalPages, onPageChange }: {
   if (totalPages <= 1) return null;
   const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
   return (
-    <div className="flex items-center justify-between border-t border-slate-100 bg-white px-5 py-3 mt-6 rounded-xl">
+    <div className="flex items-center justify-between border-t border-slate-100 bg-white px-3 md:px-5 py-3 mt-6 rounded-xl">
       <p className="text-xs text-slate-500">Page {currentPage} of {totalPages}</p>
       <div className="flex items-center gap-1">
         <button
@@ -265,12 +265,12 @@ export default function Notifications() {
 
   return (
     <div className="min-h-screen bg-white p-4 md:p-8 font-sans">
-      <div className="max-w-7xl">
+      <div className="max-w-7xl mx-auto">
 
         {/* Header */}
         <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <h1 className="text-2xl font-bold text-slate-800">Notifications</h1>
-          <div className="relative w-full max-w-sm">
+          <div className="relative w-full sm:max-w-sm">
             <svg
               className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
               viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"
@@ -288,7 +288,7 @@ export default function Notifications() {
         </div>
 
         {/* Card grid */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {alertProductsLoading ? (
             <LoadingState />
           ) : alertProductsError ? (
@@ -303,7 +303,7 @@ export default function Notifications() {
               const activeCompetitors = (p.competitor_prices || []).filter((c: any) => c.price !== null);
 
               return (
-                <div key={p._id} className="flex flex-col rounded-2xl border border-blue-100 bg-gray-50 p-6 shadow-sm transition-all hover:shadow-md">
+                <div key={p._id} className="flex flex-col rounded-2xl border border-blue-100 bg-gray-50 p-4 md:p-6 shadow-sm transition-all hover:shadow-md">
 
                   {/* Product header */}
                   <div className="flex items-center gap-4 mb-5">
