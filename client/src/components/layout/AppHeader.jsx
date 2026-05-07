@@ -24,7 +24,10 @@ export function AppHeader() {
   const setCompetitorsLoading = useStore((s) => s.setCompetitorsLoading);
   const setCompetitorsError  = useStore((s) => s.setCompetitorsError);
 
-  const [darkMode,     setDarkMode]     = useState(false);
+  const [darkMode,     setDarkMode]     = useState(() => {
+    const saved = localStorage.getItem("darkMode");
+    return saved === "true";
+  });
   const [stores,       setStores]       = useState([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
@@ -70,9 +73,19 @@ export function AppHeader() {
       .catch(console.error);
   }, [activeStoreId]);
 
+  // Apply/remove dark class whenever darkMode changes (including on first render)
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [darkMode]);
+
   const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-    document.documentElement.classList.toggle("dark");
+    const next = !darkMode;
+    setDarkMode(next);
+    localStorage.setItem("darkMode", String(next));
   };
 
   const handleLogout = () => {

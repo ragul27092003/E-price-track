@@ -130,16 +130,16 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
   const ValidatedInput = ({ value, readOnly, onChange }) => (
     <div className="relative">
       <Input value={value} readOnly={readOnly} onChange={onChange}
-        className={`bg-white border-gray-300 text-gray-900 pr-10 focus-visible:ring-blue-500 ${readOnly ? "cursor-default text-gray-700 bg-gray-50" : ""}`} />
-      {readOnly && <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />}
+        className={`bg-white dark:bg-slate-800 border-gray-300  dark:border-slate-700 text-gray-900 dark:text-white pr-10 focus-visible:ring-blue-500 ${readOnly ? "cursor-default text-gray-700 dark:text-slate-300 dark:text-slate-600 bg-slate-50 dark:bg-[#151a2a]" : ""}`} />
+      {readOnly && <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-slate-500 pointer-events-none" />}
     </div>
   );
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-full pb-10 pt-2">
       {/* Branding Section */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 md:p-6">
-        <h3 className="text-sm font-bold text-gray-800 mb-4">Company Branding</h3>
+      <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200  dark:border-slate-700 rounded-xl p-4 md:p-6">
+        <h3 className="text-sm font-bold text-gray-800 dark:text-white mb-4">Company Branding</h3>
         <div className="flex flex-col sm:flex-row sm:items-center gap-6">
           <div className="flex items-center gap-4">
             <label className="relative cursor-pointer group shrink-0">
@@ -161,40 +161,40 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
             </div>
           </div>
           <div className="sm:ml-auto">
-            <label className="text-xs font-bold text-gray-600 block mb-1.5">Primary Brand Color</label>
-            <div className="relative flex items-center gap-2 border border-gray-300 bg-white rounded-md px-3 py-1.5 cursor-pointer hover:bg-gray-100 w-fit">
+            <label className="text-xs font-bold text-gray-600 dark:text-slate-400 dark:text-slate-500 block mb-1.5">Primary Brand Color</label>
+            <div className="relative flex items-center gap-2 border border-gray-300  dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md px-3 py-1.5 cursor-pointer hover:bg-gray-100  dark:hover:bg-slate-700/60 w-fit">
               <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
               <div className="w-5 h-5 rounded-sm shadow-inner" style={{ backgroundColor: primaryColor }} />
-              <span className="text-sm text-gray-700 mx-1">{primaryColor}</span>
-              <ChevronDown className="w-4 h-4 text-gray-400" />
+              <span className="text-sm text-gray-700 dark:text-slate-300 dark:text-slate-600 mx-1">{primaryColor}</span>
+              <ChevronDown className="w-4 h-4 text-gray-400 dark:text-slate-500" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Info Section */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 md:p-6">
-        <h3 className="text-sm font-bold text-gray-800 mb-5">Basic Information</h3>
+      <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200  dark:border-slate-700 rounded-xl p-4 md:p-6">
+        <h3 className="text-sm font-bold text-gray-800 dark:text-white mb-5">Basic Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 md:gap-y-5">
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-800 block">Email Address</label>
+            <label className="text-xs font-bold text-gray-800 dark:text-white block">Email Address</label>
             <ValidatedInput value={email} readOnly />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-800 block">Website URL</label>
+            <label className="text-xs font-bold text-gray-800 dark:text-white block">Website URL</label>
             <ValidatedInput value={companyUrl} readOnly />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-800 block">Username</label>
+            <label className="text-xs font-bold text-gray-800 dark:text-white block">Username</label>
             <ValidatedInput value={isUser ? userName : companyName} readOnly />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-800 block">Phone Number</label>
+            <label className="text-xs font-bold text-gray-800 dark:text-white block">Phone Number</label>
             <ValidatedInput value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
         </div>
         <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
-          <Button variant="outline" onClick={() => setPhone("")} className="order-2 sm:order-1 border-gray-300 text-gray-700 font-semibold bg-white hover:bg-gray-50">Cancel</Button>
+          <Button variant="outline" onClick={() => setPhone("")} className="order-2 sm:order-1 border-gray-300  dark:border-slate-700 text-gray-700 dark:text-slate-300 dark:text-slate-600 font-semibold bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-[#151a2a]">Cancel</Button>
           <Button onClick={handleUpdate} disabled={saving} style={{ backgroundColor: primaryColor }} className="order-1 sm:order-2 text-white font-semibold hover:bg-opacity-90">
             {saving ? "Updating..." : "Update Account"}
           </Button>
@@ -202,40 +202,40 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
       </div>
 
       {/* Security Section */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 md:p-6">
-        <h3 className="text-sm font-bold text-gray-800 mb-5">Security</h3>
+      <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200  dark:border-slate-700 rounded-xl p-4 md:p-6">
+        <h3 className="text-sm font-bold text-gray-800 dark:text-white mb-5">Security</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
           <div className="md:col-span-2">
-            <label className="text-xs font-bold text-gray-800 block mb-1.5">Current Password</label>
+            <label className="text-xs font-bold text-gray-800 dark:text-white block mb-1.5">Current Password</label>
             <div className="relative max-w-full md:max-w-sm">
               <Input
                 type={showCurrent ? "text" : "password"}
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 autoComplete="current-password"
-                className="border-gray-300 pr-10 bg-gray-50 text-gray-700"
+                className="border-gray-300  dark:border-slate-700 pr-10 bg-slate-50 dark:bg-[#151a2a] text-gray-700 dark:text-slate-300 dark:text-slate-600"
               />
-              <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500">
                 {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-800 block">New Password</label>
+            <label className="text-xs font-bold text-gray-800 dark:text-white block">New Password</label>
             <div className="relative">
               <Input type={showNew ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="New Password" ring-color={primaryColor} className="border-gray-300 pr-10 bg-white" />
-              <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                placeholder="New Password" ring-color={primaryColor} className="border-gray-300  dark:border-slate-700 pr-10 bg-white dark:bg-slate-800" />
+              <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500">
                 {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-800 block">Confirm New Password</label>
+            <label className="text-xs font-bold text-gray-800 dark:text-white block">Confirm New Password</label>
             <div className="relative">
               <Input type={showConfirm ? "text" : "password"} value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)}
-                placeholder="Confirm New Password" className="border-gray-300 pr-10 bg-white" />
-              <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+                placeholder="Confirm New Password" className="border-gray-300  dark:border-slate-700 pr-10 bg-white dark:bg-slate-800" />
+              <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500">
                 {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
@@ -245,7 +245,7 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
           <Button onClick={handlePasswordUpdate} disabled={savingPass} style={{ backgroundColor: primaryColor }} className="text-white font-semibold px-6 hover:bg-opacity-90">
             {savingPass ? "Updating..." : "Update Password"}
           </Button>
-          <Button variant="outline" onClick={() => { setNewPassword(""); setConfirmPass(""); }} className="border-gray-300 text-gray-700 font-semibold px-6 bg-white hover:bg-gray-50">Cancel</Button>
+          <Button variant="outline" onClick={() => { setNewPassword(""); setConfirmPass(""); }} className="border-gray-300  dark:border-slate-700 text-gray-700 dark:text-slate-300 dark:text-slate-600 font-semibold px-6 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-[#151a2a]">Cancel</Button>
         </div>
       </div>
     </motion.div>
@@ -294,19 +294,19 @@ function ManageUsersTab() {
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2 gap-4">
         <div>
-          <h3 className="font-bold text-gray-900">Team Members</h3>
-          <p className="text-xs text-gray-500 mt-0.5">{storeUsers.length} users in your company</p>
+          <h3 className="font-bold text-gray-900 dark:text-white">Team Members</h3>
+          <p className="text-xs text-gray-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">{storeUsers.length} users in your company</p>
         </div>
         <Button onClick={() => setShowModal(true)} size="sm" className="gap-2 bg-[#1864ab] hover:bg-blue-800 text-white w-full sm:w-fit">
           <UserPlus className="h-4 w-4" /> Add User
         </Button>
       </div>
 
-      <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200  dark:border-slate-700 rounded-xl overflow-hidden">
         {/* Table Container for horizontal scrolling on mobile */}
         <div className="overflow-x-auto">
           <div className="min-w-[800px] md:min-w-full">
-            <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-gray-100/50 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wider">
+            <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-slate-50 dark:bg-[#151a2a] border-b border-gray-200  dark:border-slate-700 text-xs font-bold text-gray-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider">
               <div className="col-span-4">Email</div>
               <div className="col-span-3">Name</div>
               <div className="col-span-2">Role</div>
@@ -321,22 +321,22 @@ function ManageUsersTab() {
             ) : storeUsers.length === 0 ? (
               <div className="py-12 flex flex-col items-center justify-center gap-3">
                 <Users className="h-10 w-10 text-gray-300" />
-                <p className="text-sm text-gray-500">No users yet</p>
+                <p className="text-sm text-gray-500 dark:text-slate-400 dark:text-slate-500">No users yet</p>
               </div>
             ) : (
               <AnimatePresence>
                 {storeUsers.map((u, i) => (
                   <motion.div key={u.userId} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ delay: i * 0.05 }}
-                    className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-gray-200 last:border-0 hover:bg-gray-100 transition-colors items-center">
+                    className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-gray-200  dark:border-slate-700 last:border-0 hover:bg-gray-100  dark:hover:bg-slate-700/60 transition-colors items-center">
                     <div className="col-span-4 flex items-center gap-3">
                       <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center text-xs font-bold text-[#1864ab] shrink-0">
                         {u.email.slice(0, 2).toUpperCase()}
                       </div>
-                      <span className="text-sm font-medium text-gray-900 truncate">{u.email}</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{u.email}</span>
                     </div>
-                    <div className="col-span-3 text-sm text-gray-600 truncate">{u.userName || "-"}</div>
+                    <div className="col-span-3 text-sm text-gray-600 dark:text-slate-400 dark:text-slate-500 truncate">{u.userName || "-"}</div>
                     <div className="col-span-2">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tight ${u.userType === "store_admin" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tight ${u.userType === "store_admin" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600 dark:text-slate-400 dark:text-slate-500"}`}>
                         {u.userType === "store_admin" ? "Admin" : "User"}
                       </span>
                     </div>
@@ -348,7 +348,7 @@ function ManageUsersTab() {
                     <div className="col-span-1 flex justify-end">
                       <Button size="sm" variant="ghost" onClick={() => handleRemove(u.userId)}
                         disabled={removing === u.userId || u.userId === user?.userId}
-                        className="h-8 w-8 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50">
+                        className="h-8 w-8 p-0 text-gray-400 dark:text-slate-500 hover:text-red-600 hover:bg-red-50">
                         {removing === u.userId ? <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                       </Button>
                     </div>
@@ -388,10 +388,10 @@ function UsersLogTab() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="pt-2">
-      <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200  dark:border-slate-700 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <div className="min-w-[800px] md:min-w-full">
-            <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-gray-100/50 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wider">
+            <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-slate-50 dark:bg-[#151a2a] border-b border-gray-200  dark:border-slate-700 text-xs font-bold text-gray-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider">
               <div className="col-span-4">Email</div>
               <div className="col-span-2">Role</div>
               <div className="col-span-2">Company</div>
@@ -405,15 +405,15 @@ function UsersLogTab() {
             ) : usersLog.length === 0 ? (
               <div className="py-12 flex flex-col items-center justify-center gap-3">
                 <FileText className="h-10 w-10 text-gray-300" />
-                <p className="text-sm text-gray-500">No logs yet</p>
+                <p className="text-sm text-gray-500 dark:text-slate-400 dark:text-slate-500">No logs yet</p>
               </div>
             ) : (
               usersLog.map((log, i) => (
-                <div key={i} className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-gray-200 last:border-0 text-sm hover:bg-gray-100 items-center">
-                  <div className="col-span-4 text-gray-900 font-medium truncate">{log.email}</div>
-                  <div className="col-span-2 text-gray-600 capitalize">{log.userType}</div>
-                  <div className="col-span-2 text-gray-600 truncate">{log.companyId}</div>
-                  <div className="col-span-4 text-gray-500 text-xs">{new Date(log.loginAt).toLocaleString()}</div>
+                <div key={i} className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-gray-200  dark:border-slate-700 last:border-0 text-sm hover:bg-gray-100  dark:hover:bg-slate-700/60 items-center">
+                  <div className="col-span-4 text-gray-900 dark:text-white font-medium truncate">{log.email}</div>
+                  <div className="col-span-2 text-gray-600 dark:text-slate-400 dark:text-slate-500 capitalize">{log.userType}</div>
+                  <div className="col-span-2 text-gray-600 dark:text-slate-400 dark:text-slate-500 truncate">{log.companyId}</div>
+                  <div className="col-span-4 text-gray-500 dark:text-slate-400 dark:text-slate-500 text-xs">{new Date(log.loginAt).toLocaleString()}</div>
                 </div>
               ))
             )}
@@ -444,7 +444,7 @@ export default function Settings() {
           <Avatar primaryColor={primaryColor} companyName={user?.companyName || ""} photoUrl={photoUrl} />
           <div>
             <h1 className="text-xl md:text-[22px] font-bold text-gray-900 dark:text-white leading-tight">Settings</h1>
-            <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-0.5 capitalize">{user?.userType?.replace('_', ' ')}</p>
+            <p className="text-xs md:text-sm text-gray-500 dark:text-slate-400 dark:text-slate-500 mt-0.5 capitalize">{user?.userType?.replace('_', ' ')}</p>
           </div>
         </div>
 
@@ -453,7 +453,7 @@ export default function Settings() {
           {visibleTabs.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => setActiveTab(id)}
               className={`flex items-center gap-2 pb-3 text-sm font-bold transition-colors border-b-2 -mb-[1.5px] whitespace-nowrap ${
-                activeTab === id ? "text-[#1864ab] border-[#1864ab]" : "border-transparent text-gray-500 hover:text-gray-900 dark:text-gray-400"
+                activeTab === id ? "text-[#1864ab] border-[#1864ab]" : "border-transparent text-gray-500 dark:text-slate-400 dark:text-slate-500 hover:text-gray-900 dark:text-gray-400 dark:text-slate-500"
               }`}
               style={activeTab === id ? { color: primaryColor, borderColor: primaryColor } : {}}>
               <Icon className="h-4 w-4" />{label}

@@ -50,7 +50,7 @@ function ProductImage({ src, alt }) {
   const [err, setErr] = useState(false);
   if (!src || err) {
     return (
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 text-lg shadow-sm">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#151a2a] text-lg shadow-sm">
         📦
       </div>
     );
@@ -60,7 +60,7 @@ function ProductImage({ src, alt }) {
       src={src}
       alt={alt}
       onError={() => setErr(true)}
-      className="h-10 w-10 shrink-0 rounded-lg border border-slate-100 object-contain shadow-sm bg-slate-50"
+      className="h-10 w-10 shrink-0 rounded-lg border border-slate-100 dark:border-slate-700/50 object-contain shadow-sm bg-slate-50 dark:bg-[#151a2a]"
     />
   );
 }
@@ -73,7 +73,7 @@ function CompetitorLogo({ name = "", slug = "", logo = "" }) {
 
   if (logo && !imgErr) {
     return (
-      <div className="flex h-6 w-6 items-center justify-center rounded overflow-hidden border border-slate-200 bg-white shrink-0">
+      <div className="flex h-6 w-6 items-center justify-center rounded overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0">
         <img
           src={`http://localhost:5100${logo}`}
           alt={name}
@@ -111,7 +111,7 @@ function Sparkline({ data, width = 50, height = 20, color = "#3b82f6" }) {
 
 function RankBadge({ product }) {
   const rank = product.user_notification_data?.rank_pos || product.rank_by;
-  if (!rank) return <span className="text-slate-400 text-sm">—</span>;
+  if (!rank) return <span className="text-slate-400 dark:text-slate-500 text-sm">—</span>;
 
   let displayRank = rank;
   if (!String(rank).includes('/')) {
@@ -120,7 +120,7 @@ function RankBadge({ product }) {
   }
 
   const numRank = parseInt(rank, 10);
-  let colorClass = "bg-slate-100 text-slate-700";
+  let colorClass = "bg-slate-100 text-slate-700 dark:text-slate-300 dark:text-slate-600";
   if (numRank === 1) colorClass = "bg-emerald-100 text-emerald-700";
   else if (numRank === 2) colorClass = "bg-blue-100 text-blue-700";
   else if (numRank > 2) colorClass = "bg-rose-100 text-rose-700";
@@ -134,7 +134,7 @@ function RankBadge({ product }) {
 
 function PriceGapBadge({ value }) {
   if (value === null || value === undefined) {
-    return <span className="text-xs text-slate-400">No data</span>;
+    return <span className="text-xs text-slate-400 dark:text-slate-500">No data</span>;
   }
   const isNeg = value < 0;
   const baseColors = isNeg ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700";
@@ -159,12 +159,12 @@ function MarketCap({ low, avg, high }) {
   return (
     <div className="flex items-center gap-8">
       <div>
-        <span className="text-[11px] text-slate-500">Low</span><br />
-        <span className="font-bold text-slate-800">{fmt(low)}</span>
+        <span className="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">Low</span><br />
+        <span className="font-bold text-slate-800 dark:text-white">{fmt(low)}</span>
       </div>
       <div className="relative">
-        <span className="text-[11px] text-slate-500">Average</span><br />
-        <span className="font-bold text-slate-800">{avg !== null ? `Avg: ₹${avg.toLocaleString("en-IN")}` : "—"}</span>
+        <span className="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">Average</span><br />
+        <span className="font-bold text-slate-800 dark:text-white">{avg !== null ? `Avg: ₹${avg.toLocaleString("en-IN")}` : "—"}</span>
         {avg !== null && (
           <>
             <div className="absolute top-1/2 -left-4 w-2 h-0.5 bg-emerald-500" />
@@ -173,8 +173,8 @@ function MarketCap({ low, avg, high }) {
         )}
       </div>
       <div>
-        <span className="text-[11px] text-slate-500">High</span><br />
-        <span className="font-bold text-slate-800">{fmt(high)}</span>
+        <span className="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">High</span><br />
+        <span className="font-bold text-slate-800 dark:text-white">{fmt(high)}</span>
       </div>
     </div>
   );
@@ -182,13 +182,13 @@ function MarketCap({ low, avg, high }) {
 
 function MarketGapCell({ product, competitorMeta }) {
   const ourPrice = parsePrice(product.product_price);
-  if (ourPrice === null) return <span className="text-slate-300 text-xs">—</span>;
+  if (ourPrice === null) return <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>;
 
   const active = (product.competitor_prices || [])
     .map((c) => ({ ...c, price: parsePrice(c.price) }))
     .filter((c) => c.price !== null);
 
-  if (!active.length) return <span className="text-slate-300 text-xs">—</span>;
+  if (!active.length) return <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>;
 
   const lowest = active.reduce((min, c) => (c.price < min.price ? c : min));
   const meta = competitorMeta?.[lowest.slug] || {};
@@ -199,10 +199,10 @@ function MarketGapCell({ product, competitorMeta }) {
   if (gap === 0) {
     return (
       <div className="flex flex-col gap-1">
-        <span className="inline-flex items-center text-[11px] font-bold text-slate-500 bg-slate-100 rounded-full px-2.5 py-1 w-fit">
+        <span className="inline-flex items-center text-[11px] font-bold text-slate-500 dark:text-slate-400 dark:text-slate-500 bg-slate-100 rounded-full px-2.5 py-1 w-fit">
           Same price
         </span>
-        <span className="text-[10px] text-slate-400 mt-0.5">
+        <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
           {fmtAmt(lowest.price)} ({compName}) = {fmtAmt(ourPrice)} mine
         </span>
       </div>
@@ -218,7 +218,7 @@ function MarketGapCell({ product, competitorMeta }) {
           </svg>
           {fmtAmt(gap)} higher
         </span>
-        <span className="text-[10px] text-slate-400 mt-0.5">
+        <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
           {fmtAmt(lowest.price)} ({compName}) vs {fmtAmt(ourPrice)} mine
         </span>
       </div>
@@ -233,7 +233,7 @@ function MarketGapCell({ product, competitorMeta }) {
         </svg>
         {fmtAmt(-gap)} cheaper
       </span>
-      <span className="text-[10px] text-slate-400 mt-0.5">
+      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">
         {fmtAmt(lowest.price)} ({compName}) vs {fmtAmt(ourPrice)} mine
       </span>
     </div>
@@ -254,7 +254,7 @@ function CompetitorPrices({ product, competitorMeta }) {
         return (
           <div key={c.slug} className="flex items-center gap-2">
             <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
-            <span className="font-bold text-slate-800 text-[13px]">
+            <span className="font-bold text-slate-800 dark:text-white text-[13px]">
               ₹{c.price.toLocaleString("en-IN")}
             </span>
             <Sparkline data={trendFor(product, c.slug)} color="#0ea5e9" />
@@ -291,9 +291,9 @@ function FilterSelect({ label, options, value, onChange }) {
 
   return (
     <div className="relative flex-1 min-w-[140px] sm:min-w-[160px] max-w-full sm:max-w-[220px]">
-      <p className="mb-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide">{label}</p>
+      <p className="mb-1.5 text-[11px] font-bold text-slate-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wide">{label}</p>
       <div
-        className={`flex items-center gap-2 rounded-lg border bg-white px-3 py-2.5 shadow-sm cursor-text ${open ? "border-blue-300 ring-2 ring-blue-100" : "border-slate-200"}`}
+        className={`flex items-center gap-2 rounded-lg border bg-white dark:bg-slate-800 px-3 py-2.5 shadow-sm cursor-text ${open ? "border-blue-300 ring-2 ring-blue-100" : "border-slate-200 dark:border-slate-700"}`}
         onClick={() => { setOpen(true); inputRef.current?.focus(); }}
       >
         <input
@@ -303,15 +303,15 @@ function FilterSelect({ label, options, value, onChange }) {
           onChange={(e) => { setQuery(e.target.value); setCursor(-1); setOpen(true); }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKey}
-          className="w-full border-0 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 min-w-0"
+          className="w-full border-0 bg-transparent text-sm text-slate-700 dark:text-slate-300 dark:text-slate-600 outline-none placeholder:text-slate-400 dark:text-slate-500 min-w-0"
         />
         {value && (
-          <button onMouseDown={(e) => { e.stopPropagation(); commit(""); }} className="shrink-0 text-slate-400 hover:text-slate-600">
+          <button onMouseDown={(e) => { e.stopPropagation(); commit(""); }} className="shrink-0 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-400 dark:text-slate-500">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12" /></svg>
           </button>
         )}
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2"
-          className={`shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}>
+          className={`shrink-0 text-slate-400 dark:text-slate-500 transition-transform ${open ? "rotate-180" : ""}`}>
           <path d="m6 9 6 6 6-6" />
         </svg>
       </div>
@@ -319,17 +319,17 @@ function FilterSelect({ label, options, value, onChange }) {
       {open && (
         <>
           <div className="fixed inset-0 z-20" onMouseDown={() => { setOpen(false); setQuery(""); }} />
-          <div className="absolute left-0 top-full z-30 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg py-1">
+          <div className="absolute left-0 top-full z-30 mt-1 w-full max-h-52 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg py-1">
             {matched.length === 0 ? (
-              <p className="px-3 py-2 text-sm text-slate-400">No matches</p>
+              <p className="px-3 py-2 text-sm text-slate-400 dark:text-slate-500">No matches</p>
             ) : (
               matched.map((opt, i) => (
                 <button
                   key={opt || "__all__"}
                   onMouseDown={(e) => { e.preventDefault(); commit(opt); }}
                   className={`w-full text-left px-3 py-2 text-sm transition-colors ${i === cursor ? "bg-blue-50 text-blue-700"
-                    : opt === value ? "bg-slate-50 font-medium text-slate-800"
-                      : "text-slate-700 hover:bg-slate-50"
+                    : opt === value ? "bg-slate-50 dark:bg-[#151a2a] font-medium text-slate-800 dark:text-white"
+                      : "text-slate-700 dark:text-slate-300 dark:text-slate-600 hover:bg-slate-50 dark:bg-[#151a2a]"
                     }`}
                 >
                   {opt || ALL_LABEL}
@@ -353,13 +353,13 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
   for (let i = 1; i <= totalPages; i++) pages.push(i);
 
   return (
-    <div className="flex items-center justify-between border-t border-slate-100 bg-white px-5 py-3">
-      <p className="text-xs text-slate-500">Page {currentPage} of {totalPages}</p>
+    <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-700/50 bg-white dark:bg-[#0b101e] px-5 py-3">
+      <p className="text-xs text-slate-500 dark:text-slate-400 dark:text-slate-500">Page {currentPage} of {totalPages}</p>
       <div className="flex items-center gap-1">
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" /></svg>
         </button>
@@ -369,7 +369,7 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
             onClick={() => onPageChange(p)}
             className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-semibold transition-colors ${p === currentPage
               ? "bg-[#2B86C5] text-white border border-[#2B86C5]"
-              : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+              : "border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a]"
               }`}
           >
             {p}
@@ -378,7 +378,7 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m9 18 6-6-6-6" /></svg>
         </button>
@@ -398,7 +398,7 @@ const TABS = [
 function LoadingState() {
   return (
     <div className="flex min-h-[400px] items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-blue-500" />
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 dark:border-slate-700 border-t-blue-500" />
     </div>
   );
 }
@@ -407,7 +407,7 @@ function ErrorState({ message, onRetry }) {
   return (
     <div className="flex min-h-[400px] flex-col items-center justify-center gap-3 text-center">
       <p className="text-sm font-medium text-rose-600">{message || "Failed to load products"}</p>
-      <button onClick={onRetry} className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">
+      <button onClick={onRetry} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 dark:text-slate-600 shadow-sm hover:bg-slate-50 dark:bg-[#151a2a]">
         Retry
       </button>
     </div>
@@ -419,8 +419,8 @@ function ProductCell({ product }) {
     <div className="flex items-center gap-4">
       <ProductImage src={product.product_image} alt={product.product_name} />
       <div>
-        <p className="font-bold text-slate-800 text-[13px]">{product.product_name || "Unnamed Product"}</p>
-        <p className="text-[11px] text-slate-500 mt-0.5">
+        <p className="font-bold text-slate-800 dark:text-white text-[13px]">{product.product_name || "Unnamed Product"}</p>
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">
           {product.product_brand && <span>{product.product_brand} · </span>}
           {product.product_ean_id || product.product_code || product._id}
         </p>
@@ -439,16 +439,16 @@ function PriceCell({ product }) {
   return (
     <div className="flex flex-col gap-1.5 min-w-[110px]">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Web</span>
+        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Web</span>
         <span className="text-[12px] font-bold text-emerald-600">{fmt(web)}</span>
       </div>
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Store</span>
+        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Store</span>
         <span className="text-[12px] font-bold text-blue-600">{fmt(store)}</span>
       </div>
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">SAP</span>
-        <span className="text-[12px] font-bold text-slate-700">{fmt(sap)}</span>
+        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">SAP</span>
+        <span className="text-[12px] font-bold text-slate-700 dark:text-slate-300 dark:text-slate-600">{fmt(sap)}</span>
       </div>
     </div>
   );
@@ -509,18 +509,18 @@ function ConfigureModal({ product, currentUserId, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+      <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#151a2a] shadow-2xl border border-slate-200 dark:border-slate-700/60 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#0b101e]">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Configure Product</p>
-            <h2 className="font-bold text-slate-800 text-sm mt-0.5 line-clamp-1">
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Configure Product</p>
+            <h2 className="font-bold text-slate-800 dark:text-white text-sm mt-0.5 line-clamp-1">
               {product?.product_name || "Product"}
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:bg-slate-200 hover:text-slate-600 dark:text-slate-400 dark:text-slate-500 transition-colors"
           >
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M18 6 6 18M6 6l12 12" />
@@ -531,18 +531,18 @@ function ConfigureModal({ product, currentUserId, onClose, onSaved }) {
         <div className="px-6 py-5 flex flex-col gap-4">
           {/* Group Name */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">
+            <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-2">
               Group Name
             </label>
             <input
               type="text"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] px-3 py-2.5 text-sm text-slate-800 dark:text-white outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-900/40"
               placeholder="e.g. Air Conditioner"
             />
             {product?.product_category && (
-              <p className="mt-1 text-[11px] text-slate-400">
+              <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
                 From category: <span className="font-medium">{product.product_category}</span>
               </p>
             )}
@@ -552,10 +552,10 @@ function ConfigureModal({ product, currentUserId, onClose, onSaved }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#151a2a]">
           <button
             onClick={onClose}
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a] transition-colors"
           >
             Cancel
           </button>
@@ -580,7 +580,7 @@ function ConfigureModal({ product, currentUserId, onClose, onSaved }) {
 function SortIcon({ active, direction }) {
   if (!active) {
     return (
-      <svg className="shrink-0 text-slate-300" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg className="shrink-0 text-slate-300 dark:text-slate-600" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 3v18M5 10l7-7 7 7M5 14l7 7 7-7" />
       </svg>
     );
@@ -713,14 +713,14 @@ export default function Products() {
 
   return (
     <>
-      <div className="min-h-screen bg-white text-slate-800 font-sans">
+      <div className="min-h-screen bg-white dark:bg-[#0b101e] text-slate-800 dark:text-white font-sans">
         <div className="mx-auto flex max-w-[1400px] flex-col gap-5 px-3 py-4 md:px-6 md:py-6">
 
           {/* ── Competitor filter banner ── */}
           {competitorSlug && (
             <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
               {competitorMeta[competitorSlug]?.logo ? (
-                <div className="flex h-7 w-7 items-center justify-center rounded overflow-hidden border border-blue-200 bg-white shrink-0">
+                <div className="flex h-7 w-7 items-center justify-center rounded overflow-hidden border border-blue-200 bg-white dark:bg-slate-800 shrink-0">
                   <img
                     src={`http://localhost:5100${competitorMeta[competitorSlug].logo}`}
                     alt={competitorName}
@@ -747,8 +747,8 @@ export default function Products() {
 
           {/* Top Header Actions */}
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            <div className="flex w-full sm:max-w-sm items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-blue-100">
-              <svg className="text-slate-400" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <div className="flex w-full sm:max-w-sm items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-blue-100 dark:focus-within:ring-blue-900/40">
+              <svg className="text-slate-400 dark:text-slate-500" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
               </svg>
               <input
@@ -756,11 +756,11 @@ export default function Products() {
                 placeholder="Search by name, brand or EAN…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full border-0 bg-transparent text-sm text-slate-800 outline-none placeholder:text-slate-400"
+                className="w-full border-0 bg-transparent text-sm text-slate-800 dark:text-white outline-none placeholder:text-slate-400 dark:text-slate-500"
               />
             </div>
             <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-              {/* <button className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors">
+              {/* <button className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 dark:text-slate-600 shadow-sm hover:bg-slate-50 dark:bg-[#151a2a] transition-colors">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
               </svg>
@@ -789,12 +789,12 @@ export default function Products() {
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-6 border-b border-slate-200 mt-2">
+          <div className="flex gap-6 border-b border-slate-200 dark:border-slate-700 mt-2">
             {TABS.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`pb-3 text-sm font-semibold transition-all relative ${activeTab === tab.key ? "text-slate-800" : "text-slate-400 hover:text-slate-600"
+                className={`pb-3 text-sm font-semibold transition-all relative ${activeTab === tab.key ? "text-slate-800 dark:text-white" : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-400 dark:text-slate-500"
                   }`}
               >
                 {tab.label}
@@ -815,24 +815,24 @@ export default function Products() {
               <>
                 {/* ── BRAND PRODUCTS ── */}
                 {activeTab === "brand" && (
-                  <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
                     <table className="w-full min-w-[900px] border-collapse text-sm">
                       <thead>
-                        <tr className="border-b border-slate-100 bg-slate-50/50">
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Product</th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price</th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Rank</th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price Gap</th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Competitor Price Trends</th>
-                          <th className="px-5 py-4 text-right text-xs font-semibold text-slate-500">Actions</th>
+                        <tr className="border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#0b101e]/50">
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Product</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Price</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Rank</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Price Gap</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Competitor Price Trends</th>
+                          <th className="px-5 py-4 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {filtered.length === 0 ? (
-                          <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr>
+                          <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-400 dark:text-slate-500">No products found.</td></tr>
                         ) : (
                           paginated.map((p) => (
-                            <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
+                            <tr key={p._id} className="hover:bg-slate-50 dark:bg-[#151a2a]/80 transition-colors">
                               <td className="px-5 py-4"><ProductCell product={p} /></td>
                               <td className="px-5 py-4"><PriceCell product={p} /></td>
                               <td className="px-5 py-4"><RankBadge product={p} /></td>
@@ -843,11 +843,11 @@ export default function Products() {
                                   <div className="flex items-center gap-2">
                                     <button
                                       onClick={() => navigate(`/product-history?ean=${p.product_ean_id}`)}
-                                      className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm"
+                                      className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a] shadow-sm"
                                     >
                                       View Details
                                     </button>
-                                    <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">
+                                    <button className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a] shadow-sm">
                                       Quick Sync
                                     </button>
                                   </div>
@@ -864,31 +864,31 @@ export default function Products() {
 
                 {/* ── COMPARE ── */}
                 {activeTab === "compare" && (
-                  <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
                     <table className="w-full min-w-[800px] border-collapse text-sm">
                       <thead>
-                        <tr className="border-b border-slate-100 bg-slate-50/50">
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Product</th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price</th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Competitor Prices</th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Market Range</th>
-                          <th className="px-5 py-4 text-right text-xs font-semibold text-slate-500">Actions</th>
+                        <tr className="border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#0b101e]/50">
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Product</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Price</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Competitor Prices</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Market Range</th>
+                          <th className="px-5 py-4 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {filtered.length === 0 ? (
-                          <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr>
+                          <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-400 dark:text-slate-500">No products found.</td></tr>
                         ) : (
                           paginated.map((p) => {
                             const { low, avg, high } = marketStats(p);
                             const active = (p.competitor_prices || []).filter((c) => c.price !== null);
                             return (
-                              <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
+                              <tr key={p._id} className="hover:bg-slate-50 dark:bg-[#151a2a]/80 transition-colors">
                                 <td className="px-5 py-4"><ProductCell product={p} /></td>
                                 <td className="px-5 py-4"><PriceCell product={p} /></td>
                                 <td className="px-5 py-4">
                                   {active.length === 0 ? (
-                                    <span className="text-sm text-slate-400">No competitor data</span>
+                                    <span className="text-sm text-slate-400 dark:text-slate-500">No competitor data</span>
                                   ) : (
                                     <div className="flex items-center gap-6 flex-wrap">
                                       {active.map((c) => {
@@ -896,7 +896,7 @@ export default function Products() {
                                         return (
                                           <div key={c.slug} className="flex items-center gap-2">
                                             <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
-                                            <span className="font-bold text-slate-800 text-[13px]">
+                                            <span className="font-bold text-slate-800 dark:text-white text-[13px]">
                                               ₹{c.price.toLocaleString("en-IN")}
                                             </span>
                                             <Sparkline data={trendFor(p, c.slug)} color="#0ea5e9" />
@@ -911,11 +911,11 @@ export default function Products() {
                                   <div className="flex items-center justify-end gap-2">
                                     <button
                                       onClick={() => navigate(`/product-history?ean=${p.product_ean_id}`)}
-                                      className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm"
+                                      className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a] shadow-sm"
                                     >
                                       View Details
                                     </button>
-                                    <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">
+                                    <button className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a] shadow-sm">
                                       Quick Sync
                                     </button>
                                   </div>
@@ -932,40 +932,40 @@ export default function Products() {
 
                 {/* ── PRICE ANALYSIS ── */}
                 {activeTab === "analysis" && (
-                  <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
                     <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
                     <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">
                     <table className="w-full min-w-[1000px] border-collapse text-sm">
                       <thead>
-                        <tr className="border-b border-slate-100 bg-slate-50/50">
+                        <tr className="border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#0b101e]/50">
                           <th className="w-12 px-5 py-4">
                             <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                           </th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">
-                            <button onClick={() => handleSort("name")} className="flex items-center gap-1.5 hover:text-slate-800 transition-colors">
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">
+                            <button onClick={() => handleSort("name")} className="flex items-center gap-1.5 hover:text-slate-800 dark:text-white transition-colors">
                               Product
                               <SortIcon active={sortConfig.column === "name"} direction={sortConfig.direction} />
                             </button>
                           </th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price</th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">
-                            <button onClick={() => handleSort("rank")} className="flex items-center gap-1.5 hover:text-slate-800 transition-colors">
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Price</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">
+                            <button onClick={() => handleSort("rank")} className="flex items-center gap-1.5 hover:text-slate-800 dark:text-white transition-colors">
                               Rank
                               <SortIcon active={sortConfig.column === "rank"} direction={sortConfig.direction} />
                             </button>
                           </th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price Gap</th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Competitor Prices</th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Market</th>
-                          <th className="px-5 py-4 text-right text-xs font-semibold text-slate-500">Actions</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Price Gap</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Competitor Prices</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Market</th>
+                          <th className="px-5 py-4 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 dark:text-slate-500">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {sorted.length === 0 ? (
-                          <tr><td colSpan={8} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr>
+                          <tr><td colSpan={8} className="px-5 py-10 text-center text-sm text-slate-400 dark:text-slate-500">No products found.</td></tr>
                         ) : (
                           paginated.map((p) => (
-                            <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
+                            <tr key={p._id} className="hover:bg-slate-50 dark:bg-[#151a2a]/80 transition-colors">
                               <td className="px-5 py-4">
                                 <input
                                   type="checkbox"
@@ -985,11 +985,11 @@ export default function Products() {
                                 <div className="flex items-center justify-end gap-2">
                                   <button
                                     onClick={() => navigate(`/product-history?ean=${p.product_ean_id}`)}
-                                    className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm"
+                                    className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a] shadow-sm"
                                   >
                                     View Details
                                   </button>
-                                  <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">
+                                  <button className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a] shadow-sm">
                                     Quick Sync
                                   </button>
                                 </div>

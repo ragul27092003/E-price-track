@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useStore } from '../store';
 import {
   Storefront as StorefrontIcon,
   Language as LanguageIcon,
@@ -11,6 +12,7 @@ import {
 import API from '../hooks/useApi';
 
 const ManageFeedSetup = () => {
+  const activeStoreId = useStore((s) => s.activeStoreId);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [logsLoading, setLogsLoading] = useState(true);
@@ -52,7 +54,7 @@ const ManageFeedSetup = () => {
     };
     fetchConfig();
     loadActivityLog();
-  }, []);
+  }, [activeStoreId]);
 
   const loadActivityLog = async () => {
     setLogsLoading(true);
@@ -119,9 +121,9 @@ const ManageFeedSetup = () => {
   }
 
   return (
-    <div className="p-6 max-w-full bg-white text-gray-800 font-sans">
+    <div className="p-6 max-w-full bg-white dark:bg-[#0b101e] text-gray-800 dark:text-white font-sans">
       {/* Description */}
-      <p className="text-sm text-gray-600 mb-6">
+      <p className="text-sm text-gray-600 dark:text-slate-400 dark:text-slate-500 mb-6">
         Please set the format, text encoding and upload product feed file for us to process.
       </p>
 
@@ -131,14 +133,14 @@ const ManageFeedSetup = () => {
         <div 
           onClick={() => handleCardSelect('shopify')}
           className={`relative p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
-            isShopify ? 'border-teal-600 ring-2 ring-teal-600 ring-opacity-20' : 'border-gray-200'
+            isShopify ? 'border-teal-600 ring-2 ring-teal-600 ring-opacity-20' : 'border-gray-200  dark:border-slate-700'
           }`}
         >
           <div className="flex items-center gap-4 mb-3">
             <StorefrontIcon className="text-4xl text-[#96bf48]" />
             <div className="flex-1">
               <h4 className="text-sm font-bold">Shopify</h4>
-              <p className="text-xs text-gray-500 leading-tight">Connect your Shopify store for automatic sync.</p>
+              <p className="text-xs text-gray-500 dark:text-slate-400 dark:text-slate-500 leading-tight">Connect your Shopify store for automatic sync.</p>
             </div>
             {isShopify && (
               <span className="bg-teal-600 text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold">Active</span>
@@ -146,7 +148,7 @@ const ManageFeedSetup = () => {
           </div>
           <button 
             className={`w-full py-1.5 rounded text-sm font-medium transition-colors ${
-              isShopify ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-transparent border border-gray-300 text-gray-600 hover:bg-gray-50'
+              isShopify ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-transparent border border-gray-300  dark:border-slate-700 text-gray-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a]'
             }`}
           >
             {isShopify ? 'Connected' : 'Connect'}
@@ -157,14 +159,14 @@ const ManageFeedSetup = () => {
         <div 
           onClick={() => handleCardSelect('wordpress')}
           className={`relative p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
-            isWordPress ? 'border-teal-600 ring-2 ring-teal-600 ring-opacity-20' : 'border-gray-200'
+            isWordPress ? 'border-teal-600 ring-2 ring-teal-600 ring-opacity-20' : 'border-gray-200  dark:border-slate-700'
           }`}
         >
           <div className="flex items-center gap-4 mb-3">
             <LanguageIcon className="text-4xl text-[#21759b]" />
             <div className="flex-1">
               <h4 className="text-sm font-bold">WordPress</h4>
-              <p className="text-xs text-gray-500 leading-tight">Link your WooCommerce store for seamless integration.</p>
+              <p className="text-xs text-gray-500 dark:text-slate-400 dark:text-slate-500 leading-tight">Link your WooCommerce store for seamless integration.</p>
             </div>
             {isWordPress && (
               <span className="bg-teal-600 text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold">Active</span>
@@ -172,7 +174,7 @@ const ManageFeedSetup = () => {
           </div>
           <button 
             className={`w-full py-1.5 rounded text-sm font-medium transition-colors ${
-              isWordPress ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-transparent border border-gray-300 text-gray-600 hover:bg-gray-50'
+              isWordPress ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-transparent border border-gray-300  dark:border-slate-700 text-gray-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a]'
             }`}
           >
             {isWordPress ? 'Connected' : 'Connect'}
@@ -183,14 +185,14 @@ const ManageFeedSetup = () => {
         <div 
           onClick={() => handleCardSelect('none')}
           className={`relative p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
-            (!isShopify && !isWordPress) ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white'
+            (!isShopify && !isWordPress) ? 'border-blue-400 bg-blue-50' : 'border-gray-200  dark:border-slate-700 bg-white dark:bg-slate-800'
           }`}
         >
           <div className="flex items-center gap-4 mb-3">
             <InsertDriveFileIcon className="text-4xl text-[#3b6eac]" />
             <div className="flex-1">
               <h4 className="text-sm font-bold">URL Feed</h4>
-              <p className="text-xs text-gray-500 leading-tight">Import a product feed via URL (CSV, XML, JSON).</p>
+              <p className="text-xs text-gray-500 dark:text-slate-400 dark:text-slate-500 leading-tight">Import a product feed via URL (CSV, XML, JSON).</p>
             </div>
             {(!isShopify && !isWordPress) && (
               <span className="bg-[#3b6eac] text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold">Active</span>
@@ -204,7 +206,7 @@ const ManageFeedSetup = () => {
 
       {/* Feed Name */}
       <div className="flex items-center gap-4 mb-6">
-        <span className="text-sm text-gray-600 min-w-[110px]">Feed Name:</span>
+        <span className="text-sm text-gray-600 dark:text-slate-400 dark:text-slate-500 min-w-[110px]">Feed Name:</span>
         <span className="text-base font-semibold text-red-600">{formData.store_name || '—'}</span>
       </div>
 
@@ -228,7 +230,7 @@ const ManageFeedSetup = () => {
                 value={formData.shopify_name}
                 onChange={handleChange}
                 placeholder="e.g. my-store.myshopify.com"
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600"
+                className="bg-white dark:bg-[#1e2535] text-gray-800 dark:text-slate-200 placeholder:text-gray-400 dark:placeholder:text-slate-500 w-full border border-gray-300  dark:border-slate-700 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600"
               />
             </div>
             <div>
@@ -238,7 +240,7 @@ const ManageFeedSetup = () => {
                 value={formData.shopify_accesstoken}
                 onChange={handleChange}
                 placeholder="shpat_xxxxxxxxxxxxxxxx"
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600"
+                className="bg-white dark:bg-[#1e2535] text-gray-800 dark:text-slate-200 placeholder:text-gray-400 dark:placeholder:text-slate-500 w-full border border-gray-300  dark:border-slate-700 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600"
               />
             </div>
           </div>
@@ -256,7 +258,7 @@ const ManageFeedSetup = () => {
                 name="feed_type" 
                 value={formData.feed_type} 
                 onChange={handleChange}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white"
+                className="w-full border border-gray-300 dark:border-slate-700 rounded px-3 py-2 text-sm bg-white dark:bg-[#1e2535] text-gray-800 dark:text-slate-200"
               >
                 <option value="JSON">JSON</option>
                 <option value="CSV">CSV</option>
@@ -269,7 +271,7 @@ const ManageFeedSetup = () => {
                 name="feed_url"
                 value={formData.feed_url}
                 onChange={handleChange}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600"
+                className="bg-white dark:bg-[#1e2535] text-gray-800 dark:text-slate-200 placeholder:text-gray-400 dark:placeholder:text-slate-500 w-full border border-gray-300  dark:border-slate-700 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600"
               />
             </div>
           </div>
@@ -285,7 +287,7 @@ const ManageFeedSetup = () => {
               name="schedule_info" 
               value={formData.schedule_info} 
               onChange={handleChange}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm bg-white"
+              className="w-full border border-gray-300 dark:border-slate-700 rounded px-3 py-2 text-sm bg-white dark:bg-[#1e2535] text-gray-800 dark:text-slate-200"
             >
               <option value="Daily">Daily</option>
               <option value="Weekly">Weekly</option>
@@ -296,12 +298,12 @@ const ManageFeedSetup = () => {
           <div>
             <label className="block text-xs invisible mb-1">At</label>
             <div className="relative">
-              <AccessTimeIcon className="absolute left-3 top-2.5 text-gray-400 text-sm" />
+              <AccessTimeIcon className="absolute left-3 top-2.5 text-gray-400 dark:text-slate-500 text-sm" />
               <input 
                 name="import_time"
                 value={formData.import_time}
                 onChange={handleChange}
-                className="w-full border border-gray-300 bg-gray-50 rounded pl-10 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600"
+                className="w-full border border-gray-300 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] text-gray-800 dark:text-slate-200 rounded pl-10 pr-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600 placeholder:text-gray-400 dark:placeholder:text-slate-500"
               />
             </div>
           </div>
@@ -326,7 +328,7 @@ const ManageFeedSetup = () => {
         <div className="flex justify-between items-center mb-4">
           <div>
             <h3 className="text-md font-bold">Activity Log</h3>
-            <p className="text-[11px] text-gray-500">Last sync attempts</p>
+            <p className="text-[11px] text-gray-500 dark:text-slate-400 dark:text-slate-500">Last sync attempts</p>
           </div>
           <button 
             onClick={loadActivityLog} 
@@ -340,7 +342,7 @@ const ManageFeedSetup = () => {
         <div className="overflow-x-auto border-t border-gray-100">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="text-gray-500 text-xs uppercase font-bold">
+              <tr className="text-gray-500 dark:text-slate-400 dark:text-slate-500 text-xs uppercase font-bold">
                 <th className="py-3 border-b border-gray-100">Date & Time</th>
                 <th className="py-3 border-b border-gray-100">Status</th>
                 <th className="py-3 border-b border-gray-100">Message</th>
@@ -355,11 +357,11 @@ const ManageFeedSetup = () => {
                 </tr>
               ) : activityLogs.length === 0 ? (
                 <tr>
-                  <td colSpan="3" className="py-8 text-center text-gray-400 italic">No activity logs found</td>
+                  <td colSpan="3" className="py-8 text-center text-gray-400 dark:text-slate-500 italic">No activity logs found</td>
                 </tr>
               ) : (
                 activityLogs.map((log, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                  <tr key={idx} className="hover:bg-slate-50 dark:bg-[#151a2a] transition-colors">
                     <td className="py-3 border-b border-gray-50 whitespace-nowrap">{log.date}</td>
                     <td className="py-3 border-b border-gray-50">
                       <div className="flex items-center gap-1.5">
@@ -373,7 +375,7 @@ const ManageFeedSetup = () => {
                         </span>
                       </div>
                     </td>
-                    <td className="py-3 border-b border-gray-50 text-gray-600">{log.message}</td>
+                    <td className="py-3 border-b border-gray-50 text-gray-600 dark:text-slate-400 dark:text-slate-500">{log.message}</td>
                   </tr>
                 ))
               )}

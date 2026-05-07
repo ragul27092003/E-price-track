@@ -10,7 +10,13 @@ const SLUG_TO_COLLECTION = {
   vijaysales:       'ept_product_details_new_vijaysales',
 };
 
-// ─── helper: compute avg price delta for one competitor ───────────────────────
+// ─── helper: parse price (mirrors toPrice in productsController) ──────────────
+function toPrice(raw) {
+  if (raw === null || raw === undefined || raw === 'No Result' || raw === 'no result' || raw === '') return null;
+  const n = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(/[₹,\s]/g, ''));
+  return isNaN(n) ? null : n;
+}
+
 // ─── helper: compute avg price delta for one competitor ───────────────────────
 async function computeAvgPriceDelta(db, slug, ourPriceMap) {
   const colName = SLUG_TO_COLLECTION[slug];
@@ -26,14 +32,12 @@ async function computeAvgPriceDelta(db, slug, ourPriceMap) {
     const rawPrice = cp.product_price;
     if (!rawPrice) continue;
 
-    // Remove currency symbols / commas → parse float
     const cmpPrice = parseFloat(String(rawPrice).replace(/[₹,\s]/g, ''));
-    
-    // DYNAMIC TENANT FIX: Find whatever key ends with '_product_code' (e.g., suryaelectronics_product_code)
-    // Fallback to 'product_code' just in case.
+
+    // DYNAMIC TENANT FIX: Find whatever key ends with '_product_code'
     const productCodeKey = Object.keys(cp).find(key => key.endsWith('_product_code')) || 'product_code';
     const mappedProductCode = cp[productCodeKey];
-    
+
     const ourPrice = ourPriceMap[mappedProductCode];
 
     if (!isNaN(cmpPrice) && ourPrice && ourPrice > 0) {
@@ -46,6 +50,87 @@ async function computeAvgPriceDelta(db, slug, ourPriceMap) {
   return `${avg >= 0 ? '+' : ''}${avg.toFixed(1)}%`;
 }
 
+// ─── FIX: compute productsTracked using the SAME live join as Products page ───
+//
+// BUG THAT WAS HERE:
+//   productsTracked was read from ept_dashbaord_statics.competitor_count, which
+//   is a pre-computed/static number representing the TOTAL documents in the
+//   competitor's raw scrape collection (e.g. all Amazon products scraped).
+//
+//   But the Products page (/products?competitor=<slug>) filters our own products
+//   by doing a live JOIN via EAN / slug_unique_id / competitor_product_code and
+//   only keeps products where the competitor has a VALID (non-null) price.
+//
+//   These two counts are different:
+//     • ept_dashbaord_statics  → total competitor products (no join, no price check)
+//     • Products page filter   → our products with a matching non-null competitor price
+//
+// FIX:
+//   Replace the ept_dashbaord_statics lookup with this function, which replicates
+//   the exact join + price-null-check logic from productsController.enrichProducts
+//   so both pages show the same count.
+// ─────────────────────────────────────────────────────────────────────────────
+async function computeProductsTracked(db, slug, ourProducts) {
+  const colName = `ept_product_details_new_${slug}`;
+
+  // Build lookup keys from our product list (mirrors enrichProducts)
+  const eanIds       = [...new Set(ourProducts.map(p => p.product_ean_id).filter(Boolean))];
+  const productCodes = [...new Set(ourProducts.map(p => p.product_code).filter(Boolean))];
+  const uniqueIdField = `${slug}_unique_id`;
+  const uniqueIds    = [...new Set(ourProducts.map(p => p[uniqueIdField]).filter(Boolean))];
+
+  const conditions = [];
+  if (eanIds.length)       conditions.push({ product_ean_id:          { $in: eanIds       } });
+  if (uniqueIds.length)    conditions.push({ [uniqueIdField]:          { $in: uniqueIds    } });
+  if (productCodes.length) conditions.push({ competitor_product_code: { $in: productCodes } });
+  if (!conditions.length)  return 0;
+
+  try {
+    const docs = await db.collection(colName).find(
+      conditions.length === 1 ? conditions[0] : { $or: conditions },
+      {
+        projection: {
+          product_ean_id:          1,
+          [uniqueIdField]:         1,
+          competitor_product_code: 1,
+          product_price:           1,
+        },
+      }
+    ).toArray();
+
+    // Build reverse EAN maps (same as enrichProducts)
+    const eanByUniqueId = {};
+    const eanByCode     = {};
+    for (const p of ourProducts) {
+      if (p[uniqueIdField] && p.product_ean_id) eanByUniqueId[p[uniqueIdField]] = p.product_ean_id;
+      if (p.product_code   && p.product_ean_id) eanByCode[p.product_code]       = p.product_ean_id;
+    }
+
+    // Collect EANs that have a valid (non-null) competitor price
+    const matchedEans = new Set();
+    for (const d of docs) {
+      const ean = d.product_ean_id
+               || eanByUniqueId[d[uniqueIdField]]
+               || eanByCode[d.competitor_product_code]
+               || null;
+      const price = toPrice(d.product_price);
+      if (ean && price !== null) {
+        matchedEans.add(ean);
+      }
+    }
+
+    // Count our products whose EAN was matched with a valid price
+    // This is exactly what the Products page filter produces.
+    return ourProducts.filter(
+      p => p.product_ean_id && matchedEans.has(p.product_ean_id)
+    ).length;
+
+  } catch (err) {
+    console.error(`computeProductsTracked(${slug}) error:`, err.message);
+    return 0;
+  }
+}
+
 // ─── GET /api/competitors ─────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
   try {
@@ -54,15 +139,7 @@ exports.getAll = async (req, res) => {
     // 1. Client DB: competitor list
     const clientComps = await db.collection('ept_competitor_info').find({}).toArray();
 
-    // 2. Client DB: dashboard statics → productsTracked count per competitor
-    //    ept_dashbaord_statics has { competitor_name: 'amazon', competitor_count: 18 }
-    const statsDocs = await db.collection('ept_dashbaord_statics').find({}).toArray();
-    const statsMap  = {};
-    statsDocs.forEach(s => {
-      if (s.competitor_name) statsMap[s.competitor_name] = s.competitor_count || 0;
-    });
-
-    // 3. Main DB: mapping_type + color + website per competitor slug
+    // 2. Main DB: mapping_type + color + website per competitor slug
     const mainDb    = mongoose.connection.useDb('eprice_main_admin_db', { useCache: true });
     const mainComps = await mainDb.collection('competitors').find({}, {
       projection: { competitor_slug: 1, mapping_type: 1, color: 1,
@@ -71,7 +148,8 @@ exports.getAll = async (req, res) => {
     const mainMap = {};
     mainComps.forEach(m => { if (m.competitor_slug) mainMap[m.competitor_slug] = m; });
 
-    // 4. Our own product prices → { product_code: price }
+    // 3. Our own product prices → { product_code: price } (for avgPriceDelta)
+    //    Also used as the full product list for productsTracked computation.
     const ourProducts = await db.collection('ept_product_details_new').find({}).toArray();
     const ourPriceMap = {};
     ourProducts.forEach(p => {
@@ -81,19 +159,17 @@ exports.getAll = async (req, res) => {
       }
     });
 
-    // 5. Build response for each competitor
+    // 4. Build response for each competitor
     const data = await Promise.all(clientComps.map(async (c) => {
       const slug = c.competitor_slug || '';
       const main = mainMap[slug] || {};
 
-      // mapping_type: from main DB ('ean'/'item code') or default EAN
       const rawType    = (main.mapping_type || 'ean').toLowerCase();
       const mappingType = rawType === 'ean' ? 'EAN' : 'NON_EAN';
 
-      // productsTracked from dashboard statics (competitor_name is the slug)
-      const productsTracked = statsMap[slug] ?? statsMap[c.competitor_name] ?? 0;
+      // FIX: use live join count instead of ept_dashbaord_statics
+      const productsTracked = await computeProductsTracked(db, slug, ourProducts);
 
-      // avgPriceDelta: computed from real product price comparison
       const avgPriceDelta = await computeAvgPriceDelta(db, slug, ourPriceMap);
 
       return {
@@ -104,10 +180,10 @@ exports.getAll = async (req, res) => {
         website:         main.competitor_site        || c.competitor_site        || '',
         searchUrl:       main.competitor_search_url  || c.competitor_search_url  || '',
         color:           main.color || '#475e77',
-        mappingType,                  // 'EAN' or 'NON_EAN'  ← frontend splits on this
+        mappingType,
         isActive:        c.competitor_status === 'enable',
-        avgPriceDelta,                // e.g. '+2.3%' or '-1.1%'
-        productsTracked,              // from ept_dashbaord_statics
+        avgPriceDelta,
+        productsTracked,  // ← now matches Products page count exactly
         lastSync:        c.modified_date || 'Never',
         slug,
       };
