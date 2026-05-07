@@ -470,12 +470,16 @@ function exportToCSV(products) {
       p.product_item_group || p.product_category || "", compDetail,
     ].map(escape).join(",");
   });
-  const csv = "﻿" + [headers.map(escape).join(","), ...rows].join("\n");
+  const csv = [headers.map(escape).join(","), ...rows].join("\r\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = `products_${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click(); URL.revokeObjectURL(url);
+  a.href = url;
+  a.download = `products_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ── Configure Modal ────────────────────────────────────────────────────────────
@@ -689,6 +693,14 @@ export default function Products() {
     if (sortConfig.column === "name") {
       const cmp = (a.product_name || "").toLowerCase().localeCompare((b.product_name || "").toLowerCase());
       return sortConfig.direction === "asc" ? cmp : -cmp;
+    }
+    if (sortConfig.column === "price") {
+      const aPrice = parsePrice(a.product_price);
+      const bPrice = parsePrice(b.product_price);
+      if (aPrice === null && bPrice === null) return 0;
+      if (aPrice === null) return 1;
+      if (bPrice === null) return -1;
+      return sortConfig.direction === "asc" ? aPrice - bPrice : bPrice - aPrice;
     }
     if (sortConfig.column === "rank") {
       const aRank = parseInt(a.user_notification_data?.rank_pos ?? a.rank_by ?? 9999, 10);
@@ -935,70 +947,75 @@ export default function Products() {
                   <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
                     <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
                     <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">
-                    <table className="w-full min-w-[1000px] border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b border-slate-100 bg-slate-50/50">
-                          <th className="w-12 px-5 py-4">
-                            <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                          </th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">
-                            <button onClick={() => handleSort("name")} className="flex items-center gap-1.5 hover:text-slate-800 transition-colors">
-                              Product
-                              <SortIcon active={sortConfig.column === "name"} direction={sortConfig.direction} />
-                            </button>
-                          </th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price</th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">
-                            <button onClick={() => handleSort("rank")} className="flex items-center gap-1.5 hover:text-slate-800 transition-colors">
-                              Rank
-                              <SortIcon active={sortConfig.column === "rank"} direction={sortConfig.direction} />
-                            </button>
-                          </th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price Gap</th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Competitor Prices</th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Market</th>
-                          <th className="px-5 py-4 text-right text-xs font-semibold text-slate-500">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {sorted.length === 0 ? (
-                          <tr><td colSpan={8} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr>
-                        ) : (
-                          paginated.map((p) => (
-                            <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
-                              <td className="px-5 py-4">
-                                <input
-                                  type="checkbox"
-                                  checked={!!(p.group_name || (p.user_alert_id && p.user_alert_id.length > 0))}
-                                  onChange={() => setConfigProduct(p)}
-                                  className="h-4 w-4 cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                  title="Configure group & user alerts"
-                                />
-                              </td>
-                              <td className="px-5 py-4"><ProductCell product={p} /></td>
-                              <td className="px-5 py-4"><PriceCell product={p} /></td>
-                              <td className="px-5 py-4"><RankBadge product={p} /></td>
-                              <td className="px-5 py-4"><PriceGapBadge value={priceGap(p)} /></td>
-                              <td className="px-5 py-4"><CompetitorPrices product={p} competitorMeta={competitorMeta} /></td>
-                              <td className="px-5 py-4"><MarketGapCell product={p} competitorMeta={competitorMeta} /></td>
-                              <td className="px-5 py-4 text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <button
-                                    onClick={() => navigate(`/product-history?ean=${p.product_ean_id}`)}
-                                    className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm"
-                                  >
-                                    View Details
-                                  </button>
-                                  <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">
-                                    Quick Sync
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
+                      <table className="w-full min-w-[1000px] border-collapse text-sm">
+                        <thead>
+                          <tr className="border-b border-slate-100 bg-slate-50/50">
+                            <th className="w-12 px-5 py-4">
+                              <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                            </th>
+                            <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">
+                              <button onClick={() => handleSort("name")} className="flex items-center gap-1.5 hover:text-slate-800 transition-colors">
+                                Product
+                                <SortIcon active={sortConfig.column === "name"} direction={sortConfig.direction} />
+                              </button>
+                            </th>
+                            <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">
+                              <button onClick={() => handleSort("price")} className="flex items-center gap-1.5 hover:text-slate-800 transition-colors">
+                                Price
+                                <SortIcon active={sortConfig.column === "price"} direction={sortConfig.direction} />
+                              </button>
+                            </th>
+                            <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">
+                              <button onClick={() => handleSort("rank")} className="flex items-center gap-1.5 hover:text-slate-800 transition-colors">
+                                Rank
+                                <SortIcon active={sortConfig.column === "rank"} direction={sortConfig.direction} />
+                              </button>
+                            </th>
+                            <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price Gap</th>
+                            <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Competitor Prices</th>
+                            <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Market</th>
+                            <th className="px-5 py-4 text-right text-xs font-semibold text-slate-500">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {sorted.length === 0 ? (
+                            <tr><td colSpan={8} className="px-5 py-10 text-center text-sm text-slate-400">No products found.</td></tr>
+                          ) : (
+                            paginated.map((p) => (
+                              <tr key={p._id} className="hover:bg-slate-50/80 transition-colors">
+                                <td className="px-5 py-4">
+                                  <input
+                                    type="checkbox"
+                                    checked={!!(p.group_name || (p.user_alert_id && p.user_alert_id.length > 0))}
+                                    onChange={() => setConfigProduct(p)}
+                                    className="h-4 w-4 cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                    title="Configure group & user alerts"
+                                  />
+                                </td>
+                                <td className="px-5 py-4"><ProductCell product={p} /></td>
+                                <td className="px-5 py-4"><PriceCell product={p} /></td>
+                                <td className="px-5 py-4"><RankBadge product={p} /></td>
+                                <td className="px-5 py-4"><PriceGapBadge value={priceGap(p)} /></td>
+                                <td className="px-5 py-4"><CompetitorPrices product={p} competitorMeta={competitorMeta} /></td>
+                                <td className="px-5 py-4"><MarketGapCell product={p} competitorMeta={competitorMeta} /></td>
+                                <td className="px-5 py-4 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button
+                                      onClick={() => navigate(`/product-history?ean=${p.product_ean_id}`)}
+                                      className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm"
+                                    >
+                                      View Details
+                                    </button>
+                                    <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">
+                                      Quick Sync
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
                     </div>
                     <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
                   </div>

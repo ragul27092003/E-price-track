@@ -14,3 +14,6 @@ export const checkCompanyNameAvailability = (companyName) =>
 
 export const fetchAllStores = () =>
   API.get('/auth/all-stores').then((r) => r.data);
+
+export const getMerchant = (companyId) =>
+  API.get(`/auth/merchant/${companyId}`).then((r) => r.data);

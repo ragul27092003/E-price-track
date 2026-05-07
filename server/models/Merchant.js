@@ -17,6 +17,7 @@ const merchantSchema = new mongoose.Schema({
   userId:    { type: String, required: true },
   status:    { type: String, enum: ['active', 'inactive'], default: 'active' },
   feed_info: { type: feedInfoSchema },
+  export_type: { type: String, enum: ['A', 'B', 'C'], default: 'A' },
 }, { timestamps: true, collection: 'merchants' });
 
 module.exports = mongoose.model('Merchant', merchantSchema);

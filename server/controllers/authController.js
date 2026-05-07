@@ -197,3 +197,14 @@ exports.getAllStores = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+exports.getMerchant = async (req, res) => {
+  const { companyId } = req.params;
+  try {
+    const merchant = await Merchant.findOne({ companyId });
+    if (!merchant) return res.status(404).json({ message: 'Merchant not found' });
+    res.json(merchant);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};

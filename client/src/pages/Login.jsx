@@ -24,6 +24,7 @@ const Login = () => {
     try {
       const data = await loginUser(email, password);
       login(data);
+      await useStore.getState().fetchMerchant();
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');

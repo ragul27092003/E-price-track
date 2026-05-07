@@ -1,4 +1,5 @@
 import { Moon, Sun, LogOut } from "lucide-react";
+import logo from "../../services/assets/logo.png";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -101,6 +102,7 @@ export function AppHeader() {
 
   return (
     <header className="flex items-center h-16 px-6 border-b border-border bg-card shrink-0">
+      <img src={logo} alt="Logo" className="h-14 w-auto object-contain" />
       <div className="ml-auto flex items-center gap-2">
         <Button variant="ghost" size="icon" onClick={toggleDarkMode} className="text-muted-foreground hover:text-foreground">
           {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
