@@ -241,7 +241,9 @@ function MarketGapCell({ product, competitorMeta }) {
 }
 
 function CompetitorPrices({ product, competitorMeta }) {
-  const active = (product.competitor_prices || []).filter((c) => c.price !== null);
+  const active = (product.competitor_prices || [])
+    .filter((c) => c.price !== null)
+    .sort((a, b) => a.price - b.price);
   const { low, avg, high } = marketStats(product);
   if (active.length === 0) {
     return <MarketCap low={low} avg={avg} high={high} />;
@@ -349,8 +351,28 @@ const ITEMS_PER_PAGE = 5;
 
 function Pagination({ currentPage, totalPages, onPageChange }) {
   if (totalPages <= 1) return null;
+
+  const windowSize = 10;
+  const windowStart = currentPage < 5 ? 1 : currentPage - 4;
+  const windowEnd = Math.min(windowStart + windowSize - 1, totalPages);
+  const adjustedStart = Math.max(1, windowEnd - windowSize + 1);
+
   const pages = [];
-  for (let i = 1; i <= totalPages; i++) pages.push(i);
+  for (let i = adjustedStart; i <= windowEnd; i++) pages.push(i);
+
+  const pageBtn = (p, label) => (
+    <button
+      key={p}
+      onClick={() => onPageChange(p)}
+      className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-semibold transition-colors ${
+        p === currentPage
+          ? "bg-[#2B86C5] text-white border border-[#2B86C5]"
+          : "border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a]"
+      }`}
+    >
+      {label ?? p}
+    </button>
+  );
 
   return (
     <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-700/50 bg-white dark:bg-[#0b101e] px-5 py-3">
@@ -363,18 +385,21 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
         >
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" /></svg>
         </button>
-        {pages.map((p) => (
-          <button
-            key={p}
-            onClick={() => onPageChange(p)}
-            className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-semibold transition-colors ${p === currentPage
-              ? "bg-[#2B86C5] text-white border border-[#2B86C5]"
-              : "border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a]"
-              }`}
-          >
-            {p}
-          </button>
-        ))}
+
+        {adjustedStart > 1 && (
+          <>
+            {pageBtn(1)}
+            <span className="px-1 text-slate-400 dark:text-slate-500 text-xs">…</span>
+          </>
+        )}
+        {pages.map((p) => pageBtn(p))}
+        {windowEnd < totalPages && (
+          <>
+            <span className="px-1 text-slate-400 dark:text-slate-500 text-xs">…</span>
+            {pageBtn(totalPages)}
+          </>
+        )}
+
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
@@ -454,9 +479,65 @@ function PriceCell({ product }) {
   );
 }
 
-function exportToCSV(products) {
-  const headers = ["Product Name", "Item Code", "Ranking Position", "Competing With", "Price", "SAP Price", "Store Price", "Item Groups", "Competitor Detail"];
+function exportToCSV(products, exportType = "A", competitorMeta = {}) {
   const escape = (val) => { const s = String(val ?? ""); return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s; };
+
+  const triggerDownload = (csv) => {
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `products_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  if (exportType === "B") {
+    // Collect all unique competitor slugs preserving insertion order
+    const slugMap = {};
+    products.forEach((p) => {
+      (p.competitor_prices || []).forEach((c) => {
+        if (!slugMap[c.slug]) {
+          slugMap[c.slug] = competitorMeta?.[c.slug]?.name || c.name || c.slug;
+        }
+      });
+    });
+    const slugs = Object.keys(slugMap);
+
+    const headers = [
+      "Product Name", "Item Code", "Ranking Position", "Competing With",
+      "Price", "SAP Price", "Mrp Price", "Item Groups",
+      ...slugs.map((s) => slugMap[s]),
+    ];
+
+    const rows = products.map((p) => {
+      const compMap = {};
+      (p.competitor_prices || []).forEach((c) => {
+        compMap[c.slug] = (c.price === null || c.price === undefined || c.stock === 0)
+          ? "Out Of Stock"
+          : c.price;
+      });
+      return [
+        p.product_name || "",
+        p.product_code || p.product_ean_id || "",
+        p.user_notification_data?.rank_pos || p.rank_by || "",
+        p.user_notification_data?.Competing_with ?? "",
+        p.product_price ?? "",
+        p.product_sap_price ?? "",
+        p.product_store_price ?? "",
+        p.product_item_group || p.product_category || "",
+        ...slugs.map((s) => compMap[s] ?? "Out Of Stock"),
+      ].map(escape).join(",");
+    });
+
+    triggerDownload([headers.map(escape).join(","), ...rows].join("\r\n"));
+    return;
+  }
+
+  // Type A (default)
+  const headers = ["Product Name", "Item Code", "Ranking Position", "Competing With", "Price", "SAP Price", "Store Price", "Item Groups", "Competitor Detail"];
   const rows = products.map((p) => {
     const compDetail = (p.competitor_prices || []).map((c) => {
       const outOfStock = c.price === null || c.price === undefined || c.stock === 0;
@@ -470,16 +551,7 @@ function exportToCSV(products) {
       p.product_item_group || p.product_category || "", compDetail,
     ].map(escape).join(",");
   });
-  const csv = [headers.map(escape).join(","), ...rows].join("\r\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `products_${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  triggerDownload([headers.map(escape).join(","), ...rows].join("\r\n"));
 }
 
 // ── Configure Modal ────────────────────────────────────────────────────────────
@@ -615,6 +687,7 @@ export default function Products() {
   const competitors = useStore((s) => s.competitors);
   const activeStoreId = useStore((s) => s.activeStoreId);
   const currentUserId = useStore((s) => s.user?.userId);
+  const exportType = useStore((s) => s.exportType) || "A";
 
   // Build meta map for logos
   const competitorMeta = {};
@@ -779,7 +852,7 @@ export default function Products() {
               Filter
             </button> */}
               <button
-                onClick={() => exportToCSV(filtered)}
+                onClick={() => exportToCSV(filtered, exportType, competitorMeta)}
                 className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors"
               >
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
@@ -959,7 +1032,12 @@ export default function Products() {
                               <SortIcon active={sortConfig.column === "name"} direction={sortConfig.direction} />
                             </button>
                           </th>
-                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price</th>
+                          <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">
+                            <button onClick={() => handleSort("price")} className="flex items-center gap-1.5 hover:text-slate-800 transition-colors">
+                              Price
+                              <SortIcon active={sortConfig.column === "price"} direction={sortConfig.direction} />
+                            </button>
+                          </th>
                           <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">
                             <button onClick={() => handleSort("rank")} className="flex items-center gap-1.5 hover:text-slate-800 transition-colors">
                               Rank

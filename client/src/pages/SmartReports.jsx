@@ -872,11 +872,10 @@ function HeaderMetrics({ product, tab }) {
       <div className="flex items-center flex-wrap gap-8">
         <MetricCard label="Current Price" value={fmt(ourPrice)} />
         <div className="h-10 w-px bg-slate-200" />
-        <MetricCard label="Low (30d)" value={fmt(low)} accent="text-emerald-600" />
-        <div className="h-10 w-px bg-slate-200" />
-        <MetricCard label="Average (30d)" value={fmt(avg)} />
-        <div className="h-10 w-px bg-slate-200" />
-        <MetricCard label="High (30d)" value={fmt(high)} accent="text-rose-600" />
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Rank</p>
+          <RankBadge rank={1} total={1} />
+        </div>
         <div className="h-10 w-px bg-slate-200" />
         <div>
           <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Stock</p>
@@ -982,7 +981,7 @@ function SidebarProduct({ product, isSelected, onClick, tab }) {
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 
-function exportSmartReportCSV(products, tab, competitorMeta) {
+function exportSmartReportCSV(products, tab, competitorMeta, exportType = "A") {
   const escape = (val) => {
     const s = String(val ?? "");
     return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
@@ -990,11 +989,38 @@ function exportSmartReportCSV(products, tab, competitorMeta) {
   const fmtNum = (v) => (v !== null && v !== undefined ? v : "");
   const isNonComp = tab === "Non Competitors";
   const gapColName = tab === "Negative Trend" ? "Higher By" : "Cheaper By";
+  const storePriceLabel = exportType === "B" ? "Mrp Price" : "Store Price";
 
-  // Column order mirrors Products export: Name → Item Code → Rank → Competing With → Price → SAP → Store → Gap → ...
+  const triggerDownload = (csv) => {
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `smart_report_${tab.toLowerCase().replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // For Type B: collect unique competitor slugs across all products
+  let slugMap = {};
+  if (exportType === "B" && !isNonComp) {
+    products.forEach((p) => {
+      (p.competitor_prices || []).forEach((c) => {
+        if (!slugMap[c.slug]) {
+          slugMap[c.slug] = competitorMeta?.[c.slug]?.name || c.name || c.slug;
+        }
+      });
+    });
+  }
+  const bSlugs = Object.keys(slugMap);
+
   const headers = isNonComp
-    ? ["Product Name", "Item Code", "Price", "Sap Price", "Store Price", "Brand", "Item Groups", "Market Low (30d)", "Market Avg (30d)", "Market High (30d)", "Stock"]
-    : ["Product Name", "Item Code", "Ranking Position", "Price", "Sap Price", "Store Price", gapColName, "Competitor Name", "Competitor Price", "Brand", "Item Groups", "Competitor Detail", "Stock"];
+    ? ["Product Name", "Item Code", "Price", "Sap Price", storePriceLabel, "Brand", "Item Groups", "Market Low (30d)", "Market Avg (30d)", "Market High (30d)", "Stock"]
+    : exportType === "B"
+      ? ["Product Name", "Item Code", "Ranking Position", "Price", "Sap Price", storePriceLabel, gapColName, "Competitor Name", "Competitor Price", "Brand", "Item Groups", "Stock", ...bSlugs.map((s) => slugMap[s])]
+      : ["Product Name", "Item Code", "Ranking Position", "Price", "Sap Price", storePriceLabel, gapColName, "Competitor Name", "Competitor Price", "Brand", "Item Groups", "Competitor Detail", "Stock"];
 
   const rows = products.map((p) => {
     const ourPrice = parsePrice(p.product_price);
@@ -1004,17 +1030,9 @@ function exportSmartReportCSV(products, tab, competitorMeta) {
     const lowest = comps.length ? comps.reduce((min, c) => (c.price < min.price ? c : min)) : null;
     const lowestMeta = lowest ? (competitorMeta?.[lowest.slug] || {}) : {};
     const lowestName = lowest ? (lowestMeta.name || lowest.name || lowest.slug) : "";
-    const marketAvg = getMarketAvg(p);
     const pGroup = p.product_category ? p.product_category.split(">")[0].trim() : "";
     const sap = fmtNum(parsePrice(p.product_sap_price));
     const store = fmtNum(parsePrice(p.product_store_price));
-
-    const compDetail = comps
-      .map((c) => {
-        const m = competitorMeta?.[c.slug] || {};
-        return `${m.name || c.name || c.slug}: ₹${c.price.toLocaleString("en-IN")}`;
-      })
-      .join(" | ");
 
     let gapAmount = "";
     if (lowest && ourPrice !== null) {
@@ -1023,41 +1041,60 @@ function exportSmartReportCSV(products, tab, competitorMeta) {
 
     const { low, avg, high } = isNonComp ? marketStats(p) : {};
 
-    const row = isNonComp
-      ? [
-          p.product_name || "",
-          p.product_ean_id || p.product_code || "",
-          fmtNum(ourPrice), sap, store,
-          p.product_brand || "", pGroup,
-          fmtNum(low), fmtNum(avg), fmtNum(high),
-          p.product_stock ?? "",
-        ]
-      : [
-          p.product_name || "",
-          p.product_ean_id || p.product_code || "",
-          rank !== null ? `="${rank}/${rankTotal}"` : "",
-          fmtNum(ourPrice), sap, store,
-          fmtNum(gapAmount),
-          lowestName,
-          fmtNum(lowest?.price),
-          p.product_brand || "", pGroup,
-          compDetail,
-          p.product_stock ?? "",
-        ];
+    let row;
+    if (isNonComp) {
+      row = [
+        p.product_name || "",
+        p.product_ean_id || p.product_code || "",
+        fmtNum(ourPrice), sap, store,
+        p.product_brand || "", pGroup,
+        fmtNum(low), fmtNum(avg), fmtNum(high),
+        p.product_stock ?? "",
+      ];
+    } else if (exportType === "B") {
+      const compMap = {};
+      (p.competitor_prices || []).forEach((c) => {
+        const outOfStock = c.price === null || c.price === undefined || c.stock === 0;
+        compMap[c.slug] = outOfStock ? "Out Of Stock" : c.price;
+      });
+      row = [
+        p.product_name || "",
+        p.product_ean_id || p.product_code || "",
+        rank !== null ? `="${rank}/${rankTotal}"` : "",
+        fmtNum(ourPrice), sap, store,
+        fmtNum(gapAmount),
+        lowestName,
+        fmtNum(lowest?.price),
+        p.product_brand || "", pGroup,
+        p.product_stock ?? "",
+        ...bSlugs.map((s) => compMap[s] ?? "Out Of Stock"),
+      ];
+    } else {
+      // Type A
+      const compDetail = comps
+        .map((c) => {
+          const m = competitorMeta?.[c.slug] || {};
+          return `${m.name || c.name || c.slug}: ₹${c.price.toLocaleString("en-IN")}`;
+        })
+        .join(" | ");
+      row = [
+        p.product_name || "",
+        p.product_ean_id || p.product_code || "",
+        rank !== null ? `="${rank}/${rankTotal}"` : "",
+        fmtNum(ourPrice), sap, store,
+        fmtNum(gapAmount),
+        lowestName,
+        fmtNum(lowest?.price),
+        p.product_brand || "", pGroup,
+        compDetail,
+        p.product_stock ?? "",
+      ];
+    }
 
     return row.map(escape).join(",");
   });
 
-  const csv = [headers.map(escape).join(","), ...rows].join("\r\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `smart_report_${tab.toLowerCase().replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  triggerDownload([headers.map(escape).join(","), ...rows].join("\r\n"));
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -1073,6 +1110,7 @@ const HISTORY_FILTERS = [
 
 export default function SmartReports() {
   const { products, productsLoading, productsError, setProducts, setProductsLoading, setProductsError, competitors, setCompetitors } = useStore();
+  const exportType = useStore((s) => s.exportType) || "A";
   const [activeTab, setActiveTab] = useState("Easy Gain");
   const [selectedEan, setSelectedEan] = useState(null);
   const [historyDays, setHistoryDays] = useState(30);
@@ -1133,7 +1171,7 @@ export default function SmartReports() {
             <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white">Smart Reports</h2>
             {tabProducts.length > 0 && (
               <button
-                onClick={() => exportSmartReportCSV(tabProducts, activeTab, competitorMeta)}
+                onClick={() => exportSmartReportCSV(tabProducts, activeTab, competitorMeta, exportType)}
                 className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors"
               >
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
