@@ -124,7 +124,7 @@ function ProductImage({ src, alt }) {
   const [err, setErr] = useState(false);
   if (!src || err) {
     return (
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 text-lg">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#151a2a] text-lg">
         📦
       </div>
     );
@@ -134,7 +134,7 @@ function ProductImage({ src, alt }) {
       src={src}
       alt={alt}
       onError={() => setErr(true)}
-      className="h-10 w-10 shrink-0 rounded-lg border border-slate-100 object-contain bg-slate-50"
+      className="h-10 w-10 shrink-0 rounded-lg border border-slate-100 dark:border-slate-700/50 object-contain bg-slate-50 dark:bg-[#151a2a]"
     />
   );
 }
@@ -145,7 +145,7 @@ function CompetitorLogo({ name = "", slug = "", logo = "" }) {
   const label = (name || slug).slice(0, 8).toLowerCase();
   if (logo && !imgErr) {
     return (
-      <div className="flex h-6 w-6 items-center justify-center rounded overflow-hidden border border-slate-200 bg-white shrink-0">
+      <div className="flex h-6 w-6 items-center justify-center rounded overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0">
         <img
           src={`http://localhost:5100${logo}`}
           alt={name}
@@ -190,7 +190,7 @@ function StockBadge({ stock }) {
     ? { label: `Low (${qty})`, dot: "bg-amber-400" }
     : { label: `In Stock (${qty})`, dot: "bg-emerald-500" };
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700">
+    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 dark:text-slate-600">
       <span className={`h-2 w-2 rounded-full ${dot}`} />
       {label}
     </span>
@@ -216,16 +216,16 @@ function RankBadge({ rank, total }) {
 function MetricCard({ label, value, sub, accent }) {
   return (
     <div>
-      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
-      <p className={`mt-1 text-xl font-black ${accent || "text-slate-800"}`}>{value}</p>
-      {sub && <p className="text-[11px] text-slate-400 mt-0.5">{sub}</p>}
+      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
+      <p className={`mt-1 text-xl font-black ${accent || "text-slate-800 dark:text-white"}`}>{value}</p>
+      {sub && <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{sub}</p>}
     </div>
   );
 }
 
 function PriceGapBadge({ value }) {
   if (value === null || value === undefined) {
-    return <span className="text-xs text-slate-400">No data</span>;
+    return <span className="text-xs text-slate-400 dark:text-slate-500">No data</span>;
   }
   const isNeg      = value < 0;
   const baseColors = isNeg ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700";
@@ -246,7 +246,7 @@ function PriceGapBadge({ value }) {
 }
 
 function CheaperByBadge({ amount }) {
-  if (amount === null || amount === undefined) return <span className="text-xs text-slate-400">—</span>;
+  if (amount === null || amount === undefined) return <span className="text-xs text-slate-400 dark:text-slate-500">—</span>;
   return (
     <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-[12px] font-bold text-emerald-700">
       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
@@ -258,7 +258,7 @@ function CheaperByBadge({ amount }) {
 }
 
 function HigherByBadge({ amount, label = "higher" }) {
-  if (amount === null || amount === undefined) return <span className="text-xs text-slate-400">—</span>;
+  if (amount === null || amount === undefined) return <span className="text-xs text-slate-400 dark:text-slate-500">—</span>;
   const isGood = label === "higher";
   return (
     <div className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-bold ${isGood ? "bg-sky-100 text-sky-700" : "bg-rose-100 text-rose-700"}`}>
@@ -372,7 +372,7 @@ function HistoricalPriceChart({ product, days, competitorMeta }) {
 
   if (!history.length || !allVals.length) {
     return (
-      <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+      <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500 text-sm">
         No price history available
       </div>
     );
@@ -423,24 +423,24 @@ function HistoricalPriceChart({ product, days, competitorMeta }) {
         {/* Hover tooltip — positioned above cursor */}
         {hovered && (
           <div
-            className="absolute z-20 pointer-events-none bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-[11px] min-w-[140px]"
+            className="absolute z-20 pointer-events-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl px-3 py-2.5 text-[11px] min-w-[140px]"
             style={{
               left: `clamp(0px, calc(${tooltipLeftPct}% - 70px), calc(100% - 160px))`,
               top: `${hoverContainerY}px`,
               transform: "translateY(calc(-100% - 8px))",
             }}
           >
-            <p className="font-bold text-slate-600 mb-1.5 border-b border-slate-100 pb-1">{hovered.date}</p>
+            <p className="font-bold text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1.5 border-b border-slate-100 dark:border-slate-700/50 pb-1">{hovered.date}</p>
             {dataKeys.map((k, i) => {
               const val = hovered[k];
               if (val === null || val === undefined) return null;
               return (
                 <div key={k} className="flex items-center justify-between gap-3 mt-0.5">
-                  <span className="flex items-center gap-1.5 text-slate-500">
+                  <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 dark:text-slate-500">
                     <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: colors[i] }} />
                     {labels[i]}
                   </span>
-                  <span className="font-bold text-slate-800">{fmt(val)}</span>
+                  <span className="font-bold text-slate-800 dark:text-white">{fmt(val)}</span>
                 </div>
               );
             })}
@@ -574,7 +574,7 @@ function PriceGapChart({ product }) {
     }).filter((d) => d.gap !== null);
   }, [product]);
 
-  if (!data.length) return <div className="flex items-center justify-center h-full text-slate-400 text-sm">No gap data</div>;
+  if (!data.length) return <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500 text-sm">No gap data</div>;
 
   const PL = 48, PR = 12, PT = 16, PB = 20;
   const W = 320;
@@ -623,17 +623,17 @@ function PriceGapChart({ product }) {
         {/* Tooltip — positioned above cursor */}
         {hovered && (
           <div
-            className="absolute z-20 pointer-events-none bg-white border border-slate-200 rounded-xl shadow-xl px-3 py-2.5 text-[11px] min-w-[130px]"
+            className="absolute z-20 pointer-events-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl px-3 py-2.5 text-[11px] min-w-[130px]"
             style={{
               left: `clamp(0px, calc(${tooltipLeftPct}% - 65px), calc(100% - 130px))`,
               top: `${hoverContainerY}px`,
               transform: "translateY(calc(-100% - 8px))",
             }}
           >
-            <p className="font-bold text-slate-600 mb-1.5 border-b border-slate-100 pb-1">{hovered.date}</p>
+            <p className="font-bold text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1.5 border-b border-slate-100 dark:border-slate-700/50 pb-1">{hovered.date}</p>
             <div className="flex items-center justify-between gap-3 mt-0.5">
-              <span className="text-slate-500">Gap vs Avg</span>
-              <span className={`font-bold ${hovered.gap < 0 ? "text-emerald-600" : hovered.gap > 0 ? "text-rose-600" : "text-slate-600"}`}>
+              <span className="text-slate-500 dark:text-slate-400 dark:text-slate-500">Gap vs Avg</span>
+              <span className={`font-bold ${hovered.gap < 0 ? "text-emerald-600" : hovered.gap > 0 ? "text-rose-600" : "text-slate-600 dark:text-slate-400 dark:text-slate-500"}`}>
                 {hovered.gap > 0 ? "+" : ""}{fmt(hovered.gap)}
               </span>
             </div>
@@ -730,7 +730,7 @@ function InventoryForecast() {
   const bw2 = bw * 0.35;
   return (
     <div className="flex flex-col h-full w-full">
-      <div className="mb-2 flex gap-4 text-[11px] text-slate-500">
+      <div className="mb-2 flex gap-4 text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">
         <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-blue-400 inline-block" />Current</span>
         <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-400 inline-block" />Predicted</span>
       </div>
@@ -747,7 +747,7 @@ function InventoryForecast() {
           })}
         </svg>
       </div>
-      <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+      <div className="mt-1 flex justify-between text-[10px] text-slate-400 dark:text-slate-500">
         {INVENTORY_DATA.map((d) => <span key={d.m}>{d.m}</span>)}
       </div>
     </div>
@@ -784,14 +784,14 @@ function CompetitorTable({ product, tab, competitorMeta }) {
       : "Cheaper By";
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-200">
+    <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-slate-50 border-b border-slate-200">
-            <th className="text-left px-4 py-2.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Competitor</th>
-            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Price</th>
-            <th className="text-center px-4 py-2.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">Rank</th>
-            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 text-xs uppercase tracking-wide">{colLabel}</th>
+          <tr className="bg-slate-50 dark:bg-[#151a2a] border-b border-slate-200 dark:border-slate-700">
+            <th className="text-left px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 text-xs uppercase tracking-wide">Competitor</th>
+            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 text-xs uppercase tracking-wide">Price</th>
+            <th className="text-center px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 text-xs uppercase tracking-wide">Rank</th>
+            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 text-xs uppercase tracking-wide">{colLabel}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -826,7 +826,7 @@ function CompetitorTable({ product, tab, competitorMeta }) {
             return (
               <tr
                 key={entry.slug}
-                className={`transition-colors ${entry.isMe ? "bg-blue-50/60 font-semibold" : "hover:bg-slate-50"}`}
+                className={`transition-colors ${entry.isMe ? "bg-blue-50/60 font-semibold" : "hover:bg-slate-50 dark:bg-[#151a2a]"}`}
               >
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
@@ -837,11 +837,11 @@ function CompetitorTable({ product, tab, competitorMeta }) {
                     ) : (
                       <CompetitorLogo name={entry.name} slug={entry.slug} logo={entry.logo} />
                     )}
-                    <span className="text-slate-800">{entry.name}</span>
+                    <span className="text-slate-800 dark:text-white">{entry.name}</span>
                     {rankNum === 1 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 rounded-full px-1.5 py-0.5">Rank 1</span>}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right font-bold text-slate-800">{fmt(entry.price)}</td>
+                <td className="px-4 py-3 text-right font-bold text-slate-800 dark:text-white">{fmt(entry.price)}</td>
                 <td className="px-4 py-3 text-center">
                   <RankBadge rank={rankNum} total={allEntries.length} />
                 </td>
@@ -879,7 +879,7 @@ function HeaderMetrics({ product, tab }) {
         <MetricCard label="High (30d)" value={fmt(high)} accent="text-rose-600" />
         <div className="h-10 w-px bg-slate-200" />
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1">Stock</p>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Stock</p>
           <StockBadge stock={product.product_stock} />
         </div>
       </div>
@@ -924,22 +924,22 @@ function HeaderMetrics({ product, tab }) {
       <MetricCard label="Market Average" value={fmt(marketAvg)} />
       <div className="h-10 w-px bg-slate-200" />
       <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Price Gap</p>
+        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5">Price Gap</p>
         <PriceGapBadge value={gap} />
       </div>
       <div className="h-10 w-px bg-slate-200" />
       <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">{extraLabel}</p>
+        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5">{extraLabel}</p>
         {extraContent}
       </div>
       <div className="h-10 w-px bg-slate-200" />
       <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1">Rank</p>
+        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Rank</p>
         <RankBadge rank={rank} total={rankTotal} />
       </div>
       <div className="h-10 w-px bg-slate-200" />
       <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1">Stock</p>
+        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Stock</p>
         <StockBadge stock={product.product_stock} />
       </div>
     </div>
@@ -961,19 +961,19 @@ function SidebarProduct({ product, isSelected, onClick, tab }) {
     <button
       onClick={onClick}
       className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-all ${
-        isSelected ? "bg-[#ebf5fb] ring-1 ring-[#2B86C5]/30" : "hover:bg-slate-100"
+        isSelected ? "bg-[#ebf5fb] ring-1 ring-[#2B86C5]/30" : "hover:bg-slate-100 dark:hover:bg-slate-700/60"
       }`}
     >
       <ProductImage src={product.product_image} alt={product.product_name} />
       <div className="flex-1 min-w-0">
-        <p className={`font-semibold text-[13px] truncate ${isSelected ? "text-[#1e6191]" : "text-slate-800"}`}>
+        <p className={`font-semibold text-[13px] truncate ${isSelected ? "text-[#1e6191]" : "text-slate-800 dark:text-white"}`}>
           {product.product_name}
         </p>
         <div className="flex items-center gap-2 mt-0.5">
-          <p className="text-[11px] text-slate-500">{product.product_ean_id}</p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">{product.product_ean_id}</p>
           {rank && <RankBadge rank={rank} total={rankTotal} />}
         </div>
-        <p className="text-[12px] font-bold text-slate-700 mt-0.5">{fmt(ourPrice)}</p>
+        <p className="text-[12px] font-bold text-slate-700 dark:text-slate-300 dark:text-slate-600 mt-0.5">{fmt(ourPrice)}</p>
       </div>
       <Sparkline data={sparkData} color={isSelected ? "#2B86C5" : "#94a3b8"} />
     </button>
@@ -1126,11 +1126,11 @@ export default function SmartReports() {
   );
 
   return (
-    <div className="min-h-screen bg-white text-slate-800 p-3 md:p-6 lg:p-8">
+    <div className="min-h-screen bg-white dark:bg-[#0b101e] text-slate-800 dark:text-white p-3 md:p-6 lg:p-8">
       <div className="mx-auto max-w-[1400px]">
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl md:text-2xl font-bold text-slate-800">Smart Reports</h2>
+            <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white">Smart Reports</h2>
             {tabProducts.length > 0 && (
               <button
                 onClick={() => exportSmartReportCSV(tabProducts, activeTab, competitorMeta)}
@@ -1147,18 +1147,18 @@ export default function SmartReports() {
           </div>
 
           {/* Tab Navigation */}
-          <div className="mb-8 flex overflow-x-auto border-b border-slate-200 gap-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mb-8 flex overflow-x-auto border-b border-slate-200 dark:border-slate-700 gap-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {TABS.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`pb-3 text-sm font-semibold transition-all relative flex shrink-0 items-center gap-2 mr-5 whitespace-nowrap ${
-                  activeTab === tab ? "text-[#1e6191]" : "text-slate-400 hover:text-slate-600"
+                  activeTab === tab ? "text-[#1e6191]" : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-400 dark:text-slate-500"
                 }`}
               >
                 {tab}
                 {tabCounts[tab] > 0 && (
-                  <span className={`text-[10px] rounded-full px-1.5 py-0.5 font-bold ${activeTab === tab ? "bg-[#dbeafe] text-[#1e6191]" : "bg-slate-100 text-slate-500"}`}>
+                  <span className={`text-[10px] rounded-full px-1.5 py-0.5 font-bold ${activeTab === tab ? "bg-[#dbeafe] text-[#1e6191]" : "bg-slate-100 text-slate-500 dark:text-slate-400 dark:text-slate-500"}`}>
                     {tabCounts[tab]}
                   </span>
                 )}
@@ -1171,7 +1171,7 @@ export default function SmartReports() {
 
           {/* Loading / Error */}
           {productsLoading && (
-            <div className="flex items-center justify-center py-24 text-slate-400">
+            <div className="flex items-center justify-center py-24 text-slate-400 dark:text-slate-500">
               <svg className="animate-spin h-6 w-6 mr-3 text-[#2B86C5]" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
@@ -1187,7 +1187,7 @@ export default function SmartReports() {
           {!productsLoading && !productsError && (
             <div key={activeTab} className="animate-in fade-in slide-in-from-right-4 duration-500">
               {tabProducts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+                <div className="flex flex-col items-center justify-center py-24 text-slate-400 dark:text-slate-500">
                   <svg className="h-12 w-12 mb-4 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                     <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM16 3H8a2 2 0 00-2 2v2h12V5a2 2 0 00-2-2z" />
                   </svg>
@@ -1196,8 +1196,8 @@ export default function SmartReports() {
               ) : (
                 <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
                   {/* Left: Product Sidebar */}
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 shadow-sm h-[300px] md:h-[680px] overflow-y-auto flex flex-col gap-1">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 shadow-sm h-[300px] md:h-[680px] overflow-y-auto flex flex-col gap-1">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-2 py-1">
                       {tabProducts.length} Product{tabProducts.length !== 1 ? "s" : ""}
                     </p>
                     {tabProducts.map((p) => (
@@ -1218,13 +1218,13 @@ export default function SmartReports() {
                       <div className="flex items-center gap-4">
                         <ProductImage src={selectedProduct.product_image} alt={selectedProduct.product_name} />
                         <div>
-                          <h3 className="text-lg font-bold text-slate-800">{selectedProduct.product_name}</h3>
-                          <p className="text-sm text-slate-500">{selectedProduct.product_brand} · EAN: {selectedProduct.product_ean_id}</p>
+                          <h3 className="text-lg font-bold text-slate-800 dark:text-white">{selectedProduct.product_name}</h3>
+                          <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">{selectedProduct.product_brand} · EAN: {selectedProduct.product_ean_id}</p>
                         </div>
                       </div>
 
                       {/* Header Metrics */}
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 md:p-5 shadow-sm">
+                      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 md:p-5 shadow-sm">
                         <HeaderMetrics product={selectedProduct} tab={activeTab} />
                       </div>
 
@@ -1242,13 +1242,13 @@ export default function SmartReports() {
                       {/* Charts Row */}
                       <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
                         {/* Historical Price Trends */}
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 md:p-5 shadow-sm flex flex-col min-h-[260px] md:min-h-[300px]">
+                        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 md:p-5 shadow-sm flex flex-col min-h-[260px] md:min-h-[300px]">
                           <div className="mb-4 flex items-center justify-between">
-                            <h3 className="text-sm font-bold text-slate-800">Historical Price Trends</h3>
+                            <h3 className="text-sm font-bold text-slate-800 dark:text-white">Historical Price Trends</h3>
                             <select
                               value={historyDays}
                               onChange={(e) => setHistoryDays(Number(e.target.value))}
-                              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 outline-none focus:border-blue-300"
+                              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 outline-none focus:border-blue-300"
                             >
                               {HISTORY_FILTERS.map((f) => (
                                 <option key={f.value} value={f.value}>{f.label}</option>
@@ -1267,18 +1267,18 @@ export default function SmartReports() {
                         {/* Right column charts */}
                         <div className="flex flex-col gap-5">
                           {/* Inventory Forecast */}
-                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 md:p-5 shadow-sm flex flex-col min-h-[160px] md:min-h-[180px]">
-                            <h3 className="mb-3 text-sm font-bold text-slate-800">Inventory Forecast</h3>
+                          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 md:p-5 shadow-sm flex flex-col min-h-[160px] md:min-h-[180px]">
+                            <h3 className="mb-3 text-sm font-bold text-slate-800 dark:text-white">Inventory Forecast</h3>
                             <div className="flex-1 relative w-full min-h-[100px]">
                               <InventoryForecast />
                             </div>
                           </div>
 
                           {/* Price Gap History */}
-                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 md:p-5 shadow-sm flex flex-col min-h-[140px] md:min-h-[160px]">
+                          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 md:p-5 shadow-sm flex flex-col min-h-[140px] md:min-h-[160px]">
                             <div className="flex items-center justify-between mb-3">
-                              <h3 className="text-sm font-bold text-slate-800">Price Gap History</h3>
-                              <span className="text-[10px] text-slate-400">30 days · vs avg competitor</span>
+                              <h3 className="text-sm font-bold text-slate-800 dark:text-white">Price Gap History</h3>
+                              <span className="text-[10px] text-slate-400 dark:text-slate-500">30 days · vs avg competitor</span>
                             </div>
                             <div className="flex-1 relative w-full min-h-[80px]">
                               <PriceGapChart product={selectedProduct} />

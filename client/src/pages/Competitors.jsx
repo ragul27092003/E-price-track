@@ -74,18 +74,18 @@ const CompetitorRow = ({ data, onToggleSync }) => {
   const safeName = data.name || 'Unknown';
 
   return (
-    <div className="flex flex-col md:flex-row md:items-center p-4 border border-blue-200 rounded-lg mb-3 bg-white hover:shadow-sm transition-shadow gap-3 md:gap-0">
+    <div className="flex flex-col md:flex-row md:items-center p-4 border border-slate-200 dark:border-slate-700/60 rounded-lg mb-3 bg-slate-50 dark:bg-[#151a2a] hover:shadow-sm transition-shadow gap-3 md:gap-0">
       {/* Name & Logo */}
       <div className="flex items-center gap-3 w-full md:w-[20%]">
         <div className="w-10 h-10 rounded border border-gray-100 flex items-center justify-center overflow-hidden shrink-0" style={{ backgroundColor: data.color || '#475e77' }}>
           {data.logo ? <img src={`http://localhost:5100${data.logo}`} className="w-full h-full object-contain" /> : <span className="text-[10px] font-bold text-white uppercase">{safeName.substring(0, 2)}</span>}
         </div>
-        <span className="text-sm font-medium text-gray-800 truncate">{safeName}</span>
+        <span className="text-sm font-medium text-gray-800 dark:text-white truncate">{safeName}</span>
       </div>
 
       {/* Status */}
       <div className="w-full md:w-[20%] flex justify-between md:block">
-        <span className="md:hidden text-[11px] font-bold text-gray-400 uppercase">Status</span>
+        <span className="md:hidden text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase">Status</span>
         <div>
           {isSyncing ? (
             <div className="flex items-center gap-1 text-blue-600 font-bold text-sm md:justify-start">
@@ -95,15 +95,15 @@ const CompetitorRow = ({ data, onToggleSync }) => {
           ) : isActive ? (
             <span className="text-green-600 font-bold text-sm">● Online</span>
           ) : (
-            <span className="text-gray-400 font-bold text-sm">○ Offline</span>
+            <span className="text-gray-400 dark:text-slate-500 font-bold text-sm">○ Offline</span>
           )}
-          <p className="text-[11px] text-gray-500 mt-0.5">{formatSync(data.lastSync)}</p>
+          <p className="text-[11px] text-gray-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">{formatSync(data.lastSync)}</p>
         </div>
       </div>
 
       {/* Delta */}
       <div className="w-full md:w-[15%] flex justify-between md:block">
-        <span className="md:hidden text-[11px] font-bold text-gray-400 uppercase">Avg Delta</span>
+        <span className="md:hidden text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase">Avg Delta</span>
         <span className={`text-sm font-bold ${isNegDelta ? 'text-red-600' : 'text-green-600'}`}>
           {isNegDelta ? '▼' : '▲'} {data.avgPriceDelta || '+0.0%'}
         </span>
@@ -111,25 +111,25 @@ const CompetitorRow = ({ data, onToggleSync }) => {
 
       {/* Tracked */}
       <div className="w-full md:w-[15%] flex justify-between md:block">
-        <span className="md:hidden text-[11px] font-bold text-gray-400 uppercase">Tracked</span>
-        <div className="text-sm font-medium text-gray-800">{data.productsTracked ?? 0}</div>
+        <span className="md:hidden text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase">Tracked</span>
+        <div className="text-sm font-medium text-gray-800 dark:text-white">{data.productsTracked ?? 0}</div>
       </div>
 
       {/* Trend */}
       <div className="w-full md:w-[20%] flex justify-between items-center md:block">
-        <span className="md:hidden text-[11px] font-bold text-gray-400 uppercase">7-Day Trend</span>
+        <span className="md:hidden text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase">7-Day Trend</span>
         <Sparkline productsTracked={data.productsTracked} avgPriceDelta={data.avgPriceDelta} />
       </div>
 
       {/* Activation */}
       <div className="w-full md:w-[10%] flex justify-between md:justify-end items-center">
-        <span className="md:hidden text-[11px] font-bold text-gray-400 uppercase">Activation</span>
+        <span className="md:hidden text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase">Activation</span>
         <button
           onClick={handleToggle}
           disabled={isSyncing}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isActive ? 'bg-green-500' : 'bg-gray-300'} ${isSyncing ? 'opacity-50' : 'cursor-pointer'}`}
         >
-          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isActive ? 'translate-x-6' : 'translate-x-1'}`} />
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-800 transition-transform ${isActive ? 'translate-x-6' : 'translate-x-1'}`} />
         </button>
       </div>
     </div>
@@ -137,22 +137,22 @@ const CompetitorRow = ({ data, onToggleSync }) => {
 };
 
 const CompetitorSection = ({ title, items = [], onToggleSync }) => (
-  <div className="border border-gray-200 rounded-lg overflow-hidden mb-8 shadow-sm">
+  <div className="border border-gray-200  dark:border-slate-700 rounded-lg overflow-hidden mb-8 shadow-sm">
     <div className="bg-[#475e77] text-white px-5 py-3">
       <h3 className="text-sm font-bold">{title}</h3>
     </div>
     <div className="bg-[#f8fafd] p-4 md:p-5">
         {/* Desktop Header - Only visible on MD+ screens */}
         <div className="hidden md:flex px-4 mb-3">
-          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider w-[20%]">Competitor</span>
-          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider w-[20%]">Status & Last Sync</span>
-          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider w-[15%]">Avg. Price Delta</span>
-          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider w-[15%]">Products Tracked</span>
-          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider w-[20%]">7-Day Trend</span>
-          <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider w-[10%] text-right">Activation</span>
+          <span className="text-[11px] font-bold text-gray-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[20%]">Competitor</span>
+          <span className="text-[11px] font-bold text-gray-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[20%]">Status & Last Sync</span>
+          <span className="text-[11px] font-bold text-gray-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[15%]">Avg. Price Delta</span>
+          <span className="text-[11px] font-bold text-gray-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[15%]">Products Tracked</span>
+          <span className="text-[11px] font-bold text-gray-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[20%]">7-Day Trend</span>
+          <span className="text-[11px] font-bold text-gray-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider w-[10%] text-right">Activation</span>
         </div>
         {items.length === 0 ? (
-          <div className="py-10 text-center text-sm text-gray-400">No competitors found.</div>
+          <div className="py-10 text-center text-sm text-gray-400 dark:text-slate-500">No competitors found.</div>
         ) : (
           items.map((item) => <CompetitorRow key={item.id} data={item} onToggleSync={onToggleSync} />)
         )}
@@ -215,7 +215,7 @@ const Competitors = () => {
   }
 
   return (
-    <div className="p-3 md:p-8 bg-white min-h-screen">
+    <div className="p-3 md:p-8 bg-white dark:bg-[#0b101e] min-h-screen">
       <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-8">
         <div className="relative w-full sm:w-[300px]">
           <div className="absolute left-3 top-2.5 text-gray-300"><SearchIcon /></div>
@@ -224,7 +224,7 @@ const Competitors = () => {
             placeholder="Search competitors..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-md bg-gray-50 text-sm outline-none focus:ring-1 focus:ring-blue-400"
+            className="w-full pl-10 pr-4 py-2 border border-gray-200  dark:border-slate-700 rounded-md bg-slate-50 dark:bg-[#151a2a] text-sm outline-none focus:ring-1 focus:ring-blue-400"
           />
         </div>
         <button
@@ -241,23 +241,23 @@ const Competitors = () => {
       {/* Original Modal Design */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg w-full max-w-3xl overflow-hidden shadow-2xl">
-            <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-bold text-gray-800">Add Competitor</h2></div>
+          <div className="bg-white dark:bg-[#151a2a] rounded-lg w-full max-w-3xl overflow-hidden shadow-2xl">
+            <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-bold text-gray-800 dark:text-white">Add Competitor</h2></div>
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-gray-500 uppercase">Competitor Name</label>
-                <input className="w-full p-2 border border-gray-200 rounded text-sm focus:ring-1 focus:ring-blue-400 outline-none" value={newCompetitor.name} onChange={(e) => setNewCompetitor({ ...newCompetitor, name: e.target.value })} />
+                <label className="text-[11px] font-bold text-gray-500 dark:text-slate-400 dark:text-slate-500 uppercase">Competitor Name</label>
+                <input className="bg-white dark:bg-[#1e2535] text-gray-800 dark:text-slate-200 placeholder:text-gray-400 dark:placeholder:text-slate-500 w-full p-2 border border-gray-200  dark:border-slate-700 rounded text-sm focus:ring-1 focus:ring-blue-400 outline-none" value={newCompetitor.name} onChange={(e) => setNewCompetitor({ ...newCompetitor, name: e.target.value })} />
               </div>
               <div className="space-y-1">
-                <label className="text-[11px] font-bold text-gray-500 uppercase">Website</label>
-                <input className="w-full p-2 border border-gray-200 rounded text-sm focus:ring-1 focus:ring-blue-400 outline-none" value={newCompetitor.website} onChange={(e) => setNewCompetitor({ ...newCompetitor, website: e.target.value })} />
+                <label className="text-[11px] font-bold text-gray-500 dark:text-slate-400 dark:text-slate-500 uppercase">Website</label>
+                <input className="bg-white dark:bg-[#1e2535] text-gray-800 dark:text-slate-200 placeholder:text-gray-400 dark:placeholder:text-slate-500 w-full p-2 border border-gray-200  dark:border-slate-700 rounded text-sm focus:ring-1 focus:ring-blue-400 outline-none" value={newCompetitor.website} onChange={(e) => setNewCompetitor({ ...newCompetitor, website: e.target.value })} />
               </div>
               <div className="space-y-1 md:col-span-2">
-                <label className="text-[11px] font-bold text-gray-500 uppercase">Search URL</label>
-                <input className="w-full p-2 border border-gray-200 rounded text-sm focus:ring-1 focus:ring-blue-400 outline-none" value={newCompetitor.searchUrl} onChange={(e) => setNewCompetitor({ ...newCompetitor, searchUrl: e.target.value })} />
+                <label className="text-[11px] font-bold text-gray-500 dark:text-slate-400 dark:text-slate-500 uppercase">Search URL</label>
+                <input className="bg-white dark:bg-[#1e2535] text-gray-800 dark:text-slate-200 placeholder:text-gray-400 dark:placeholder:text-slate-500 w-full p-2 border border-gray-200  dark:border-slate-700 rounded text-sm focus:ring-1 focus:ring-blue-400 outline-none" value={newCompetitor.searchUrl} onChange={(e) => setNewCompetitor({ ...newCompetitor, searchUrl: e.target.value })} />
               </div>
             </div>
-            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 border-t">
+            <div className="px-6 py-4 bg-slate-50 dark:bg-[#151a2a] flex justify-end gap-3 border-t">
               <button onClick={() => setIsModalOpen(false)} className="px-5 py-2 bg-gray-500 text-white rounded text-sm">Close</button>
               <button onClick={handleSaveCompetitor} className="px-5 py-2 bg-green-600 text-white rounded text-sm">Save Competitor</button>
             </div>
