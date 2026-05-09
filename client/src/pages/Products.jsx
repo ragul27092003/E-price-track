@@ -454,10 +454,20 @@ function ProductCell({ product }) {
   );
 }
 
+function webPriceColorClass(rank) {
+  const n = parseInt(rank, 10);
+  if (!rank || isNaN(n)) return "text-slate-700 dark:text-slate-300";
+  if (n === 1) return "text-emerald-600";
+  if (n === 2) return "text-yellow-500";
+  if (n === 3) return "text-orange-500";
+  return "text-rose-600";
+}
+
 function PriceCell({ product }) {
   const web = parsePrice(product.product_price);
   const store = parsePrice(product.product_store_price);
   const sap = parsePrice(product.product_sap_price);
+  const rank = product.user_notification_data?.rank_pos ?? product.rank_by;
 
   const fmt = (v) => v !== null ? `₹${v.toLocaleString("en-IN")}` : "—";
 
@@ -465,7 +475,7 @@ function PriceCell({ product }) {
     <div className="flex flex-col gap-1.5 min-w-[110px]">
       <div className="flex items-center justify-between gap-3">
         <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Web</span>
-        <span className="text-[12px] font-bold text-emerald-600">{fmt(web)}</span>
+        <span className={`text-[12px] font-bold ${webPriceColorClass(rank)}`}>{fmt(web)}</span>
       </div>
       <div className="flex items-center justify-between gap-3">
         <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Store</span>
