@@ -9,6 +9,7 @@ const companySchema = new mongoose.Schema({
   companyId:   { type: String, unique: true },
   companyName: { type: String, required: true },
   companyUrl:  { type: String, default: '' },
+  logoUrl:     { type: String, default: '' },
   status:      { type: String, enum: ['active', 'inactive'], default: 'active' },
 }, { timestamps: true, collection: 'companies' });
 

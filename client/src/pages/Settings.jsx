@@ -12,6 +12,7 @@ import {
   fetchProfile,
   updateProfile,
   updatePassword,
+  updateLogo,
   fetchUsers,
   addUser,
   removeUser,
@@ -53,6 +54,8 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
   const profile = useStore((s) => s.profile);
   const setProfile = useStore((s) => s.setProfile);
   const activeStoreId = useStore((s) => s.activeStoreId);
+  const storeLogoMap = useStore((s) => s.storeLogoMap);
+  const setStoreLogo = useStore((s) => s.setStoreLogo);
 
   const [email, setEmail] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -70,6 +73,10 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
   const [savingPass, setSavingPass] = useState(false);
   const isUser = user?.userType === "user";
 
+  // Current store key for logo map
+  const currentStoreKey = (user?.userType === 'super_admin' ? activeStoreId : user?.companyId) || "default";
+  const savedLogo = storeLogoMap?.[currentStoreKey] || null;
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -82,6 +89,11 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
         setCompanyName(data.companyName || data.companyId || "");
         setUserName(data.userName || "");
         setCurrentPassword(data.plainPassword || "");
+        // Load logo from DB and sync to store
+        const dbLogo = data.logoUrl || null;
+        setPhotoUrl(dbLogo);
+        if (dbLogo) setStoreLogo(currentStoreKey, dbLogo);
+        else setStoreLogo(currentStoreKey, null);
       } catch (err) {
         console.error("Failed to load profile:", err);
       }
@@ -89,6 +101,12 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
     setProfile(null);
     load();
   }, [user?.userId, activeStoreId]);
+
+  // Sync photoUrl from global store on store switch (before DB fetch completes)
+  useEffect(() => {
+    const cached = storeLogoMap?.[currentStoreKey] || null;
+    setPhotoUrl(cached);
+  }, [currentStoreKey]);
 
   const handleUpdate = async () => {
     setSaving(true);
@@ -103,12 +121,33 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
     }
   };
 
-  const handlePhotoChange = (e) => {
+  const handleLogoChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => setPhotoUrl(ev.target.result);
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target.result;
+      setPhotoUrl(dataUrl);
+      setStoreLogo(currentStoreKey, dataUrl);
+      try {
+        await updateLogo(dataUrl);
+        toast.success("Store logo saved!");
+      } catch {
+        toast.error("Failed to save logo to server");
+      }
+    };
     reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = async () => {
+    setPhotoUrl(null);
+    setStoreLogo(currentStoreKey, null);
+    try {
+      await updateLogo(null);
+      toast.success("Store logo removed");
+    } catch {
+      toast.error("Failed to remove logo from server");
+    }
   };
 
   const handlePasswordUpdate = async () => {
@@ -140,17 +179,46 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
       {/* Branding Section */}
       <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200  dark:border-slate-700 rounded-xl p-4 md:p-6">
         <h3 className="text-sm font-bold text-gray-800 dark:text-white mb-4">Company Branding</h3>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-          <div className="flex items-center gap-4">
-            <label className="relative cursor-pointer group shrink-0">
-              <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
-              <div className="relative">
-                <Avatar size="lg" primaryColor={primaryColor} companyName={companyName} photoUrl={photoUrl} />
-                <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Camera className="h-5 w-5 text-white" />
-                </div>
+        <div className="flex flex-col sm:flex-row sm:items-start gap-6">
+          {/* Logo Upload */}
+          <div className="flex flex-col gap-3">
+            <label className="text-xs font-bold text-gray-600 dark:text-slate-400 block">Store Logo</label>
+            <div className="flex items-center gap-4">
+              {/* Logo preview / placeholder */}
+              <div className="relative group shrink-0">
+                {photoUrl ? (
+                  <div className="h-[72px] w-[72px] rounded-xl overflow-hidden border-2 border-dashed border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm">
+                    <img src={photoUrl} alt="Store Logo" className="w-full h-full object-contain p-1" />
+                  </div>
+                ) : (
+                  <div className="h-[72px] w-[72px] rounded-xl border-2 border-dashed border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 flex flex-col items-center justify-center gap-1 shadow-sm">
+                    <Camera className="h-6 w-6 text-gray-400 dark:text-slate-500" />
+                    <span className="text-[9px] font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wide">Logo</span>
+                  </div>
+                )}
               </div>
-            </label>
+              {/* Upload / Remove buttons */}
+              <div className="flex flex-col gap-2">
+                <label className="cursor-pointer">
+                  <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors cursor-pointer select-none">
+                    <Camera className="h-3.5 w-3.5" />
+                    {photoUrl ? "Change Logo" : "Upload Logo"}
+                  </span>
+                </label>
+                {photoUrl && (
+                  <button onClick={handleRemoveLogo} className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors">
+                    <X className="h-3.5 w-3.5" />
+                    Remove Logo
+                  </button>
+                )}
+                <p className="text-[10px] text-gray-400 dark:text-slate-500">PNG, JPG, SVG · Shown in header</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Brand preview */}
+          <div className="flex items-center gap-4 sm:pt-6">
             <div className="flex flex-col leading-none">
               <span className="text-red-600 font-extrabold text-xl md:text-2xl tracking-tighter uppercase">
                 {companyName.trim().split(/\s+/)[0] || "BRAND"}
@@ -160,6 +228,7 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
               </span>
             </div>
           </div>
+
           <div className="sm:ml-auto">
             <label className="text-xs font-bold text-gray-600 dark:text-slate-400 dark:text-slate-500 block mb-1.5">Primary Brand Color</label>
             <div className="relative flex items-center gap-2 border border-gray-300  dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md px-3 py-1.5 cursor-pointer hover:bg-gray-100  dark:hover:bg-slate-700/60 w-fit">
@@ -211,11 +280,15 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
               <Input
                 type={showCurrent ? "text" : "password"}
                 value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
+                readOnly
                 autoComplete="current-password"
-                className="border-gray-300  dark:border-slate-700 pr-10 bg-slate-50 dark:bg-[#151a2a] text-gray-700 dark:text-slate-300 dark:text-slate-600"
+                className="border-gray-300 dark:border-slate-700 pr-10 bg-slate-50 dark:bg-[#151a2a] text-gray-700 dark:text-slate-300 cursor-default select-none"
               />
-              <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500">
+              <button
+                type="button"
+                onClick={() => setShowCurrent(!showCurrent)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors"
+              >
                 {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>

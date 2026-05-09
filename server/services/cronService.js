@@ -1,4 +1,5 @@
 // services/cronService.js
+
 const cron     = require('node-cron');
 const axios    = require('axios');
 const mongoose = require('mongoose');
@@ -7,10 +8,29 @@ const { getTenantDb } = require('../config/db');
 const activeCrons = new Map();
 
 // ============================================
+// CONVERT 12-HOUR TIME TO 24-HOUR
+// ============================================
+function convertTo24Hour(timeStr) {
+  if (!timeStr) return '06:00';
+  if (!timeStr.toUpperCase().includes('AM') && !timeStr.toUpperCase().includes('PM')) {
+    return timeStr.trim();
+  }
+  const upper = timeStr.toUpperCase().trim();
+  const isPM  = upper.includes('PM');
+  const isAM  = upper.includes('AM');
+  const clean = upper.replace('AM', '').replace('PM', '').trim();
+  let [h, m]  = clean.split(':').map(Number);
+  if (isPM && h !== 12) h += 12;
+  if (isAM && h === 12) h = 0;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+// ============================================
 // BUILD CRON EXPRESSION
 // ============================================
 function buildCronExpression(schedule, scheduleTime) {
-  const [hour, minute] = (scheduleTime || '06:00').split(':');
+  const time24         = convertTo24Hour(scheduleTime);
+  const [hour, minute] = time24.split(':');
 
   switch (schedule) {
     case 'Hourly':  return `${minute} * * * *`;
@@ -409,7 +429,7 @@ async function initAllCrons() {
     console.log('[CRON] 🚀 Initializing all cron jobs...');
 
     // Read from merchants collection in main DB
-    const mainDb    = mongoose.connection.useDb('gmc_main_admin_db');
+    const mainDb    = mongoose.connection.useDb('eprice_main_admin_db');
     const merchants = await mainDb.collection('merchants')
       .find({ status: 'active' })
       .toArray();
@@ -417,7 +437,7 @@ async function initAllCrons() {
     console.log(`[CRON] Found ${merchants.length} merchants`);
 
     for (const merchant of merchants) {
-      const tenantId = merchant.storeId;
+      const tenantId = merchant.companyId;
       const feedInfo = merchant.feed_info;
 
       if (!tenantId || !feedInfo?.feed_url || !feedInfo?.schedule_info) {
@@ -427,7 +447,7 @@ async function initAllCrons() {
 
       registerFeedCron(tenantId, {
         _id:          merchant._id,
-        feedName:     feedInfo.feed_name || tenantId,
+        feedName:     feedInfo.feed_name || feedInfo.store_name || tenantId,
         importUrl:    feedInfo.feed_url,
         schedule:     feedInfo.schedule_info,
         scheduleTime: feedInfo.import_time,

@@ -24,6 +24,7 @@ export function AppHeader() {
   const setCompetitors       = useStore((s) => s.setCompetitors);
   const setCompetitorsLoading = useStore((s) => s.setCompetitorsLoading);
   const setCompetitorsError  = useStore((s) => s.setCompetitorsError);
+  const storeLogoMap         = useStore((s) => s.storeLogoMap);
 
   const [darkMode,     setDarkMode]     = useState(() => {
     const saved = localStorage.getItem("darkMode");
@@ -113,10 +114,35 @@ export function AppHeader() {
     : (profile?.companyName || profile?.companyUrl || profile?.email || "");
   const roleLabel    = isSuperAdmin ? "Super Admin" : isStoreAdmin ? "Store Admin" : "User";
 
+  // Resolve logo: profile.logoUrl (from DB) is source of truth; storeLogoMap is a fast cache
+  const currentStoreKey = (user?.userType === 'super_admin' ? activeStoreId : user?.companyId) || "default";
+  const storeLogo = profile?.logoUrl || storeLogoMap?.[currentStoreKey] || null;
+
   return (
     <header className="flex items-center h-16 px-6 border-b border-border bg-card shrink-0">
       <img src={logo} alt="Logo" className="h-14 w-auto object-contain" />
       <div className="ml-auto flex items-center gap-2">
+
+        {/* Store name + logo badge near dark mode toggle */}
+        {displayName && (
+          <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-muted/60 border border-border mr-1">
+            {storeLogo ? (
+              <img
+                src={storeLogo}
+                alt="Store Logo"
+                className="h-5 w-5 rounded object-contain shrink-0"
+              />
+            ) : (
+              <div className="h-5 w-5 rounded bg-primary flex items-center justify-center text-[9px] font-bold text-primary-foreground shrink-0">
+                {initials.slice(0, 1)}
+              </div>
+            )}
+            <span className="text-xs font-semibold text-foreground max-w-[120px] truncate leading-none">
+              {displayName}
+            </span>
+          </div>
+        )}
+
         <Button variant="ghost" size="icon" onClick={toggleDarkMode} className="text-muted-foreground hover:text-foreground">
           {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </Button>
@@ -133,9 +159,14 @@ export function AppHeader() {
             <>
               <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
               <div className="absolute right-0 top-full mt-2 w-56 rounded-lg border bg-card shadow-lg z-50 py-1">
-                <div className="px-3 py-2 border-b">
-                  <p className="text-sm font-medium text-foreground">{displayName}</p>
-                  <p className="text-xs text-muted-foreground">{roleLabel}</p>
+                <div className="px-3 py-2 border-b flex items-center gap-2.5">
+                  {storeLogo && (
+                    <img src={storeLogo} alt="Store Logo" className="h-7 w-7 rounded object-contain shrink-0 border border-border bg-white dark:bg-slate-800" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{displayName}</p>
+                    <p className="text-xs text-muted-foreground">{roleLabel}</p>
+                  </div>
                 </div>
 
                 {isSuperAdmin && (

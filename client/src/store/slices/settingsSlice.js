@@ -5,6 +5,7 @@ export const createSettingsSlice = (set) => ({
   usersLog:        [],     // login activity log
   settingsLoading: false,
   settingsError:   null,
+  storeLogoMap:    {},     // { [storeId]: base64DataUrl } — logo per store
 
   // ── Actions ────────────────────────────────────────────────────────
   setProfile:         (profile)         => set({ profile }),
@@ -12,6 +13,11 @@ export const createSettingsSlice = (set) => ({
   setUsersLog:        (usersLog)        => set({ usersLog }),
   setSettingsLoading: (settingsLoading) => set({ settingsLoading }),
   setSettingsError:   (settingsError)   => set({ settingsError }),
+
+  setStoreLogo: (storeId, logoUrl) =>
+    set((state) => ({
+      storeLogoMap: { ...state.storeLogoMap, [storeId]: logoUrl },
+    })),
 
   addStoreUser: (user) =>
     set((state) => ({ storeUsers: [...state.storeUsers, user] })),

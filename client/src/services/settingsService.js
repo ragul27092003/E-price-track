@@ -9,6 +9,9 @@ export const updateProfile = (phone) =>
 export const updatePassword = (newPassword) =>
   API.put('/settings/password', { newPassword }).then((r) => r.data);
 
+export const updateLogo = (logoUrl) =>
+  API.put('/settings/logo', { logoUrl }).then((r) => r.data);
+
 export const fetchUsers = () =>
   API.get('/settings/users').then((r) => r.data);
 

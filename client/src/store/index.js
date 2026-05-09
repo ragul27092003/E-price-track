@@ -40,6 +40,8 @@ export const useStore = create(
         // Notifications — persisted so unread badge survives refresh
         notifications:   state.notifications,
         unreadCount:     state.unreadCount,
+        // Branding — persisted so store logos survive refresh
+        storeLogoMap:    state.storeLogoMap,
       }),
     }
   )

@@ -40,7 +40,7 @@ const Login = () => {
           <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center">
             <Rss className="w-5 h-5 text-white" />
           </div>
-          <span className="text-2xl font-bold text-slate-900 dark:text-white">DigitalDataFeed</span>
+          <span className="text-2xl font-bold text-slate-900 dark:text-white">E-Price Track</span>
         </div>
 
         <Card>
@@ -49,15 +49,17 @@ const Login = () => {
             <CardDescription>Sign in to your account to continue</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" placeholder="you@example.com" value={email}
+                  autoComplete="off"
                   onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input id="password" type="password" placeholder="••••••••" value={password}
+                  autoComplete="new-password"
                   onChange={(e) => setPassword(e.target.value)} required />
               </div>
 

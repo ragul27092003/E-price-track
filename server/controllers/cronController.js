@@ -9,8 +9,8 @@ exports.runNow = async (req, res) => {
   try {
     const { tenantId } = req.params;
 
-    const mainDb  = require('mongoose').connection.useDb('gmc_main_admin_db');
-    const company = await mainDb.collection('gmc_admin_companies').findOne({ store_id: tenantId });
+    const mainDb  = require('mongoose').connection.useDb('eprice_main_admin_db');
+    const company = await mainDb.collection('merchants').findOne({ companyId: tenantId });
 
     if (!company)
       return res.json({ success: false, message: 'Company not found' });
@@ -18,10 +18,10 @@ exports.runNow = async (req, res) => {
     const { importFeedForTenant } = require('../services/cronService');
     importFeedForTenant(tenantId, {
       _id:          company._id,
-      feedName:     company.shopName,
-      importUrl:    company.feed_info.feed_url,
-      schedule:     company.feed_info.schedule_info,
-      scheduleTime: company.feed_info.import_time,
+      feedName:     company.feed_info?.feed_name || company.feed_info?.store_name || tenantId,
+      importUrl:    company.feed_info?.feed_url,
+      schedule:     company.feed_info?.schedule_info,
+      scheduleTime: company.feed_info?.import_time,
     });
 
     res.json({ success: true, message: `Cron triggered for tenant: ${tenantId}` });

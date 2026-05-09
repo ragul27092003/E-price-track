@@ -64,8 +64,8 @@ exports.refreshAudit = async (req, res) => {
     if (!tenantId)
       return res.status(400).json({ success: false, message: 'store_id is required' });
 
-    const mainDb  = mongoose.connection.useDb('gmc_main_admin_db');
-    const company = await mainDb.collection('gmc_admin_companies').findOne({ store_id: tenantId });
+    const mainDb  = mongoose.connection.useDb('eprice_main_admin_db');
+    const company = await mainDb.collection('merchants').findOne({ companyId: tenantId });
 
     if (!company)
       return res.status(404).json({ success: false, message: 'Company not found' });
@@ -90,8 +90,8 @@ exports.getStores = async (req, res) => {
     if (req.user.role !== 'super_admin')
       return res.status(403).json({ success: false, message: 'Access denied' });
 
-    const mainDb    = mongoose.connection.useDb('gmc_main_admin_db');
-    const companies = await mainDb.collection('gmc_admin_companies')
+    const mainDb    = mongoose.connection.useDb('eprice_main_admin_db');
+    const companies = await mainDb.collection('merchants')
       .find({ role: 'store_admin' })
       .project({ store_id: 1, shopName: 1, _id: 0 })
       .toArray();

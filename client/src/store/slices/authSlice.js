@@ -33,7 +33,11 @@ export const createAuthSlice = (set, get) => ({
   },
 
   logout: () => {
-    localStorage.clear();
+    // Remove only auth-specific keys — DO NOT use localStorage.clear()
+    // because that would wipe storeLogoMap, darkMode, and other persisted UI state
+    localStorage.removeItem('token');
+    localStorage.removeItem('activeStoreId');
+    localStorage.removeItem('activeShopName');
     set({ token: null, user: null, activeStoreId: null, activeShopName: null, exportType: '' });
   },
 

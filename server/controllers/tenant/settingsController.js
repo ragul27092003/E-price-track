@@ -13,16 +13,43 @@ exports.getProfile = async (req, res) => {
 
       if (tenantId) {
         const storeUser = await User.findOne({ companyId: tenantId, userType: 'store_admin' });
-        if (storeUser) return res.json({ ...storeUser.toObject(), email: superAdmin?.email || '' });
+        const company   = await Company.findOne({ companyId: tenantId }).select('logoUrl');
+        if (storeUser) return res.json({
+          ...storeUser.toObject(),
+          email:   superAdmin?.email || '',
+          logoUrl: company?.logoUrl  || '',
+        });
       }
 
       const admin = await User.findOne({ userId });
       return res.json(admin);
     }
 
-    const user = await User.findOne({ userId });
+    const user    = await User.findOne({ userId });
     if (!user) return res.status(404).json({ message: 'User not found' });
-    res.json(user);
+    const company = await Company.findOne({ companyId: user.companyId }).select('logoUrl');
+    res.json({ ...user.toObject(), logoUrl: company?.logoUrl || '' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.updateLogo = async (req, res) => {
+  try {
+    const { logoUrl } = req.body;
+
+    const companyId = req.user.userType === 'super_admin'
+      ? req.headers['x-tenant-id']
+      : req.user.companyId;
+
+    if (!companyId) return res.status(400).json({ message: 'No store selected' });
+
+    await Company.findOneAndUpdate(
+      { companyId },
+      { $set: { logoUrl: logoUrl || '' } }
+    );
+
+    res.json({ message: 'Logo updated successfully', logoUrl: logoUrl || '' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

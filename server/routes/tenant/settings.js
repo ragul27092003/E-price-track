@@ -5,6 +5,7 @@ const {
   getProfile,
   updateProfile,
   updatePassword,
+  updateLogo,
   getUsers,
   addUser,
   removeUser,
@@ -14,6 +15,7 @@ const {
 router.get('/profile',         auth, getProfile);
 router.put('/profile',         auth, updateProfile);
 router.put('/password',        auth, updatePassword);
+router.put('/logo',            auth, updateLogo);
 router.get('/users',           auth, getUsers);
 router.post('/add-user',       auth, addUser);
 router.delete('/users/:userId',auth, removeUser);

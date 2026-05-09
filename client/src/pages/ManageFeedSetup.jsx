@@ -182,26 +182,34 @@ const ManageFeedSetup = () => {
         </div>
 
         {/* URL Feed Card */}
-        <div 
-          onClick={() => handleCardSelect('none')}
-          className={`relative p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
-            (!isShopify && !isWordPress) ? 'border-blue-400 bg-blue-50' : 'border-gray-200  dark:border-slate-700 bg-white dark:bg-slate-800'
-          }`}
-        >
-          <div className="flex items-center gap-4 mb-3">
-            <InsertDriveFileIcon className="text-4xl text-[#3b6eac]" />
-            <div className="flex-1">
-              <h4 className="text-sm font-bold">URL Feed</h4>
-              <p className="text-xs text-gray-500 dark:text-slate-400 dark:text-slate-500 leading-tight">Import a product feed via URL (CSV, XML, JSON).</p>
-            </div>
-            {(!isShopify && !isWordPress) && (
-              <span className="bg-[#3b6eac] text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold">Active</span>
-            )}
-          </div>
-          <button className="w-full py-1.5 bg-[#3b6eac] hover:bg-[#2d5a8e] text-white rounded text-sm font-medium transition-colors">
-            Import
-          </button>
-        </div>
+<div 
+  onClick={() => handleCardSelect('none')}
+  className={`relative p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
+    (!isShopify && !isWordPress) 
+      ? 'border-teal-600 ring-2 ring-teal-600 ring-opacity-20 bg-teal-600/10' 
+      : 'border-gray-200 dark:border-slate-700 bg-transparent'
+  }`}
+>
+  <div className="flex items-center gap-4 mb-3">
+    <InsertDriveFileIcon className={`text-4xl ${(!isShopify && !isWordPress) ? 'text-teal-500' : 'text-[#3b6eac]'}`} />
+    <div className="flex-1">
+      <h4 className="text-sm font-bold">URL Feed</h4>
+      <p className="text-xs text-gray-500 dark:text-slate-400 leading-tight">Import a product feed via URL (CSV, XML, JSON).</p>
+    </div>
+    {(!isShopify && !isWordPress) && (
+      <span className="bg-teal-600 text-white text-[10px] px-2 py-0.5 rounded uppercase font-bold">Active</span>
+    )}
+  </div>
+  <button 
+    className={`w-full py-1.5 rounded text-sm font-medium transition-colors ${
+      (!isShopify && !isWordPress) 
+        ? 'bg-teal-600 text-white hover:bg-teal-700' 
+        : 'bg-transparent border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-[#151a2a]'
+    }`}
+  >
+    {(!isShopify && !isWordPress) ? 'Selected' : 'Import'}
+  </button>
+</div>
       </div>
 
       {/* Feed Name */}
