@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useStore } from "../store";
-import { fetchProducts, configureProduct } from "../services/productsService";
+import { fetchProducts, configureProduct, removeProductConfiguration } from "../services/productsService";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -661,6 +661,122 @@ function ConfigureModal({ product, currentUserId, onClose, onSaved }) {
   );
 }
 
+// ── Bulk Confirm Modal ─────────────────────────────────────────────────────────
+
+function BulkConfirmModal({ count, onConfirm, onClose, saving }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#151a2a] shadow-2xl border border-slate-200 dark:border-slate-700/60 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#0b101e]">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">Bulk Configure</p>
+            <h2 className="font-bold text-slate-800 dark:text-white text-sm mt-0.5">Configure All Selected Products</h2>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:bg-slate-200 hover:text-slate-600 transition-colors disabled:opacity-50"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="px-6 py-5">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Are you sure you want to add all <strong className="text-slate-800 dark:text-white">{count}</strong> selected products to Individual Item Group?
+          </p>
+          <p className="mt-2 text-xs text-slate-400 dark:text-slate-500">
+            Each product will be assigned to its own group based on its category.
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#151a2a]">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2 text-sm font-medium text-white hover:bg-[#226fa3] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+          >
+            {saving && (
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white inline-block" />
+            )}
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Remove Confirm Modal ───────────────────────────────────────────────────────
+
+function RemoveConfirmModal({ product, count, onConfirm, onClose, removing }) {
+  const isBulk = !product;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#151a2a] shadow-2xl border border-slate-200 dark:border-slate-700/60 overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#0b101e]">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+              {isBulk ? "Bulk Remove" : "Remove Configuration"}
+            </p>
+            <h2 className="font-bold text-slate-800 dark:text-white text-sm mt-0.5 line-clamp-1">
+              {isBulk ? `Remove ${count} Products` : (product?.product_name || "Product")}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={removing}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 dark:text-slate-500 hover:bg-slate-200 hover:text-slate-600 transition-colors disabled:opacity-50"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="px-6 py-5">
+          {isBulk ? (
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Are you sure you want to remove all{" "}
+              <strong className="text-slate-800 dark:text-white">{count}</strong> products from their Item Groups? This will clear their group name and alert settings.
+            </p>
+          ) : (
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Are you sure you want to remove{" "}
+              <strong className="text-slate-800 dark:text-white">{product?.product_name}</strong> from its Item Group? This will clear its group name and alert settings.
+            </p>
+          )}
+        </div>
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#151a2a]">
+          <button
+            onClick={onClose}
+            disabled={removing}
+            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={removing}
+            className="flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+          >
+            {removing && (
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white inline-block" />
+            )}
+            Remove
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Sort icon ─────────────────────────────────────────────────────────────────
 
 function SortIcon({ active, direction }) {
@@ -715,6 +831,12 @@ export default function Products() {
   const [currentPage, setCurrentPage] = useState(1);
   const [configProduct, setConfigProduct] = useState(null); // product being configured
   const [sortConfig, setSortConfig] = useState({ column: null, direction: "asc" });
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState(null); // product object = single, "bulk" = all filtered
+  const [removing, setRemoving] = useState(false);
+
+  const headerCheckboxRef = useRef(null);
 
   const handleSort = (column) => {
     setSortConfig((prev) =>
@@ -771,6 +893,15 @@ export default function Products() {
   // Reset to page 1 whenever filters/tab/competitor changes
   useEffect(() => { setCurrentPage(1); }, [search, brandFilter, catFilter, rankFilter, itemGroupFilter, activeTab, competitorSlug]);
 
+  const isConfigured = (p) => !!(p.group_name || (p.user_alert_id && p.user_alert_id.length > 0));
+  const allConfigured = filtered.length > 0 && filtered.every(isConfigured);
+  const someConfigured = filtered.some(isConfigured);
+
+  useEffect(() => {
+    if (!headerCheckboxRef.current) return;
+    headerCheckboxRef.current.indeterminate = someConfigured && !allConfigured;
+  }, [allConfigured, someConfigured]);
+
   const sorted = [...filtered].sort((a, b) => {
     if (!sortConfig.column) return 0;
     if (sortConfig.column === "name") {
@@ -804,6 +935,66 @@ export default function Products() {
         p._id === productId ? { ...p, group_name: groupName, user_alert_id: userAlertId } : p
       )
     );
+  };
+
+  const handleRemove = async () => {
+    setRemoving(true);
+    try {
+      if (removeTarget === "bulk") {
+        const filteredIds = new Set(filtered.map((p) => p._id));
+        await Promise.all(filtered.map((p) => removeProductConfiguration(p._id)));
+        setProducts(
+          products.map((p) =>
+            filteredIds.has(p._id) ? { ...p, group_name: "", user_alert_id: [] } : p
+          )
+        );
+      } else {
+        await removeProductConfiguration(removeTarget._id);
+        setProducts(
+          products.map((p) =>
+            p._id === removeTarget._id ? { ...p, group_name: "", user_alert_id: [] } : p
+          )
+        );
+      }
+      setRemoveTarget(null);
+    } catch {
+      // silent
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  const handleBulkSave = async () => {
+    setBulkSaving(true);
+    try {
+      const filteredIds = new Set(filtered.map((p) => p._id));
+      await Promise.all(
+        filtered.map((p) => {
+          const groupName = p.product_category ? p.product_category.split(">")[0].trim() : (p.group_name || "");
+          const existingIds = Array.isArray(p.user_alert_id) ? p.user_alert_id : [];
+          const userAlertId = currentUserId && !existingIds.includes(currentUserId)
+            ? [...existingIds, currentUserId]
+            : existingIds.length > 0 ? existingIds : (currentUserId ? [currentUserId] : []);
+          return configureProduct(p._id, { group_name: groupName, user_alert_id: userAlertId });
+        })
+      );
+      setProducts(
+        products.map((p) => {
+          if (!filteredIds.has(p._id)) return p;
+          const groupName = p.product_category ? p.product_category.split(">")[0].trim() : (p.group_name || "");
+          const existingIds = Array.isArray(p.user_alert_id) ? p.user_alert_id : [];
+          const userAlertId = currentUserId && !existingIds.includes(currentUserId)
+            ? [...existingIds, currentUserId]
+            : existingIds.length > 0 ? existingIds : (currentUserId ? [currentUserId] : []);
+          return { ...p, group_name: groupName, user_alert_id: userAlertId };
+        })
+      );
+      setShowBulkConfirm(false);
+    } catch {
+      // save silently; individual product errors won't surface
+    } finally {
+      setBulkSaving(false);
+    }
   };
 
   return (
@@ -1034,7 +1225,14 @@ export default function Products() {
                       <thead>
                         <tr className="border-b border-slate-100 bg-slate-50/50">
                           <th className="w-12 px-5 py-4">
-                            <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                            <input
+                              ref={headerCheckboxRef}
+                              type="checkbox"
+                              checked={allConfigured}
+                              className="h-4 w-4 cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                              onChange={() => allConfigured ? setRemoveTarget("bulk") : setShowBulkConfirm(true)}
+                              title={allConfigured ? "Uncheck all — remove from Item Groups" : "Check all — configure Item Groups"}
+                            />
                           </th>
                           <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">
                             <button onClick={() => handleSort("name")} className="flex items-center gap-1.5 hover:text-slate-800 transition-colors">
@@ -1069,10 +1267,10 @@ export default function Products() {
                               <td className="px-5 py-4">
                                 <input
                                   type="checkbox"
-                                  checked={!!(p.group_name || (p.user_alert_id && p.user_alert_id.length > 0))}
-                                  onChange={() => setConfigProduct(p)}
+                                  checked={isConfigured(p)}
+                                  onChange={() => isConfigured(p) ? setRemoveTarget(p) : setConfigProduct(p)}
                                   className="h-4 w-4 cursor-pointer rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                  title="Configure group & user alerts"
+                                  title={isConfigured(p) ? "Uncheck to remove from Item Group" : "Check to configure Item Group"}
                                 />
                               </td>
                               <td className="px-5 py-4"><ProductCell product={p} /></td>
@@ -1115,6 +1313,25 @@ export default function Products() {
           currentUserId={currentUserId}
           onClose={() => setConfigProduct(null)}
           onSaved={handleConfigSaved}
+        />
+      )}
+
+      {showBulkConfirm && (
+        <BulkConfirmModal
+          count={filtered.length}
+          onConfirm={handleBulkSave}
+          onClose={() => setShowBulkConfirm(false)}
+          saving={bulkSaving}
+        />
+      )}
+
+      {removeTarget && (
+        <RemoveConfirmModal
+          product={removeTarget === "bulk" ? null : removeTarget}
+          count={filtered.length}
+          onConfirm={handleRemove}
+          onClose={() => setRemoveTarget(null)}
+          removing={removing}
         />
       )}
     </>

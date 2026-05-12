@@ -23,3 +23,6 @@ export const fetchAdminUsers = () =>
 
 export const configureProduct = (id, data) =>
   API.patch(`/products/${id}/configure`, data).then((r) => r.data);
+
+export const removeProductConfiguration = (id) =>
+  API.patch(`/products/${id}/remove-configuration`).then((r) => r.data);

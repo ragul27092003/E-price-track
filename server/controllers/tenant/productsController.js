@@ -211,3 +211,16 @@ exports.configureProduct = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// Clear group_name and user_alert_id for a specific product
+exports.removeConfiguration = async (req, res) => {
+  try {
+    await req.tenantDb.collection('ept_product_details_new').updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { group_name: '', user_alert_id: [], updatedAt: new Date() } }
+    );
+    res.json({ message: 'Product configuration removed' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
