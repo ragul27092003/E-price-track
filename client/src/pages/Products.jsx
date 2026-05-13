@@ -415,7 +415,7 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
 // ── Shared UI ──────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { key: "analysis", label: "Price Analysis" },
+  // { key: "analysis", label: "Price Analysis" },
   // { key: "brand", label: "Brand Products" },
   // { key: "compare", label: "Compare" },
 ];
@@ -1075,7 +1075,7 @@ export default function Products() {
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-6 border-b border-slate-200 dark:border-slate-700 mt-2">
+          <div>
             {TABS.map((tab) => (
               <button
                 key={tab.key}
