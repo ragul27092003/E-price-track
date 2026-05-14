@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { useStore } from "../store";
 import { fetchProducts } from "../services/productsService";
 import { fetchCompetitors } from "../services/competitorsService";
@@ -1109,9 +1110,10 @@ const HISTORY_FILTERS = [
 ];
 
 export default function SmartReports() {
+  const location = useLocation();
   const { products, productsLoading, productsError, setProducts, setProductsLoading, setProductsError, competitors, setCompetitors } = useStore();
   const exportType = useStore((s) => s.exportType) || "A";
-  const [activeTab, setActiveTab] = useState("Easy Gain");
+  const [activeTab, setActiveTab] = useState(location.state?.tab || "Easy Gain");
   const [selectedEan, setSelectedEan] = useState(null);
   const [historyDays, setHistoryDays] = useState(30);
 

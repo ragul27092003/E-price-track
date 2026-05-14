@@ -10,6 +10,7 @@ import { createAuditSlice }         from './slices/auditSlice';
 import { createSettingsSlice }      from './slices/settingsSlice';
 import { createNotificationsSlice } from './slices/notificationsSlice';
 import { createUISlice }            from './slices/uiSlice';
+import { createDashboardSlice }     from './slices/dashboardSlice';
 
 export const useStore = create(
   persist(
@@ -23,6 +24,7 @@ export const useStore = create(
       ...createSettingsSlice(set, get),
       ...createNotificationsSlice(set, get),
       ...createUISlice(set, get),
+      ...createDashboardSlice(set, get),
     }),
     {
       name: 'eprice-store',

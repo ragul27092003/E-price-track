@@ -24,7 +24,11 @@ export function AppHeader() {
   const setCompetitors       = useStore((s) => s.setCompetitors);
   const setCompetitorsLoading = useStore((s) => s.setCompetitorsLoading);
   const setCompetitorsError  = useStore((s) => s.setCompetitorsError);
-  const storeLogoMap         = useStore((s) => s.storeLogoMap);
+  const storeLogoMap              = useStore((s) => s.storeLogoMap);
+  const fetchSapUpdateStatus      = useStore((s) => s.fetchSapUpdateStatus);
+  const fetchOverallStatistics    = useStore((s) => s.fetchOverallStatistics);
+  const fetchRankAnalysis         = useStore((s) => s.fetchRankAnalysis);
+  const fetchBrandAnalyticsBrands = useStore((s) => s.fetchBrandAnalyticsBrands);
 
   const [darkMode,     setDarkMode]     = useState(() => {
     const saved = localStorage.getItem("darkMode");
@@ -73,6 +77,12 @@ export function AppHeader() {
     fetchProfile()
       .then(setProfile)
       .catch(console.error);
+
+    // Refresh dashboard KPI data for the newly selected store
+    fetchSapUpdateStatus();
+    fetchOverallStatistics();
+    fetchRankAnalysis();
+    fetchBrandAnalyticsBrands();
   }, [activeStoreId]);
 
   // Apply/remove dark class whenever darkMode changes (including on first render)
