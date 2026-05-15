@@ -1133,9 +1133,9 @@ export default function Products() {
                                     >
                                       View Details
                                     </button>
-                                    <button className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a] shadow-sm">
+                                    {/* <button className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a] shadow-sm">
                                       Quick Sync
-                                    </button>
+                                    </button> */}
                                   </div>
                                 </div>
                               </td>
@@ -1201,9 +1201,9 @@ export default function Products() {
                                     >
                                       View Details
                                     </button>
-                                    <button className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a] shadow-sm">
+                                    {/* <button className="rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:bg-[#151a2a] shadow-sm">
                                       Quick Sync
-                                    </button>
+                                    </button> */}
                                   </div>
                                 </td>
                               </tr>
@@ -1287,9 +1287,9 @@ export default function Products() {
                                   >
                                     View Details
                                   </button>
-                                  <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">
+                                  {/* <button className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 shadow-sm">
                                     Quick Sync
-                                  </button>
+                                  </button> */}
                                 </div>
                               </td>
                             </tr>

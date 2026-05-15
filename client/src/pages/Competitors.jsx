@@ -14,7 +14,10 @@ const AutorenewIcon = ({ className }) => (
 const generateTrend = (seed, delta) => {
   const base = (seed || 20) % 50 || 20;
   const isNeg = String(delta || '').includes('-');
+  const deltaNum = parseFloat(String(delta || '0').replace('%', '')) || 0;
+  const isFlat = deltaNum === 0 || !seed;
   return Array.from({ length: 7 }, (_, i) => {
+    if (isFlat) return 50; // perfectly flat middle line
     const noise = (((seed || 1) * (i + 3)) % 15) - 7;
     const trend = isNeg ? -i * 0.6 : i * 0.6;
     return Math.max(5, Math.min(95, base + noise + trend));

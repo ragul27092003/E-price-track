@@ -399,9 +399,9 @@ export default function Notifications() {
                     >
                       View Details
                     </button>
-                    <button className="flex-1 rounded-xl bg-[#2B86C5] py-2.5 text-xs font-bold text-white transition-colors hover:bg-[#226fa3]">
+                    {/* <button className="flex-1 rounded-xl bg-[#2B86C5] py-2.5 text-xs font-bold text-white transition-colors hover:bg-[#226fa3]">
                       Quick Sync
-                    </button>
+                    </button> */}
                   </div>
                 </div>
               );
