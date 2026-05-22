@@ -22,6 +22,6 @@ export const createSettingsSlice = (set) => ({
   addStoreUser: (user) =>
     set((state) => ({ storeUsers: [...state.storeUsers, user] })),
 
-  removeStoreUser: (userId) =>
-    set((state) => ({ storeUsers: state.storeUsers.filter((u) => u.userId !== userId) })),
+  removeStoreUser: (user_id) =>
+    set((state) => ({ storeUsers: state.storeUsers.filter((u) => u.user_id !== user_id) })),
 });

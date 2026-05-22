@@ -52,7 +52,7 @@ exports.getFeedAudit = async (req, res) => {
 
 exports.refreshAudit = async (req, res) => {
   try {
-    const merchant = await Merchant.findOne({ companyId: req.tenantId });
+    const merchant = await Merchant.findOne({ cmpid: req.tenantId });
     if (!merchant || !merchant.feed_info?.feed_url) {
       return res.status(400).json({
         success: false,
@@ -62,7 +62,7 @@ exports.refreshAudit = async (req, res) => {
 
     await importFeedForTenant(req.tenantId, {
       _id:          merchant._id,
-      feedName:     merchant.feed_info.feed_name,
+      feedName:     merchant.feed_info.store_name,
       importUrl:    merchant.feed_info.feed_url,
       schedule:     merchant.feed_info.schedule_info,
       scheduleTime: merchant.feed_info.import_time,

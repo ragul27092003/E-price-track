@@ -23,9 +23,9 @@ export function AuthProvider({ children }) {
 
     return {
       token,
-      userId:    decoded.userId,
-      userType:  decoded.userType,
-      companyId: decoded.companyId,
+      user_id:   decoded.user_id,
+      user_type: decoded.user_type,
+      cmpid:     decoded.cmpid,
     };
   });
 
@@ -44,9 +44,9 @@ export function AuthProvider({ children }) {
 
     setUser({
       token:     data.token,
-      userId:    decoded?.userId,
-      userType:  decoded?.userType,
-      companyId: decoded?.companyId,
+      user_id:   decoded?.user_id,
+      user_type: decoded?.user_type,
+      cmpid:     decoded?.cmpid,
     });
   };
 
@@ -64,12 +64,12 @@ export function AuthProvider({ children }) {
     localStorage.setItem('activeShopName', companyName);
   };
 
-  // Super admin → switched store, Store admin → own companyId
-  const currentStoreId = user?.userType === 'super_admin' ? activeStoreId : user?.companyId;
+  // Super admin → switched store, Store admin → own cmpid
+  const currentStoreId = user?.user_type === 'super_admin' ? activeStoreId : user?.cmpid;
 
   // Role helpers
-  const isSuperAdmin = user?.userType === 'super_admin';
-  const isStoreAdmin = user?.userType === 'store_admin';
+  const isSuperAdmin = user?.user_type === 'super_admin';
+  const isStoreAdmin = user?.user_type === 'store_admin';
   const canEdit      = isSuperAdmin;
 
   return (

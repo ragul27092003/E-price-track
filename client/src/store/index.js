@@ -52,8 +52,8 @@ export const useStore = create(
 // ── Selectors ───────────────────────────────────────────────────────────────
 // Use these in components instead of deriving values inline
 
-export const selectIsSuperAdmin  = (s) => s.user?.userType === 'super_admin';
-export const selectIsStoreAdmin  = (s) => s.user?.userType === 'store_admin';
-export const selectCanEdit       = (s) => s.user?.userType === 'super_admin';
+export const selectIsSuperAdmin  = (s) => s.user?.user_type === 'super_admin';
+export const selectIsStoreAdmin  = (s) => s.user?.user_type === 'store_admin';
+export const selectCanEdit       = (s) => s.user?.user_type === 'super_admin';
 export const selectCurrentStoreId = (s) =>
-  s.user?.userType === 'super_admin' ? s.activeStoreId : s.user?.companyId;
+  s.user?.user_type === 'super_admin' ? s.activeStoreId : s.user?.cmpid;

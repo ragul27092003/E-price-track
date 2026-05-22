@@ -126,7 +126,9 @@ async function enrichProducts(db, products) {
 exports.getAll = async (req, res) => {
   try {
     const db       = req.tenantDb;
+    console.log('Fetching products for tenant:', req.tenantId);
     const products = await db.collection('ept_product_details_new').find({}).toArray();
+    console.log('Fetched products:', products.length);
     let enriched   = await enrichProducts(db, products);
 
     const { competitor: filterSlug } = req.query;
@@ -144,19 +146,24 @@ exports.getAll = async (req, res) => {
 
 // ── GET /api/products/alert ───────────────────────────────────────────────────
 // Returns products the current user should be alerted on.
-// - userType === 'user'  → only products where user_alert_id contains req.user.userId
+// - user_type === 'user'  → only products where user_alert_id contains req.user.user_id
 // - store_admin / super_admin → all products that have at least one user_alert_id set
 exports.getAlertProducts = async (req, res) => {
   try {
     const db                    = req.tenantDb;
-    const { userId, userType }  = req.user;
+    const { user_id, user_type } = req.user;
+
+    const baseFilter = {
+      status: 'active',
+      ean_product_data_details_scrap_status: 'completed',
+    };
 
     let query = {};
-    if (userType === 'user') {
-      query = { user_alert_id: userId };
+    if (user_type === 'user') {
+      query = { ...baseFilter, user_alert_id: user_id };
     } else {
       // admins see every product that has been configured for alerts
-      query = { user_alert_id: { $exists: true, $not: { $size: 0 } } };
+      query = { ...baseFilter, user_alert_id: { $exists: true, $not: { $size: 0 } } };
     }
 
     const products = await db.collection('ept_product_details_new').find(query).toArray();

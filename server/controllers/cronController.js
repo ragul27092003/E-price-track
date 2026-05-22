@@ -1,4 +1,5 @@
 const { getCronStatus } = require('../services/cronService');
+const { getAdminDb } = require('../config/db');
 
 exports.getStatus = (req, res) => {
   const status = getCronStatus();
@@ -9,7 +10,7 @@ exports.runNow = async (req, res) => {
   try {
     const { tenantId } = req.params;
 
-    const mainDb  = require('mongoose').connection.useDb('eprice_main_admin_db');
+    const mainDb  = getAdminDb('eprice_main_admin_db');
     const company = await mainDb.collection('merchants').findOne({ companyId: tenantId });
 
     if (!company)

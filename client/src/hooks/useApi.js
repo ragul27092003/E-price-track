@@ -24,7 +24,7 @@ API.interceptors.request.use((config) => {
   // Store admin / user → companyId from JWT token decode
   const activeStoreId = localStorage.getItem('activeStoreId');
   const decoded       = token ? decodeToken(token) : null;
-  const storeId       = activeStoreId || decoded?.companyId;
+  const storeId       = activeStoreId || decoded?.cmpid;
 
   if (storeId) {
     config.headers['x-tenant-id'] = storeId;
@@ -37,7 +37,8 @@ API.interceptors.request.use((config) => {
 API.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isAuthEndpoint = error.config?.url?.includes('/auth/');
+    if (error.response?.status === 401 && !isAuthEndpoint) {
       localStorage.clear();
       window.location.href = '/login';
     }

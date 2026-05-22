@@ -1,13 +1,41 @@
 const mongoose = require('mongoose');
+const crypto   = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Company = require('../models/Company');
 const Merchant = require('../models/Merchant');
 const Access = require('../models/Access');
-const { getTenantDb } = require('../config/db');
+const { getTenantDb, getAdminDb } = require('../config/db');
 
 const generateToken = (payload) =>
   jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
+
+function formatLogTime(date) {
+  const d = date || new Date();
+  const year  = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day   = String(d.getDate()).padStart(2, '0');
+  let   hours = d.getHours();
+  const mins  = String(d.getMinutes()).padStart(2, '0');
+  const secs  = String(d.getSeconds()).padStart(2, '0');
+  const ampm  = hours >= 12 ? 'pm' : 'am';
+  hours = hours % 12 || 12;
+  return `${year}-${month}-${day} ${String(hours).padStart(2, '0')}:${mins}:${secs}${ampm}`;
+}
+
+function parseUA(ua = '') {
+  const s = ua.toLowerCase();
+  let device  = 'desktop';
+  let browser = 'Unknown';
+  if (/mobile|android|iphone/.test(s))       device = 'mobile';
+  else if (/tablet|ipad/.test(s))             device = 'tablet';
+  if      (/edg\//.test(s))                  browser = 'Edge';
+  else if (/opr\/|opera/.test(s))             browser = 'Opera';
+  else if (/firefox/.test(s))                browser = 'Firefox';
+  else if (/chrome/.test(s))                 browser = 'Chrome';
+  else if (/safari/.test(s))                 browser = 'Safari';
+  return { device, browser };
+}
 
 exports.login = async (req, res) => {
   const { email, password } = req.body;
@@ -15,51 +43,73 @@ exports.login = async (req, res) => {
     return res.status(400).json({ message: 'Email and password are required' });
 
   try {
-    const user = await User.findOne({ email });
-    if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+    console.log('Login attempt for email:', email);
+    const user = await User.findOne({ email_address: email });
+    // const user = await User.find({})
+    // console.log('all datas', user);
+    if (!user) return res.status(401).json({ message: 'Invalid credentials1' });
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
 
     const access = await Access.findOne({
-      userId:    user.userId,
-      companyId: user.companyId,
-      status:    'active',
+      user_id:  user.user_id,
+      cmpid:    user.cmpid,
+      archived: 0,
     });
     if (!access)
       return res.status(401).json({ message: 'Access denied. Please contact admin.' });
 
-    const merchant = await Merchant.findOne({ companyId: user.companyId });
-    const company  = await Company.findOne({ companyId: user.companyId });
+    const merchant = await Merchant.findOne({ cmpid: user.cmpid });
+    const company  = await Company.findOne({ companyId: user.cmpid });
 
     const token = generateToken({
       id:        user._id,
-      userId:    user.userId,
-      userType:  user.userType,
-      companyId: user.companyId,
+      user_id:   user.user_id,
+      user_type: user.user_type,
+      cmpid:     user.cmpid,
     });
-
-    const mainDb = mongoose.connection.useDb('eprice_main_admin_db');
-    await mainDb.collection('userlogs').insertOne({
-      userId:    user.userId,
-      email:     user.email,
-      userType:  user.userType,
-      companyId: user.companyId,
-      action:    'login',
-      loginAt:   new Date(),
-      ip:        req.ip || req.headers['x-forwarded-for'] || '',
-    });
+    const now = new Date().toISOString().replace('T', ' ').replace(/\.\d+Z$/, '');
+    User.findOneAndUpdate(
+      { user_id: user.user_id },
+      { $set: { last_login: now } }
+    ).catch(() => {});
 
     res.json({
       token,
-      userId:      user.userId,
-      userType:    user.userType,
-      companyId:   user.companyId,
-      companyName: company?.companyName  || '',
-      companyUrl:  user.companyUrl       || '',
-      email:       user.email,
-      shopName:    merchant?.feed_info?.feed_name || '',
+      user_id:       user.user_id,
+      user_type:     user.user_type,
+      cmpid:         user.cmpid,
+      companyName:   company?.companyName || '',
+      website:       user.website         || '',
+      email_address: user.email_address,
+      shopName:      merchant?.feed_info?.store_name || '',
     });
+
+    const { device, browser } = parseUA(req.headers['user-agent']);
+    getAdminDb('eprice_main_admin_db')
+      .collection('plm_user_history_logs')
+      .insertOne({
+        usersess_id:   crypto.randomBytes(16).toString('base64url').slice(0, 26),
+        user_id:       user.user_id,
+        user_name:     user.user_name || user.email_address,
+        user_type:     user.user_type,
+        email_address: user.email_address,
+        cmpid:         user.cmpid,
+        action:        'manual_login',
+        log_at:        formatLogTime(new Date()),
+        system_log: {
+          ip_addr: req.ip || req.headers['x-forwarded-for'] || '',
+          device,
+          browser,
+        },
+        data_log: {
+          pageurl: '/login',
+          action:  'manual_login',
+          query:   null,
+        },
+      })
+      .catch((err) => console.error('Login log failed:', err.message));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -68,7 +118,7 @@ exports.login = async (req, res) => {
 exports.checkEmail = async (req, res) => {
   const { email } = req.query;
   if (!email) return res.json({ exists: false });
-  const user = await User.findOne({ email: email.toLowerCase() });
+  const user = await User.findOne({ email_address: email.toLowerCase() });
   res.json({ exists: !!user });
 };
 
@@ -89,33 +139,33 @@ exports.signup = async (req, res) => {
     return res.status(400).json({ message: 'companyName, companyUrl, email and password are required' });
 
   try {
-    const exists = await User.findOne({ email });
+    const exists = await User.findOne({ email_address: email });
     if (exists) return res.status(400).json({ message: 'Email already registered' });
 
     const company = await Company.create({ companyName, companyUrl, status: 'active' });
 
     const user = await User.create({
-      companyId:   company.companyId,
-      companyName,
-      companyUrl,
-      email,
+      cmpid:         company.companyId,
+      website:       companyUrl,
+      email_address: email,
       password,
-      phone:    phone || '',
-      userType: 'store_admin',
+      password_new:  password,
+      mobile_number: phone || '',
+      user_type:     'store_admin',
+      addedby:       '',
     });
 
     const merchant = await Merchant.create({
-      companyId: company.companyId,
-      userId:    user.userId,
-      status:    'active',
+      cmpid:   company.companyId,
+      userid:  user.user_id,
     });
 
     await Access.create({
-      companyId:   company.companyId,
-      userId:      user.userId,
-      userType:    'store_admin',
-      companyName,
-      status:      'active',
+      cmpid:     company.companyId,
+      user_id:   user.user_id,
+      user_type: 'store_admin',
+      user_name: companyName,
+      addedby:   user.user_id,
     });
 
     const tenantDb = getTenantDb(company.companyId);
@@ -123,7 +173,7 @@ exports.signup = async (req, res) => {
       companyId:   company.companyId,
       companyName,
       companyUrl,
-      userId:      user.userId,
+      user_id:     user.user_id,
       merchantId:  merchant._id,
       status:      'active',
       createdAt:   new Date(),
@@ -131,9 +181,9 @@ exports.signup = async (req, res) => {
 
     res.status(201).json({
       message:     'Store created successfully',
-      companyId:   company.companyId,
+      cmpid:       company.companyId,
       companyName,
-      userId:      user.userId,
+      user_id:     user.user_id,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -142,7 +192,7 @@ exports.signup = async (req, res) => {
 
 exports.seedSuperAdmin = async (req, res) => {
   try {
-    const exists = await User.findOne({ userType: 'super_admin' });
+    const exists = await User.findOne({ user_type: 'super_admin' });
     if (exists) return res.status(400).json({ message: 'Super admin already exists' });
 
     const { companyUrl, email, password } = req.body;
@@ -152,22 +202,23 @@ exports.seedSuperAdmin = async (req, res) => {
     const company = await Company.create({ companyName: 'GMC Admin', status: 'active' });
 
     const admin = await User.create({
-      companyId:  company.companyId,
-      companyUrl,
-      email,
+      cmpid:         company.companyId,
+      website:       companyUrl,
+      email_address: email,
       password,
-      userType: 'super_admin',
+      password_new:  password,
+      user_type:     'super_admin',
     });
 
     await Access.create({
-      companyId: company.companyId,
-      userId:    admin.userId,
-      userType:  'super_admin',
-      userName:  companyUrl,
-      status:    'active',
+      cmpid:     company.companyId,
+      user_id:   admin.user_id,
+      user_type: 'super_admin',
+      user_name: companyUrl,
+      addedby:   admin.user_id,
     });
 
-    res.status(201).json({ message: 'Super admin created', userId: admin.userId });
+    res.status(201).json({ message: 'Super admin created', user_id: admin.user_id });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -175,24 +226,39 @@ exports.seedSuperAdmin = async (req, res) => {
 
 exports.getAllStores = async (req, res) => {
   try {
-    const merchants = await Merchant.find({ status: 'active' });
+    const cmpDbsSetup = require('../configs/cmpDbsSetup');
 
-    const stores = await Promise.all(
+    // Stores from the main DB (Node.js registered stores)
+    const merchants = await Merchant.find({ archived: 0 });
+    const dbStores  = await Promise.all(
       merchants.map(async (merchant) => {
-        const user    = await User.findOne({ userId: merchant.userId }).select('-password');
-        const company = await Company.findOne({ companyId: merchant.companyId });
+        const user    = await User.findOne({ user_id: merchant.userid }).select('-password');
+        const company = await Company.findOne({ companyId: merchant.cmpid });
         return {
           _id:         merchant._id,
-          companyId:   merchant.companyId,
-          companyName: company?.companyName || '',
-          companyUrl:  user?.companyUrl     || '',
-          userId:      merchant.userId,
-          status:      merchant.status,
+          companyId:   merchant.cmpid,
+          companyName: company?.companyName || merchant.cmpid,
+          website:     user?.website        || '',
+          user_id:     merchant.userid,
+          archived:    merchant.archived,
         };
       })
     );
 
-    res.json(stores);
+    // Supplement with cmpDbsSetup entries not already in the DB list
+    const dbCmpIds    = new Set(dbStores.map((s) => s.companyId));
+    const configStores = Object.keys(cmpDbsSetup)
+      .filter((cmpId) => !dbCmpIds.has(cmpId))
+      .map((cmpId) => ({
+        _id:         cmpId,
+        companyId:   cmpId,
+        companyName: cmpId.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        website:     '',
+        user_id:     '',
+        archived:    0,
+      }));
+
+    res.json([...dbStores, ...configStores]);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -201,7 +267,7 @@ exports.getAllStores = async (req, res) => {
 exports.getMerchant = async (req, res) => {
   const { companyId } = req.params;
   try {
-    const merchant = await Merchant.findOne({ companyId });
+    const merchant = await Merchant.findOne({ cmpid: companyId });
     if (!merchant) return res.status(404).json({ message: 'Merchant not found' });
     res.json(merchant);
   } catch (error) {

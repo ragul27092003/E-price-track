@@ -1,11 +1,10 @@
-const Merchant        = require('../../models/Merchant');
-const { getTenantDb } = require('../../config/db');
+const Merchant             = require('../../models/Merchant');
 const { registerFeedCron } = require('../../services/cronService');
 
 // ── helper ────────────────────────────────────────────────────────────────────
 async function getMerchant(req) {
-  const companyId = req.headers['x-tenant-id'] || req.user?.companyId;
-  return await Merchant.findOne({ companyId });
+  const cmpid = req.headers['x-tenant-id'] || req.user?.cmpid;
+  return await Merchant.findOne({ cmpid });
 }
 
 // ── Format raw DB date strings like "2026-04-27 07:15:06am" → "Apr 27, 2026, 07:15 AM"
@@ -38,8 +37,7 @@ exports.getFeed = async (req, res) => {
     // This handles all existing merchants without requiring manual DB updates
     if (!merchant.feed_info || !merchant.feed_info.store_name) {
       const defaultFeedInfo = {
-        store_name:          merchant.companyId,
-        feed_name:           merchant.companyId,
+        store_name:          merchant.cmpid,
         feed_type:           'json',
         feed_url:            '',
         schedule_info:       'Daily',
@@ -58,8 +56,7 @@ exports.getFeed = async (req, res) => {
 
     const fi = merchant.feed_info;
     res.json({
-      store_name:          fi.store_name          || merchant.companyId,
-      feed_name:           fi.feed_name           || fi.store_name || merchant.companyId,
+      store_name:          fi.store_name          || merchant.cmpid,
       feed_type:           fi.feed_type           || 'json',
       feed_url:            fi.feed_url            || '',
       schedule_info:       fi.schedule_info       || 'Daily',
@@ -106,7 +103,7 @@ exports.saveFeed = async (req, res) => {
 
     if (!isShopify && feed_url) {
       try {
-        registerFeedCron(merchant.companyId, {
+        registerFeedCron(merchant.cmpid, {
           _id:          merchant._id,
           feedName:     store_name,
           importUrl:    feed_url,
@@ -127,10 +124,7 @@ exports.saveFeed = async (req, res) => {
 // ── GET /api/feeds/activity-log ───────────────────────────────────────────────
 exports.getActivityLog = async (req, res) => {
   try {
-    const merchant = await getMerchant(req);
-    if (!merchant) return res.status(404).json({ message: 'Merchant not found' });
-
-    const tenantDb = getTenantDb(merchant.companyId);
+    const tenantDb = req.tenantDb;
 
     // 1. Feed sync records
     const sapDocs = await tenantDb

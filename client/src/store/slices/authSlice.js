@@ -18,16 +18,29 @@ export const createAuthSlice = (set, get) => ({
   login: (data) => {
     const decoded = decodeToken(data.token);
     localStorage.setItem('token', data.token);
+
+    // Super admin: pin sathya as default tenant so every API call immediately
+    // sends x-tenant-id: sathya before the stores list is fetched.
+    // Restore a previously chosen store if the admin had switched before.
+    let activeStoreId  = null;
+    let activeShopName = null;
+    if (decoded?.user_type === 'super_admin') {
+      activeStoreId  = localStorage.getItem('activeStoreId')  || 'sathya';
+      activeShopName = localStorage.getItem('activeShopName') || null;
+      localStorage.setItem('activeStoreId', activeStoreId);
+    }
+
     set({
       token: data.token,
+      activeStoreId,
+      activeShopName,
       user: {
-        userId:      decoded?.userId,
-        userType:    decoded?.userType,
-        companyId:   decoded?.companyId,
-        // Store these from the API response — JWT does NOT encode them
-        companyName: data.companyName || '',
-        companyUrl:  data.companyUrl  || '',
-        email:       data.email       || '',
+        user_id:       decoded?.user_id,
+        user_type:     decoded?.user_type,
+        cmpid:         decoded?.cmpid,
+        companyName:   data.companyName   || '',
+        website:       data.website       || '',
+        email_address: data.email_address || '',
       },
     });
   },
@@ -45,12 +58,12 @@ export const createAuthSlice = (set, get) => ({
 
   fetchMerchant: async (companyId) => {
     const { user } = get();
-    const targetCompanyId = companyId || user?.companyId;
+    const targetCompanyId = companyId || user?.cmpid;
     if (!targetCompanyId) return;
     try {
       const { getMerchant } = await import('../../services/authService');
       const merchant = await getMerchant(targetCompanyId);
-      set({ exportType: merchant.export_type || '' });
+      set({ exportType: merchant.payment === 'yes' ? 'A' : '' });
     } catch (error) {
       console.error('Failed to fetch merchant:', error);
       set({ exportType: '' });

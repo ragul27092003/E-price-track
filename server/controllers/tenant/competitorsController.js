@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { getAdminDb } = require('../../config/db');
 
 // Competitor slug → product collection name mapping
 const SLUG_TO_COLLECTION = {
@@ -140,7 +141,7 @@ exports.getAll = async (req, res) => {
     const clientComps = await db.collection('ept_competitor_info').find({}).toArray();
 
     // 2. Main DB: mapping_type + color + website per competitor slug
-    const mainDb    = mongoose.connection.useDb('eprice_main_admin_db', { useCache: true });
+    const mainDb    = getAdminDb('eprice_main_admin_db');
     const mainComps = await mainDb.collection('competitors').find({}, {
       projection: { competitor_slug: 1, mapping_type: 1, color: 1,
                     competitor_site: 1, competitor_search_url: 1 },

@@ -1,28 +1,41 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
-const generateUserId = () => `usr_${crypto.randomBytes(8).toString('hex')}`;
+const sha1 = (str) => crypto.createHash('sha1').update('salt' + str).digest('hex');
+
+const generateUserId = () => crypto.randomBytes(16).toString('hex');
 
 const userSchema = new mongoose.Schema({
-  userId:     { type: String, unique: true, default: generateUserId },
-  companyId:  { type: String, required: true },
-  companyUrl: { type: String, default: '' },
-  companyName: { type: String, default: '' },
-  userName:    { type: String },   
-  email:      { type: String, required: true, unique: true, lowercase: true },
-  password:   { type: String, required: true },
-  phone:      { type: String, default: '' },
-  userType:   { type: String, enum: ['super_admin', 'store_admin','user'], default: 'store_admin' },
-}, { timestamps: true, collection: 'users' });
+  user_id:                  { type: String, unique: true, default: generateUserId },
+  cmpid:                    { type: String, required: true },
+  website:                  { type: String, default: '' },
+  email_address:            { type: String, required: true, unique: true, lowercase: true },
+  password:                 { type: String, required: true },
+  password_code:            { type: String, default: '' },
+  mobile_number:            { type: String, default: '' },
+  user_type:                { type: String, enum: ['super_admin', 'store_admin', 'user'], default: 'store_admin' },
+  user_name:                { type: String, default: '' },
+  email_notify:             { type: String, default: 'yes' },
+  export_option:            { type: String, default: 'yes' },
+  addedby:                  { type: String, default: '' },
+  addedon:                  { type: Date, default: Date.now },
+  archived:                 { type: Number, default: 0 },
+  account_type:             { type: String, default: 'live_account' },
+  last_login:               { type: String, default: '' },
+  password_new:             { type: String, default: '' },
+  login_cookie:             { type: String, default: '' },
+  modifiedon:               { type: String, default: '' },
+  profile_picture_location: { type: String, default: '' },
+}, { collection: 'plm_admin_users' });
 
-userSchema.pre('save', async function () {
+userSchema.pre('save', function () {
   if (!this.isModified('password')) return;
-  this.password = await bcrypt.hash(this.password, 10);
-}); 
+  this.password = sha1(this.password);
+});
 
 userSchema.methods.comparePassword = async function (candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
+  console.log('Comparing password for user:',sha1(candidatePassword), this.password);
+  return sha1(candidatePassword) === this.password;
 };
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.model('plm_admin_users', userSchema);

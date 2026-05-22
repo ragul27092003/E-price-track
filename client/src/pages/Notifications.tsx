@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../store";
-import { fetchAlertProducts } from "../services/notificationsService";
+import { fetchAlertProducts } from "../services/notificationsService.js";
 
 // ── Helpers (mirrored from Products page) ─────────────────────────────────────
 
@@ -241,6 +241,7 @@ export default function Notifications() {
     setAlertProductsError(null);
     try {
       const data = await fetchAlertProducts();
+      console.log("Fetched alert products:", data);
       setAlertProducts(data);
     } catch (err: any) {
       setAlertProductsError(err.response?.data?.message || err.message || "Failed to load");

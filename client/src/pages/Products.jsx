@@ -812,7 +812,7 @@ export default function Products() {
   const setProductsError = useStore((s) => s.setProductsError);
   const competitors = useStore((s) => s.competitors);
   const activeStoreId = useStore((s) => s.activeStoreId);
-  const currentUserId = useStore((s) => s.user?.userId);
+  const currentUserId = useStore((s) => s.user?.user_id);
   const exportType = useStore((s) => s.exportType) || "A";
 
   // Build meta map for logos

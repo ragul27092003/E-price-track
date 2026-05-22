@@ -57,12 +57,12 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
   const storeLogoMap = useStore((s) => s.storeLogoMap);
   const setStoreLogo = useStore((s) => s.setStoreLogo);
 
-  const [email, setEmail] = useState("");
+  const [email_address, setEmailAddress] = useState("");
   const [companyName, setCompanyName] = useState("");
-  const [companyUrl, setCompanyUrl] = useState("");
-  const [userType, setUserType] = useState("");
-  const [userName, setUserName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [website, setWebsite] = useState("");
+  const [user_type, setUserType] = useState("");
+  const [user_name, setUserName] = useState("");
+  const [mobile_number, setMobileNumber] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
@@ -71,10 +71,10 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
   const [showConfirm, setShowConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savingPass, setSavingPass] = useState(false);
-  const isUser = user?.userType === "user";
+  const isUser = user?.user_type === "user";
 
   // Current store key for logo map
-  const currentStoreKey = (user?.userType === 'super_admin' ? activeStoreId : user?.companyId) || "default";
+  const currentStoreKey = (user?.user_type === 'super_admin' ? activeStoreId : user?.cmpid) || "default";
   const savedLogo = storeLogoMap?.[currentStoreKey] || null;
 
   useEffect(() => {
@@ -82,13 +82,13 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
       try {
         const data = await fetchProfile();
         setProfile(data);
-        setEmail(data.email || "");
-        setCompanyUrl(data.companyUrl || "");
-        setUserType(data.userType || "store_admin");
-        setPhone(data.phone || "");
-        setCompanyName(data.companyName || data.companyId || "");
-        setUserName(data.userName || "");
-        setCurrentPassword(data.plainPassword || "");
+        setEmailAddress(data.email_address || "");
+        setWebsite(data.website || "");
+        setUserType(data.user_type || "store_admin");
+        setMobileNumber(data.mobile_number || "");
+        setCompanyName(data.companyName || data.cmpid || "");
+        setUserName(data.user_name || "");
+        setCurrentPassword(data.password_new || "");
         // Load logo from DB and sync to store
         const dbLogo = data.logoUrl || null;
         setPhotoUrl(dbLogo);
@@ -100,7 +100,7 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
     };
     setProfile(null);
     load();
-  }, [user?.userId, activeStoreId]);
+  }, [user?.user_id, activeStoreId]);
 
   // Sync photoUrl from global store on store switch (before DB fetch completes)
   useEffect(() => {
@@ -111,8 +111,8 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
   const handleUpdate = async () => {
     setSaving(true);
     try {
-      await updateProfile(phone);
-      setProfile({ ...profile, phone });
+      await updateProfile(mobile_number);
+      setProfile({ ...profile, mobile_number });
       toast.success("Account updated successfully!");
     } catch {
       toast.error("Failed to update account");
@@ -247,19 +247,19 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 md:gap-y-5">
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-800 dark:text-white block">Email Address</label>
-            <ValidatedInput value={email} readOnly />
+            <ValidatedInput value={email_address} readOnly />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-800 dark:text-white block">Website URL</label>
-            <ValidatedInput value={companyUrl} readOnly />
+            <ValidatedInput value={website} readOnly />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-800 dark:text-white block">Username</label>
-            <ValidatedInput value={isUser ? userName : companyName} readOnly />
+            <ValidatedInput value={isUser ? user_name : companyName} readOnly />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-800 dark:text-white block">Phone Number</label>
-            <ValidatedInput value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <ValidatedInput value={mobile_number} onChange={(e) => setMobileNumber(e.target.value)} />
           </div>
         </div>
         <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
@@ -322,6 +322,96 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
         </div>
       </div>
     </motion.div>
+  );
+}
+
+// ── AddUserModal ─────────────────────────────────────────────────────────────
+function AddUserModal({ onClose, onSuccess, companyName }) {
+  const [email_address, setEmailAddress] = useState("");
+  const [user_name,     setUserName]     = useState("");
+  const [password,      setPassword]     = useState("");
+  const [showPass,      setShowPass]     = useState(false);
+  const [saving,        setSaving]       = useState(false);
+
+  const handleAdd = async () => {
+    if (!email_address || !password) { toast.error("Email and password are required"); return; }
+    setSaving(true);
+    try {
+      await addUser({ email_address, user_name, password });
+      toast.success("User added successfully");
+      onSuccess();
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to add user");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      >
+        <div className="bg-white dark:bg-[#151a2a] border border-gray-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-base font-bold text-gray-900 dark:text-white">Add User</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-800 dark:text-white block">Email Address</label>
+              <Input
+                type="email"
+                placeholder="user@example.com"
+                value={email_address}
+                onChange={(e) => setEmailAddress(e.target.value)}
+                className="border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-800 dark:text-white block">Name <span className="font-normal text-gray-400">(optional)</span></label>
+              <Input
+                placeholder="Full name"
+                value={user_name}
+                onChange={(e) => setUserName(e.target.value)}
+                className="border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-gray-800 dark:text-white block">Password</label>
+              <div className="relative">
+                <Input
+                  type={showPass ? "text" : "password"}
+                  placeholder="Min 8 chars, 1 uppercase, 1 number"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 pr-10"
+                />
+                <button type="button" onClick={() => setShowPass(!showPass)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500">
+                  {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-3 mt-6">
+            <Button variant="outline" onClick={onClose} className="flex-1 border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-800">
+              Cancel
+            </Button>
+            <Button onClick={handleAdd} disabled={saving} className="flex-1 bg-[#1864ab] hover:bg-blue-800 text-white">
+              {saving ? "Adding..." : "Add User"}
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+    </>
   );
 }
 
@@ -399,18 +489,18 @@ function ManageUsersTab() {
             ) : (
               <AnimatePresence>
                 {storeUsers.map((u, i) => (
-                  <motion.div key={u.userId} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ delay: i * 0.05 }}
+                  <motion.div key={u.user_id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ delay: i * 0.05 }}
                     className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-gray-200  dark:border-slate-700 last:border-0 hover:bg-gray-100  dark:hover:bg-slate-700/60 transition-colors items-center">
                     <div className="col-span-4 flex items-center gap-3">
                       <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center text-xs font-bold text-[#1864ab] shrink-0">
-                        {u.email.slice(0, 2).toUpperCase()}
+                        {u.email_address.slice(0, 2).toUpperCase()}
                       </div>
-                      <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{u.email}</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{u.email_address}</span>
                     </div>
-                    <div className="col-span-3 text-sm text-gray-600 dark:text-slate-400 dark:text-slate-500 truncate">{u.userName || "-"}</div>
+                    <div className="col-span-3 text-sm text-gray-600 dark:text-slate-400 dark:text-slate-500 truncate">{u.user_name || "-"}</div>
                     <div className="col-span-2">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tight ${u.userType === "store_admin" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600 dark:text-slate-400 dark:text-slate-500"}`}>
-                        {u.userType === "store_admin" ? "Admin" : "User"}
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tight ${u.user_type === "store_admin" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600 dark:text-slate-400 dark:text-slate-500"}`}>
+                        {u.user_type === "store_admin" ? "Admin" : "User"}
                       </span>
                     </div>
                     <div className="col-span-2">
@@ -419,10 +509,10 @@ function ManageUsersTab() {
                       </span>
                     </div>
                     <div className="col-span-1 flex justify-end">
-                      <Button size="sm" variant="ghost" onClick={() => handleRemove(u.userId)}
-                        disabled={removing === u.userId || u.userId === user?.userId}
+                      <Button size="sm" variant="ghost" onClick={() => handleRemove(u.user_id)}
+                        disabled={removing === u.user_id || u.user_id === user?.user_id}
                         className="h-8 w-8 p-0 text-gray-400 dark:text-slate-500 hover:text-red-600 hover:bg-red-50">
-                        {removing === u.userId ? <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        {removing === u.user_id ? <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                       </Button>
                     </div>
                   </motion.div>
@@ -483,9 +573,9 @@ function UsersLogTab() {
             ) : (
               usersLog.map((log, i) => (
                 <div key={i} className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-gray-200  dark:border-slate-700 last:border-0 text-sm hover:bg-gray-100  dark:hover:bg-slate-700/60 items-center">
-                  <div className="col-span-4 text-gray-900 dark:text-white font-medium truncate">{log.email}</div>
-                  <div className="col-span-2 text-gray-600 dark:text-slate-400 dark:text-slate-500 capitalize">{log.userType}</div>
-                  <div className="col-span-2 text-gray-600 dark:text-slate-400 dark:text-slate-500 truncate">{log.companyId}</div>
+                  <div className="col-span-4 text-gray-900 dark:text-white font-medium truncate">{log.email_address}</div>
+                  <div className="col-span-2 text-gray-600 dark:text-slate-400 dark:text-slate-500 capitalize">{log.user_type}</div>
+                  <div className="col-span-2 text-gray-600 dark:text-slate-400 dark:text-slate-500 truncate">{log.cmpid}</div>
                   <div className="col-span-4 text-gray-500 dark:text-slate-400 dark:text-slate-500 text-xs">{new Date(log.loginAt).toLocaleString()}</div>
                 </div>
               ))
@@ -506,7 +596,7 @@ export default function Settings() {
 
   const visibleTabs = TABS.filter((tab) => {
     if (tab.id === "users" || tab.id === "log")
-      return user?.userType === "store_admin" || user?.userType === "super_admin";
+      return user?.user_type === "store_admin" || user?.user_type === "super_admin";
     return true;
   });
 
@@ -517,7 +607,7 @@ export default function Settings() {
           <Avatar primaryColor={primaryColor} companyName={user?.companyName || ""} photoUrl={photoUrl} />
           <div>
             <h1 className="text-xl md:text-[22px] font-bold text-gray-900 dark:text-white leading-tight">Settings</h1>
-            <p className="text-xs md:text-sm text-gray-500 dark:text-slate-400 dark:text-slate-500 mt-0.5 capitalize">{user?.userType?.replace('_', ' ')}</p>
+            <p className="text-xs md:text-sm text-gray-500 dark:text-slate-400 dark:text-slate-500 mt-0.5 capitalize">{user?.user_type?.replace('_', ' ')}</p>
           </div>
         </div>
 

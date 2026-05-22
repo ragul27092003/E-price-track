@@ -3,7 +3,7 @@
 const cron     = require('node-cron');
 const axios    = require('axios');
 const mongoose = require('mongoose');
-const { getTenantDb } = require('../config/db');
+const { getTenantDb, getAdminDb } = require('../config/db');
 
 const activeCrons = new Map();
 
@@ -429,15 +429,15 @@ async function initAllCrons() {
     console.log('[CRON] 🚀 Initializing all cron jobs...');
 
     // Read from merchants collection in main DB
-    const mainDb    = mongoose.connection.useDb('eprice_main_admin_db');
-    const merchants = await mainDb.collection('merchants')
-      .find({ status: 'active' })
+    const mainDb    = getAdminDb('eprice_main_admin_db');
+    const merchants = await mainDb.collection('plm_admin_cmp_merchant_accounts')
+      .find({ archived: 0 })
       .toArray();
 
     console.log(`[CRON] Found ${merchants.length} merchants`);
 
     for (const merchant of merchants) {
-      const tenantId = merchant.companyId;
+      const tenantId = merchant.cmpid;
       const feedInfo = merchant.feed_info;
 
       if (!tenantId || !feedInfo?.feed_url || !feedInfo?.schedule_info) {
@@ -447,7 +447,7 @@ async function initAllCrons() {
 
       registerFeedCron(tenantId, {
         _id:          merchant._id,
-        feedName:     feedInfo.feed_name || feedInfo.store_name || tenantId,
+        feedName:     feedInfo.store_name || tenantId,
         importUrl:    feedInfo.feed_url,
         schedule:     feedInfo.schedule_info,
         scheduleTime: feedInfo.import_time,

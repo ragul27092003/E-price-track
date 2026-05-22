@@ -4,7 +4,6 @@ const cors = require('cors');
 const { connectDB } = require('./config/db');
 const { initAllCrons } = require('./services/cronService');
 const cronRoutes       = require('./routes/cronRoutes');
-const auditRoutes = require('./routes/auditRoutes');
 const path = require('path');
 
 const app = express();
@@ -29,7 +28,6 @@ app.use('/api/competitors', require('./routes/tenant/competitors'));
 app.use('/api/dashboard',  require('./routes/tenant/dashboard'));
 app.use('/api/product-history', require('./routes/tenant/productHistory'));
 app.use('/api/cron', cronRoutes);
-app.use('/api/audit', auditRoutes);
 
 app.post('/api/test-signup', (req, res) => res.json({ ok: true, body: req.body }));
 app.get('/', (req, res) => res.json({ message: 'Product Feed Studio API running' }));
@@ -39,7 +37,5 @@ const PORT = process.env.PORT || 5000;
 connectDB().then(async () => {
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   
-  // ✅ Cron jobs start 
-  const { initAllCrons } = require('./services/cronService');
-  await initAllCrons();
+  // await initAllCrons();
 });

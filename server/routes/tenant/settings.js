@@ -18,7 +18,7 @@ router.put('/password',        auth, updatePassword);
 router.put('/logo',            auth, updateLogo);
 router.get('/users',           auth, getUsers);
 router.post('/add-user',       auth, addUser);
-router.delete('/users/:userId',auth, removeUser);
+router.delete('/users/:user_id', auth, removeUser);
 router.get('/users-log',       auth, getUsersLog);
 
 module.exports = router;
