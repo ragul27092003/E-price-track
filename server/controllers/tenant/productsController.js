@@ -1,5 +1,6 @@
 const { ObjectId } = require('mongodb');
 const mongoose     = require('mongoose');
+const User         = require('../../models/User');
 
 function toPrice(raw) {
   if (raw === null || raw === undefined || raw === 'No Result' || raw === '') return null;
@@ -122,23 +123,67 @@ async function enrichProducts(db, products) {
   });
 }
 
+// ── GET /api/products/meta ────────────────────────────────────────────────────
+// Returns unique brands / categories / ranks / itemGroups for filter dropdowns.
+exports.getMeta = async (req, res) => {
+  try {
+    const docs = await req.tenantDb
+      .collection('ept_product_details_new')
+      .find({}, { projection: { product_brand: 1, product_category: 1, rank_by: 1 } })
+      .toArray();
+
+    const brands     = [...new Set(docs.map((d) => d.product_brand).filter(Boolean))].sort();
+    const categories = [...new Set(docs.map((d) => d.product_category).filter(Boolean))].sort();
+    const ranks      = [...new Set(docs.map((d) => String(d.rank_by || '')).filter(Boolean))].sort();
+    const itemGroups = [...new Set(docs.map((d) =>
+      d.product_category ? d.product_category.split('>')[0].trim() : ''
+    ).filter(Boolean))].sort();
+
+    res.json({ brands, categories, ranks, itemGroups });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // ── GET /api/products ─────────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
   try {
-    const db       = req.tenantDb;
-    console.log('Fetching products for tenant:', req.tenantId);
-    const products = await db.collection('ept_product_details_new').find({}).toArray();
-    console.log('Fetched products:', products.length);
+    const db    = req.tenantDb;
+    const page  = Math.max(1, parseInt(req.query.page  || '1', 10));
+    const limit = Math.max(1, parseInt(req.query.limit || '5', 10));
+    const skip  = (page - 1) * limit;
+    const { competitor: filterSlug, search, brand, category, rank, itemGroup } = req.query;
+
+    const mongoFilter = {};
+    if (search) {
+      const re = { $regex: search, $options: 'i' };
+      mongoFilter.$or = [
+        { product_name:   re },
+        { product_brand:  re },
+        { product_ean_id: re },
+        { product_code:   re },
+      ];
+    }
+    if (brand)         mongoFilter.product_brand    = brand;
+    if (category)      mongoFilter.product_category = category;
+    else if (itemGroup) {
+      const escaped = itemGroup.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      mongoFilter.product_category = { $regex: `^${escaped}`, $options: 'i' };
+    }
+    if (rank) mongoFilter.rank_by = rank;
+
+    const col      = db.collection('ept_product_details_new');
+    const total    = await col.countDocuments(mongoFilter);
+    const products = await col.find(mongoFilter).skip(skip).limit(limit).toArray();
     let enriched   = await enrichProducts(db, products);
 
-    const { competitor: filterSlug } = req.query;
     if (filterSlug) {
       enriched = enriched.filter((p) =>
         p.competitor_prices.some((c) => c.slug === filterSlug && c.price !== null)
       );
     }
 
-    res.json(enriched);
+    res.json({ data: enriched, total, page, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -152,6 +197,10 @@ exports.getAlertProducts = async (req, res) => {
   try {
     const db                    = req.tenantDb;
     const { user_id, user_type } = req.user;
+    const page  = Math.max(1, parseInt(req.query.page  || '1', 10));
+    const limit = Math.max(1, parseInt(req.query.limit || '9', 10));
+    const skip  = (page - 1) * limit;
+    console.log(`Fetching alert products for user_id: ${user_id}, user_type: ${user_type}`);
 
     const baseFilter = {
       status: 'active',
@@ -160,15 +209,36 @@ exports.getAlertProducts = async (req, res) => {
 
     let query = {};
     if (user_type === 'user') {
+      // MongoDB element match: find docs where user_alert_id array contains this user_id
       query = { ...baseFilter, user_alert_id: user_id };
     } else {
-      // admins see every product that has been configured for alerts
-      query = { ...baseFilter, user_alert_id: { $exists: true, $not: { $size: 0 } } };
+      const tenantCmpid = req.headers['x-tenant-id'] || req.user.cmpid;
+
+      if (user_type === 'super_admin') {
+        // super_admin viewing a tenant: find that tenant's store_admin and use their user_id
+        const storeAdmin = await User
+          .findOne({ cmpid: tenantCmpid, user_type: 'store_admin' })
+          .select('user_id')
+          .lean();
+        console.log(`store_admin for cmpid ${tenantCmpid}:`, storeAdmin?.user_id);
+        if (!storeAdmin) return res.json({ data: [], total: 0, page: 1, totalPages: 0 });
+        query = { ...baseFilter, user_alert_id: storeAdmin.user_id };
+      } else {
+        // store_admin: show all products with alerts from any user in this tenant
+        const tenantUsers   = await User.find({ cmpid: tenantCmpid }).select('user_id').lean();
+        const tenantUserIds = tenantUsers.map((u) => u.user_id);
+        console.log(`Tenant users for cmpid ${tenantCmpid}:`, tenantUserIds);
+        if (tenantUserIds.length === 0) return res.json({ data: [], total: 0, page: 1, totalPages: 0 });
+        query = { ...baseFilter, user_alert_id: { $in: tenantUserIds } };
+      }
     }
 
-    const products = await db.collection('ept_product_details_new').find(query).toArray();
+    const col      = db.collection('ept_product_details_new');
+    const total    = await col.countDocuments(query);
+    const products = await col.find(query).skip(skip).limit(limit).toArray();
     const enriched = await enrichProducts(db, products);
-    res.json(enriched);
+
+    res.json({ data: enriched, total, page, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

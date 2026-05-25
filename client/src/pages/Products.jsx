@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useStore } from "../store";
-import { fetchProducts, configureProduct, removeProductConfiguration } from "../services/productsService";
+import { fetchProducts, fetchProductsMeta, configureProduct, removeProductConfiguration } from "../services/productsService";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -804,16 +804,20 @@ export default function Products() {
   const competitorSlug = searchParams.get("competitor") || "";
   const competitorName = searchParams.get("name") || "";
 
-  const products = useStore((s) => s.products);
-  const productsLoading = useStore((s) => s.productsLoading);
-  const productsError = useStore((s) => s.productsError);
-  const setProducts = useStore((s) => s.setProducts);
-  const setProductsLoading = useStore((s) => s.setProductsLoading);
-  const setProductsError = useStore((s) => s.setProductsError);
-  const competitors = useStore((s) => s.competitors);
+  const products          = useStore((s) => s.products);
+  const productsLoading   = useStore((s) => s.productsLoading);
+  const productsError     = useStore((s) => s.productsError);
+  const productsTotalPages = useStore((s) => s.productsTotalPages);
+  const productsMeta      = useStore((s) => s.productsMeta);
+  const setProducts           = useStore((s) => s.setProducts);
+  const setProductsLoading    = useStore((s) => s.setProductsLoading);
+  const setProductsError      = useStore((s) => s.setProductsError);
+  const setProductsTotalPages = useStore((s) => s.setProductsTotalPages);
+  const setProductsMeta       = useStore((s) => s.setProductsMeta);
+  const competitors   = useStore((s) => s.competitors);
   const activeStoreId = useStore((s) => s.activeStoreId);
   const currentUserId = useStore((s) => s.user?.user_id);
-  const exportType = useStore((s) => s.exportType) || "A";
+  const exportType    = useStore((s) => s.exportType) || "A";
 
   // Build meta map for logos
   const competitorMeta = {};
@@ -823,12 +827,20 @@ export default function Products() {
   const onlineSlugs = new Set(competitors.filter((c) => c.isActive).map((c) => c.slug));
 
   const [activeTab, setActiveTab] = useState("analysis");
-  const [search, setSearch] = useState("");
-  const [brandFilter, setBrandFilter] = useState("");
-  const [catFilter, setCatFilter] = useState("");
-  const [rankFilter, setRankFilter] = useState("");
-  const [itemGroupFilter, setItemGroupFilter] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+
+  // Filter state — wrappers reset page to 1 so the fetch useEffect always fires
+  const [currentPage,     setCurrentPage]     = useState(1);
+  const [search,          _setSearch]         = useState("");
+  const [brandFilter,     _setBrandFilter]    = useState("");
+  const [catFilter,       _setCatFilter]      = useState("");
+  const [rankFilter,      _setRankFilter]     = useState("");
+  const [itemGroupFilter, _setItemGroupFilter] = useState("");
+
+  const setSearch         = (v) => { _setSearch(v);         setCurrentPage(1); };
+  const setBrandFilter    = (v) => { _setBrandFilter(v);    setCurrentPage(1); };
+  const setCatFilter      = (v) => { _setCatFilter(v);      setCurrentPage(1); };
+  const setRankFilter     = (v) => { _setRankFilter(v);     setCurrentPage(1); };
+  const setItemGroupFilter = (v) => { _setItemGroupFilter(v); setCurrentPage(1); };
   const [configProduct, setConfigProduct] = useState(null); // product being configured
   const [sortConfig, setSortConfig] = useState({ column: null, direction: "asc" });
   const [showBulkConfirm, setShowBulkConfirm] = useState(false);
@@ -847,12 +859,25 @@ export default function Products() {
     setCurrentPage(1);
   };
 
-  const load = async () => {
+  const load = async (page, searchQ, brand, cat, rank, itemGroup) => {
     setProductsLoading(true);
     setProductsError(null);
     try {
-      const data = await fetchProducts(competitorSlug || null);
-      setProducts(data);
+      const res = await fetchProducts({
+        page,
+        limit: ITEMS_PER_PAGE,
+        competitorSlug: competitorSlug || null,
+        search:    searchQ   || undefined,
+        brand:     brand     || undefined,
+        category:  cat       || undefined,
+        rank:      rank      || undefined,
+        itemGroup: itemGroup || undefined,
+      });
+      // Normalise: server returns { data, totalPages } but guard against old flat-array shape
+      const rows       = Array.isArray(res) ? res           : (res?.data       || []);
+      const totalPages = Array.isArray(res) ? Math.ceil(res.length / ITEMS_PER_PAGE) : (res?.totalPages || 1);
+      setProducts(rows);
+      setProductsTotalPages(totalPages);
     } catch (err) {
       setProductsError(err.response?.data?.message || err.message);
     } finally {
@@ -860,38 +885,31 @@ export default function Products() {
     }
   };
 
-  useEffect(() => { load(); }, [activeStoreId, competitorSlug]);
+  // Fetch filter-dropdown metadata once per store
+  useEffect(() => {
+    fetchProductsMeta()
+      .then((meta) => setProductsMeta(meta))
+      .catch(() => {});
+  }, [activeStoreId]);
 
-  const brandOptions = [...new Set(products.map((p) => p.product_brand).filter(Boolean))].sort();
-  const catOptions = [...new Set(products.map((p) => p.product_category).filter(Boolean))].sort();
-  const rankOptions = [...new Set(products.map((p) => String(p.rank_by ?? "")).filter(Boolean))].sort();
-  const itemGroupOptions = [...new Set(products.map((p) => p.product_category ? p.product_category.split(">")[0].trim() : "").filter(Boolean))].sort();
+  // Reload whenever page, filters, store, or competitor changes
+  useEffect(() => {
+    load(currentPage, search, brandFilter, catFilter, rankFilter, itemGroupFilter);
+  }, [currentPage, search, brandFilter, catFilter, rankFilter, itemGroupFilter, activeStoreId, competitorSlug]);
 
-  const filtered = products
-    .filter((p) => {
-      const q = search.toLowerCase();
-      const matchSearch = !q || (
-        p.product_name?.toLowerCase().includes(q) ||
-        p.product_brand?.toLowerCase().includes(q) ||
-        String(p.product_ean_id || "").includes(q) ||
-        String(p.product_code || "").includes(q)
-      );
-      const matchBrand = !brandFilter || p.product_brand === brandFilter;
-      const matchCat = !catFilter || p.product_category === catFilter;
-      const matchRank = !rankFilter || String(p.rank_by ?? "") === rankFilter;
-      const pGroup = p.product_category ? p.product_category.split(">")[0].trim() : "";
-      const matchGroup = !itemGroupFilter || pGroup === itemGroupFilter;
-      return matchSearch && matchBrand && matchCat && matchRank && matchGroup;
-    })
-    .map((p) => ({
-      ...p,
-      competitor_prices: (p.competitor_prices || []).filter(
-        (c) => onlineSlugs.size === 0 || onlineSlugs.has(c.slug)
-      ),
-    }));
+  // Dropdown options come from lightweight metadata (full dataset, not just current page)
+  const brandOptions     = productsMeta?.brands     || [];
+  const catOptions       = productsMeta?.categories || [];
+  const rankOptions      = productsMeta?.ranks      || [];
+  const itemGroupOptions = productsMeta?.itemGroups || [];
 
-  // Reset to page 1 whenever filters/tab/competitor changes
-  useEffect(() => { setCurrentPage(1); }, [search, brandFilter, catFilter, rankFilter, itemGroupFilter, activeTab, competitorSlug]);
+  // Server already filtered & paginated — just apply the online-competitor price mask
+  const filtered = (Array.isArray(products) ? products : []).map((p) => ({
+    ...p,
+    competitor_prices: (p.competitor_prices || []).filter(
+      (c) => onlineSlugs.size === 0 || onlineSlugs.has(c.slug)
+    ),
+  }));
 
   const isConfigured = (p) => !!(p.group_name || (p.user_alert_id && p.user_alert_id.length > 0));
   const allConfigured = filtered.length > 0 && filtered.every(isConfigured);
@@ -924,8 +942,9 @@ export default function Products() {
     return 0;
   });
 
-  const totalPages = Math.ceil(sorted.length / ITEMS_PER_PAGE);
-  const paginated = sorted.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  // Server already paginates — totalPages comes from the server response
+  const totalPages = productsTotalPages;
+  const paginated  = sorted; // no client-side slicing needed
 
   const clearCompetitorFilter = () => setSearchParams({});
 
@@ -1096,7 +1115,7 @@ export default function Products() {
             {productsLoading ? (
               <LoadingState />
             ) : productsError ? (
-              <ErrorState message={productsError} onRetry={load} />
+              <ErrorState message={productsError} onRetry={() => load(currentPage, search, brandFilter, catFilter, rankFilter, itemGroupFilter)} />
             ) : (
               <>
                 {/* ── BRAND PRODUCTS ── */}

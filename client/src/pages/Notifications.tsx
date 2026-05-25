@@ -221,9 +221,11 @@ export default function Notifications() {
   const alertProducts        = useStore((s) => s.alertProducts);
   const alertProductsLoading = useStore((s) => s.alertProductsLoading);
   const alertProductsError   = useStore((s) => s.alertProductsError);
-  const setAlertProducts        = useStore((s) => s.setAlertProducts);
-  const setAlertProductsLoading = useStore((s) => s.setAlertProductsLoading);
-  const setAlertProductsError   = useStore((s) => s.setAlertProductsError);
+  const setAlertProducts           = useStore((s) => s.setAlertProducts);
+  const setAlertProductsLoading    = useStore((s) => s.setAlertProductsLoading);
+  const setAlertProductsError      = useStore((s) => s.setAlertProductsError);
+  const alertProductsTotalPages    = useStore((s) => s.alertProductsTotalPages);
+  const setAlertProductsTotalPages = useStore((s) => s.setAlertProductsTotalPages);
   const competitors  = useStore((s) => s.competitors);
   const activeStoreId = useStore((s) => s.activeStoreId);
 
@@ -236,13 +238,16 @@ export default function Notifications() {
   const [search,      setSearch]      = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const load = async () => {
+  const load = async (page: number) => {
     setAlertProductsLoading(true);
     setAlertProductsError(null);
     try {
-      const data = await fetchAlertProducts();
-      console.log("Fetched alert products:", data);
-      setAlertProducts(data);
+      const res = await fetchAlertProducts(page, ITEMS_PER_PAGE);
+      // Normalise: guard against old flat-array response shape
+      const rows       = Array.isArray(res) ? res : (res?.data       || []);
+      const totalPages = Array.isArray(res) ? 1   : (res?.totalPages || 1);
+      setAlertProducts(rows);
+      setAlertProductsTotalPages(totalPages);
     } catch (err: any) {
       setAlertProductsError(err.response?.data?.message || err.message || "Failed to load");
     } finally {
@@ -250,9 +255,11 @@ export default function Notifications() {
     }
   };
 
-  useEffect(() => { load(); }, [activeStoreId]);
-  useEffect(() => { setCurrentPage(1); }, [search, activeStoreId]);
+  useEffect(() => { load(currentPage); }, [currentPage, activeStoreId]);
+  // Reset to page 1 when store switches (avoids stale page number)
+  useEffect(() => { setCurrentPage(1); }, [activeStoreId]);
 
+  // Search filters the current page's data only
   const filtered = alertProducts.filter((p: any) => {
     const q = search.toLowerCase();
     return !q ||
@@ -261,8 +268,9 @@ export default function Notifications() {
       String(p.product_ean_id || "").includes(q);
   });
 
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
-  const paginated  = filtered.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  // totalPages and paginated come from the server — no client-side slicing needed
+  const totalPages = alertProductsTotalPages;
+  const paginated  = filtered;
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0b101e] p-4 md:p-8 font-sans">
@@ -293,7 +301,7 @@ export default function Notifications() {
           {alertProductsLoading ? (
             <LoadingState />
           ) : alertProductsError ? (
-            <ErrorState message={alertProductsError} onRetry={load} />
+            <ErrorState message={alertProductsError} onRetry={() => load(currentPage)} />
           ) : filtered.length === 0 ? (
             <EmptyState />
           ) : (

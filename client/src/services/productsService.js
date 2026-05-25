@@ -1,13 +1,24 @@
 import API from '../hooks/useApi';
 
-// competitorSlug is optional — passed when navigating from MarketCompetitor
-// GET /api/products?competitor=amazon → backend filters products to those amazon sells
-export const fetchProducts = (competitorSlug = null) => {
-  const url = competitorSlug
-    ? `/products?competitor=${competitorSlug}`
-    : '/products';
-  return API.get(url).then((r) => r.data);
+// Paginated product fetch — all filter params are optional
+export const fetchProducts = ({
+  page = 1, limit = 5,
+  competitorSlug = null,
+  search, brand, category, rank, itemGroup,
+} = {}) => {
+  const params = new URLSearchParams({ page, limit });
+  if (competitorSlug) params.set('competitor', competitorSlug);
+  if (search)     params.set('search',     search);
+  if (brand)      params.set('brand',      brand);
+  if (category)   params.set('category',   category);
+  if (rank)       params.set('rank',       rank);
+  if (itemGroup)  params.set('itemGroup',  itemGroup);
+  return API.get(`/products?${params}`).then((r) => r.data);
 };
+
+// Lightweight dropdown metadata (brands / categories / ranks / itemGroups)
+export const fetchProductsMeta = () =>
+  API.get('/products/meta').then((r) => r.data);
 
 export const createProduct = (data) =>
   API.post('/products', data).then((r) => r.data);

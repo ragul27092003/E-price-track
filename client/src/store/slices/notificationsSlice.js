@@ -17,11 +17,15 @@ export const createNotificationsSlice = (set) => ({
   clearNotifications: () => set({ notifications: [], unreadCount: 0 }),
 
   // ── Alert products (Notifications page) ───────────────────────────
-  alertProducts:        [],
-  alertProductsLoading: false,
-  alertProductsError:   null,
+  alertProducts:          [],
+  alertProductsLoading:   false,
+  alertProductsError:     null,
+  alertProductsTotal:     0,
+  alertProductsTotalPages: 0,
 
-  setAlertProducts:        (alertProducts)        => set({ alertProducts }),
-  setAlertProductsLoading: (alertProductsLoading) => set({ alertProductsLoading }),
-  setAlertProductsError:   (alertProductsError)   => set({ alertProductsError }),
+  setAlertProducts:           (alertProducts)          => set({ alertProducts }),
+  setAlertProductsLoading:    (alertProductsLoading)   => set({ alertProductsLoading }),
+  setAlertProductsError:      (alertProductsError)     => set({ alertProductsError }),
+  setAlertProductsTotal:      (alertProductsTotal)     => set({ alertProductsTotal }),
+  setAlertProductsTotalPages: (alertProductsTotalPages) => set({ alertProductsTotalPages }),
 });
