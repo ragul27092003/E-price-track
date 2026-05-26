@@ -10,7 +10,7 @@ function decodeToken(token) {
 }
 
 const API = axios.create({
-  baseURL: 'http://localhost:5100/api',
+  baseURL: 'http://13.234.228.110:3002/api',
 });
 
 // Auto-attach JWT token and x-tenant-id on every request
