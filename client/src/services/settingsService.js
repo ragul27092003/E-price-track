@@ -9,6 +9,23 @@ export const updateProfile = (mobile_number) =>
 export const updatePassword = (newPassword) =>
   API.put('/settings/password', { newPassword }).then((r) => r.data);
 
+/**
+ * Upload a store logo to Cloudinary via the server.
+ * Replaces the old base64 approach — sends the raw File, gets back a
+ * permanent Cloudinary URL that is stored in the Company collection.
+ *
+ * @param {File} file - the image File object from <input type="file">
+ * @returns {Promise<{ logoUrl: string, message: string }>}
+ */
+export const uploadStoreLogo = (file) => {
+  const form = new FormData();
+  form.append('logo', file);
+  return API.post('/settings/logo-upload', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then((r) => r.data);
+};
+
+// Kept for any direct URL updates (e.g. clearing the logo)
 export const updateLogo = (logoUrl) =>
   API.put('/settings/logo', { logoUrl }).then((r) => r.data);
 

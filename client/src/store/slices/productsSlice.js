@@ -11,7 +11,9 @@ export const createProductsSlice = (set) => ({
   lastViewedEan:      null,
 
   // ── Actions ────────────────────────────────────────────────────────
-  setProducts:           (products)           => set({ products }),
+  setProducts: (data) => set({
+  products: Array.isArray(data) ? data : (data?.products ?? data?.data ?? data?.items ?? [])
+}),
   setProductsLoading:    (productsLoading)    => set({ productsLoading }),
   setProductsError:      (productsError)      => set({ productsError }),
   setProductsSearch:     (productsSearch)     => set({ productsSearch, productsPage: 1 }),

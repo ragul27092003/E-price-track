@@ -3,10 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { fetchCompetitors } from '../services/competitorsService';
 
+// ─── Resolve logo URL safely ──────────────────────────────────────────────────
+// Cloudinary URLs are absolute (https://…); local assets start with /assets/…
+const resolveLogoUrl = (logo) => {
+  if (!logo) return null;
+  if (logo.startsWith('http://') || logo.startsWith('https://')) return logo;
+  return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5100'}${logo}`;
+};
+
 // ─── Single competitor row ────────────────────────────────────────────────────
 const CompetitorRow = ({ data, onClick }) => {
   const isNegDelta = String(data.avgPriceDelta).includes('-');
   const isOffline = !data.isActive;
+  const logoUrl = resolveLogoUrl(data.logo);
 
   return (
     <div className="group relative">
@@ -24,9 +33,9 @@ const CompetitorRow = ({ data, onClick }) => {
             className="w-10 h-10 sm:w-11 sm:h-11 rounded border border-gray-200  dark:border-slate-700 flex items-center justify-center overflow-hidden shrink-0 shadow-sm"
             style={{ backgroundColor: data.color || '#475e77' }}
           >
-            {data.logo ? (
+            {logoUrl ? (
               <img
-                src={`http://localhost:5100${data.logo}`}
+                src={logoUrl}
                 alt={data.name}
                 className="w-full h-full object-contain"
                 onError={(e) => { e.target.style.display = 'none'; }}
@@ -111,6 +120,10 @@ const MarketCompetitor = () => {
     navigate(`/products?competitor=${comp.slug}&name=${encodeURIComponent(comp.name)}`);
   };
 
+  // ── Split by mappingType ───────────────────────────────────────────
+  const eanList    = competitors.filter((c) => c.mappingType === 'EAN');
+  const nonEanList = competitors.filter((c) => c.mappingType === 'NON_EAN');
+
   if (competitorsLoading) {
     return (
       <div className="flex justify-center p-20 bg-white dark:bg-slate-800 min-h-screen">
@@ -122,33 +135,73 @@ const MarketCompetitor = () => {
   return (
     <div className="p-3 sm:p-6 bg-white dark:bg-[#0b101e] min-h-screen flex justify-center font-sans">
       <div className="w-full max-w-[1000px] h-fit border border-gray-200  dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl overflow-hidden shadow-sm">
+
         {/* Header */}
         <div className="bg-[#475e77] text-white p-4 px-5">
           <h2 className="text-xs sm:text-sm font-bold">
             Competitor Listings <span className="hidden sm:inline">— Click a competitor to view their products</span>
           </h2>
         </div>
-        
-        {/* Table Headings - Hidden on mobile, shown on SM+ screens */}
-        <div className="hidden sm:flex px-8 pt-5 pb-2 bg-[#f8fafd] border-b border-gray-100">
-          <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest w-[45%]">Competitor</span>
-          <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest w-[20%]">Avg. Price Delta</span>
-          <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest w-[20%]">Products Tracked</span>
-          <span className="w-[15%]" />
-        </div>
 
-        {/* Competitor Rows Container */}
-        <div className="p-3 sm:p-6 bg-[#f8fafd]">
-          {competitors.length === 0 ? (
+        {competitors.length === 0 ? (
+          <div className="p-3 sm:p-6 bg-[#f8fafd]">
             <div className="py-12 text-center text-sm text-gray-400 dark:text-slate-500 italic">
               No competitors found.
             </div>
-          ) : (
-            competitors.map((item) => (
-              <CompetitorRow key={item.id} data={item} onClick={handleCompetitorClick} />
-            ))
-          )}
-        </div>
+          </div>
+        ) : (
+          <>
+            {/* ── EAN Section ── */}
+            {eanList.length > 0 && (
+              <>
+                <div className="px-5 pt-4 pb-1 bg-[#f8fafd] border-b border-gray-100 dark:border-slate-700 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+                  <span className="text-[11px] font-black text-gray-500 dark:text-slate-400 uppercase tracking-widest">
+                    EAN Competitors
+                  </span>
+                  <span className="text-[10px] font-bold bg-blue-100 text-blue-600 rounded-full px-2 py-0.5">{eanList.length}</span>
+                </div>
+                {/* Column headings */}
+                <div className="hidden sm:flex px-8 pt-3 pb-2 bg-[#f8fafd] border-b border-gray-100">
+                  <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest w-[45%]">Competitor</span>
+                  <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest w-[20%]">Avg. Price Delta</span>
+                  <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest w-[20%]">Products Tracked</span>
+                  <span className="w-[15%]" />
+                </div>
+                <div className="p-3 sm:p-6 bg-[#f8fafd]">
+                  {eanList.map((item) => (
+                    <CompetitorRow key={item.id} data={item} onClick={handleCompetitorClick} />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* ── NON-EAN Section ── */}
+            {nonEanList.length > 0 && (
+              <>
+                <div className="px-5 pt-4 pb-1 bg-[#f8fafd] border-t-2 border-b border-gray-200 dark:border-slate-600 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-violet-500 inline-block" />
+                  <span className="text-[11px] font-black text-gray-500 dark:text-slate-400 uppercase tracking-widest">
+                    Non-EAN Competitors
+                  </span>
+                  <span className="text-[10px] font-bold bg-violet-100 text-violet-600 rounded-full px-2 py-0.5">{nonEanList.length}</span>
+                </div>
+                {/* Column headings */}
+                <div className="hidden sm:flex px-8 pt-3 pb-2 bg-[#f8fafd] border-b border-gray-100">
+                  <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest w-[45%]">Competitor</span>
+                  <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest w-[20%]">Avg. Price Delta</span>
+                  <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest w-[20%]">Products Tracked</span>
+                  <span className="w-[15%]" />
+                </div>
+                <div className="p-3 sm:p-6 bg-[#f8fafd]">
+                  {nonEanList.map((item) => (
+                    <CompetitorRow key={item.id} data={item} onClick={handleCompetitorClick} />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

@@ -1121,10 +1121,11 @@ export default function SmartReports() {
     if (!products.length) {
       setProductsLoading(true);
       fetchProducts()
-        .then((data) => {
-          setProducts(data);
-          setProductsLoading(false);
-        })
+  .then((data) => {
+    const arr = Array.isArray(data) ? data : (data?.products ?? data?.data ?? data?.items ?? []);
+    setProducts(arr);
+    setProductsLoading(false);
+  })
         .catch((e) => {
           setProductsError(e?.message || "Failed to load products");
           setProductsLoading(false);
@@ -1142,10 +1143,10 @@ export default function SmartReports() {
     [competitors]
   );
 
-  const tabProducts = useMemo(
-    () => (products || []).filter(TAB_FILTERS[activeTab] || (() => false)),
-    [products, activeTab]
-  );
+ const tabProducts = useMemo(
+  () => (Array.isArray(products) ? products : []).filter(TAB_FILTERS[activeTab] || (() => false)),
+  [products, activeTab]
+);
 
   const selectedProduct = useMemo(() => {
     if (!tabProducts.length) return null;

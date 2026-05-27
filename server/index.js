@@ -9,11 +9,22 @@ const path = require('path');
 const app = express();
 
 app.use(cors({
-  origin: ['http://13.234.228.110:3001', 'http://localhost:8080', 'http://localhost:5173', 'http://localhost:3000'],
+  origin: [
+    'http://localhost:8080',
+    'http://localhost:5173', 
+    'http://localhost:3000',
+    'http://13.234.228.110',        // ← add this
+    'https://epricetrack.com',      // ← and your domain
+  ],
   credentials: true,
 }));
 app.use(express.json());
-app.use('/assets', express.static(path.join(__dirname, 'assets')));
+
+// ─── Static file serving ─────────────────────────────────────────────────────
+// Use path.resolve() so paths work correctly on Windows regardless of where
+// node is started from (unlike path.join() which is relative to cwd).
+app.use('/assets', express.static(path.resolve(__dirname, 'assets')));
+app.use('/uploads', express.static(path.resolve(__dirname, 'uploads')));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -37,5 +48,5 @@ const PORT = process.env.PORT || 5000;
 connectDB().then(async () => {
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   
-  await initAllCrons();
+  // await initAllCrons();
 });

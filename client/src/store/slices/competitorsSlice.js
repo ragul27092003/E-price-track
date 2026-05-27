@@ -18,4 +18,15 @@ export const createCompetitorsSlice = (set, get) => ({
         String(c.id) === String(id) ? { ...c, isActive, lastSync: lastSync ?? c.lastSync } : c
       ),
     })),
+
+  /**
+   * After super_admin uploads a logo, update the logo URL for that competitor
+   * across ALL items in state (matched by slug) so every store reflects the change.
+   */
+  updateCompetitorLogo: (slug, logoUrl) =>
+    set((state) => ({
+      competitors: state.competitors.map((c) =>
+        c.slug === slug ? { ...c, logo: logoUrl, fullLogo: logoUrl } : c
+      ),
+    })),
 });

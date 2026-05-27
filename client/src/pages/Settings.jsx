@@ -12,6 +12,7 @@ import {
   fetchProfile,
   updateProfile,
   updatePassword,
+  uploadStoreLogo,
   updateLogo,
   fetchUsers,
   addUser,
@@ -121,22 +122,30 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
     }
   };
 
-  const handleLogoChange = (e) => {
+  const handleLogoChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const dataUrl = ev.target.result;
-      setPhotoUrl(dataUrl);
-      setStoreLogo(currentStoreKey, dataUrl);
-      try {
-        await updateLogo(dataUrl);
-        toast.success("Store logo saved!");
-      } catch {
-        toast.error("Failed to save logo to server");
-      }
-    };
-    reader.readAsDataURL(file);
+
+    // Show a local preview immediately while the upload is in flight
+    const previewUrl = URL.createObjectURL(file);
+    setPhotoUrl(previewUrl);
+
+    try {
+      // Upload the raw file → Cloudinary → get back a permanent URL
+      const result = await uploadStoreLogo(file);
+      const cloudinaryUrl = result.logoUrl;
+
+      // Replace the temporary blob URL with the real Cloudinary URL
+      setPhotoUrl(cloudinaryUrl);
+      setStoreLogo(currentStoreKey, cloudinaryUrl);
+      toast.success("Store logo saved!");
+    } catch {
+      // Roll back preview on failure
+      setPhotoUrl(savedLogo || null);
+      toast.error("Failed to save logo to server");
+    } finally {
+      e.target.value = '';
+    }
   };
 
   const handleRemoveLogo = async () => {

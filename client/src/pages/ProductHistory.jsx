@@ -336,7 +336,12 @@ export default function ProductHistory() {
         const [, comps] = await Promise.all([
           storeProducts.length
             ? Promise.resolve(storeProducts)
-            : fetchProducts().then((d) => { setProducts(d); setProductsLoading(false); return d; }),
+            : fetchProducts().then((d) => {
+                     const arr = Array.isArray(d) ? d : (d?.products ?? d?.data ?? d?.items ?? []);
+                     setProducts(arr);
+                     setProductsLoading(false);
+                     return arr;
+               }),
           storeCompetitors.length
             ? Promise.resolve(storeCompetitors)
             : fetchCompetitors().then((d) => { setCompetitors(d); return d; }),

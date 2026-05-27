@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 const { getAdminDb } = require('../../config/db');
-const User = require('../../models/User');
-const Access = require('../../models/Access');
+const User    = require('../../models/User');
 const Company = require('../../models/Company');
 
+// ─── GET /api/settings/profile ────────────────────────────────────────────────
 exports.getProfile = async (req, res) => {
   try {
     const user_id = req.user.user_id;
@@ -17,8 +17,8 @@ exports.getProfile = async (req, res) => {
         const company   = await Company.findOne({ companyId: tenantId }).select('logoUrl companyName');
         if (storeUser) return res.json({
           ...storeUser.toObject(),
-          email_address: superAdmin?.email_address  || '',
-          logoUrl:       company?.logoUrl            || '',
+          email_address: superAdmin?.email_address || '',
+          logoUrl:       company?.logoUrl           || '',
           companyName:   company?.companyName        || tenantId,
         });
       }
@@ -32,7 +32,7 @@ exports.getProfile = async (req, res) => {
       });
     }
 
-    const user    = await User.findOne({ user_id });
+    const user = await User.findOne({ user_id });
     if (!user) return res.status(404).json({ message: 'User not found' });
     const company = await Company.findOne({ companyId: user.cmpid }).select('logoUrl companyName');
     res.json({
@@ -45,6 +45,36 @@ exports.getProfile = async (req, res) => {
   }
 };
 
+// ─── POST /api/settings/logo-upload  (multipart — uses uploadStoreLogo middleware) ──
+// Uploads the file to Cloudinary, saves the returned URL to Company, returns the URL.
+// This replaces the old base64 approach: no giant strings in MongoDB, logo persists
+// across store switches because it's a stable Cloudinary URL keyed by cmpid.
+exports.uploadStoreLogo = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No image file provided.' });
+
+    const logoUrl = req.file.path; // Cloudinary URL set by multer-storage-cloudinary
+
+    const cmpid = req.user.user_type === 'super_admin'
+      ? req.headers['x-tenant-id']
+      : req.user.cmpid;
+
+    if (!cmpid) return res.status(400).json({ message: 'No store selected.' });
+
+    await Company.findOneAndUpdate(
+      { companyId: cmpid },
+      { $set: { logoUrl } },
+      { upsert: true }
+    );
+
+    res.json({ message: 'Logo updated successfully', logoUrl });
+  } catch (error) {
+    console.error('uploadStoreLogo error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ─── PUT /api/settings/logo  (kept for any direct-URL updates) ───────────────
 exports.updateLogo = async (req, res) => {
   try {
     const { logoUrl } = req.body;
@@ -66,6 +96,7 @@ exports.updateLogo = async (req, res) => {
   }
 };
 
+// ─── PUT /api/settings/profile ────────────────────────────────────────────────
 exports.updateProfile = async (req, res) => {
   try {
     const { mobile_number } = req.body;
@@ -80,6 +111,7 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
+// ─── PUT /api/settings/password ───────────────────────────────────────────────
 exports.updatePassword = async (req, res) => {
   try {
     const { newPassword } = req.body;
@@ -106,7 +138,7 @@ exports.updatePassword = async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     user.password_new = newPassword;
-    user.password = newPassword;
+    user.password     = newPassword;
     await user.save();
 
     res.json({ message: 'Password updated successfully' });
@@ -115,6 +147,7 @@ exports.updatePassword = async (req, res) => {
   }
 };
 
+// ─── GET /api/settings/users ──────────────────────────────────────────────────
 exports.getUsers = async (req, res) => {
   try {
     const cmpid = req.user.user_type === 'super_admin'
@@ -123,21 +156,21 @@ exports.getUsers = async (req, res) => {
 
     if (!cmpid) return res.status(400).json({ message: 'Company ID is required' });
 
-    const company = await Company.findOne({ companyId: cmpid });
-    if (!company) return res.status(404).json({ message: 'Store not found' });
-
-    const users = await User.find({
-      cmpid,
-      user_type: 'user',
-      user_id:   { $ne: req.user.user_id },
-    }).select('-password');
+    const adminDb = getAdminDb('plm_admin_manage_info');
+    const users = await adminDb
+      .collection('plm_admin_users')
+      .find({ cmpid, user_type: 'user', user_id: { $ne: req.user.user_id } })
+      .project({ password: 0, password_new: 0, password_code: 0 })
+      .toArray();
 
     res.json(users);
   } catch (error) {
+    console.error('getUsers error:', error);
     res.status(500).json({ message: error.message });
   }
 };
 
+// ─── POST /api/settings/add-user ─────────────────────────────────────────────
 exports.addUser = async (req, res) => {
   try {
     if (!['super_admin', 'store_admin'].includes(req.user.user_type))
@@ -147,22 +180,25 @@ exports.addUser = async (req, res) => {
     if (!email_address || !password)
       return res.status(400).json({ message: 'Email and password are required' });
 
-    const exists = await User.findOne({ email_address });
-    if (exists) return res.status(400).json({ message: 'Email already registered' });
-
     const targetCmpid = req.user.user_type === 'super_admin'
       ? req.headers['x-tenant-id']
       : req.user.cmpid;
 
     if (!targetCmpid) return res.status(400).json({ message: 'No store selected' });
 
-    const adminUser = await User.findOne({ user_id: req.user.user_id });
-    const company   = await Company.findOne({ companyId: targetCmpid });
-    if (!company) return res.status(404).json({ message: 'Company not found' });
+    const adminDb = getAdminDb('plm_admin_manage_info');
 
-    const newUser = await User.create({
+    const exists = await adminDb.collection('plm_admin_users').findOne({ email_address });
+    if (exists) return res.status(400).json({ message: 'Email already registered' });
+
+    const adminUser = await adminDb.collection('plm_admin_users').findOne({ user_id: req.user.user_id });
+
+    const user_id = require('crypto').randomBytes(16).toString('hex');
+    const now     = new Date();
+
+    await adminDb.collection('plm_admin_users').insertOne({
+      user_id,
       cmpid:         targetCmpid,
-      website:       company.companyUrl || '',
       user_name:     user_name || '',
       email_address,
       password,
@@ -170,22 +206,19 @@ exports.addUser = async (req, res) => {
       mobile_number: adminUser?.mobile_number || '',
       user_type:     'user',
       addedby:       req.user.user_id,
+      addedon:       now,
+      archived:      0,
+      status:        'active',
     });
 
-    await Access.create({
-      cmpid:     targetCmpid,
-      user_id:   newUser.user_id,
-      user_type: 'user',
-      user_name: user_name || '',
-      addedby:   req.user.user_id,
-    });
-
-    res.status(201).json({ message: 'User added successfully', user_id: newUser.user_id });
+    res.status(201).json({ message: 'User added successfully', user_id });
   } catch (error) {
+    console.error('addUser error:', error);
     res.status(500).json({ message: error.message });
   }
 };
 
+// ─── DELETE /api/settings/users/:user_id ─────────────────────────────────────
 exports.removeUser = async (req, res) => {
   try {
     if (!['super_admin', 'store_admin'].includes(req.user.user_type))
@@ -195,22 +228,31 @@ exports.removeUser = async (req, res) => {
     if (user_id === req.user.user_id)
       return res.status(400).json({ message: 'Cannot remove yourself' });
 
-    const user = await User.findOne({ user_id, cmpid: req.user.cmpid });
+    const cmpid = req.user.user_type === 'super_admin'
+      ? req.headers['x-tenant-id']
+      : req.user.cmpid;
+
+    const adminDb = getAdminDb('plm_admin_manage_info');
+
+    const user = await adminDb.collection('plm_admin_users').findOne({ user_id, cmpid });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    await User.deleteOne({ user_id });
-    await Access.deleteOne({ user_id, cmpid: req.user.cmpid });
+    await adminDb.collection('plm_admin_users').deleteOne({ user_id });
 
     res.json({ message: 'User removed successfully' });
   } catch (error) {
+    console.error('removeUser error:', error);
     res.status(500).json({ message: error.message });
   }
 };
 
+// ─── GET /api/settings/users-log ─────────────────────────────────────────────
+// FIX: was querying the old 'eprice_main_admin_db' which no longer exists.
+// Now reads from plm_admin_manage_info via mongoose.connection.db (MONGO_URI).
 exports.getUsersLog = async (req, res) => {
   try {
-    const mainDb = getAdminDb('eprice_main_admin_db');
-    let query    = {};
+    const adminDb = mongoose.connection.db; // plm_admin_manage_info
+    let query = {};
 
     if (req.user.user_type === 'super_admin') {
       const tenantId = req.headers['x-tenant-id'];
@@ -220,7 +262,8 @@ exports.getUsersLog = async (req, res) => {
       query = { cmpid: req.user.cmpid, user_type: 'user' };
     }
 
-    const logs = await mainDb.collection('plm_user_history_logs')
+    const logs = await adminDb
+      .collection('plm_user_history_logs')
       .find(query)
       .sort({ _id: -1 })
       .limit(50)

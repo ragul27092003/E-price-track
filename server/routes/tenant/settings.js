@@ -10,15 +10,21 @@ const {
   addUser,
   removeUser,
   getUsersLog,
+  uploadStoreLogo: uploadStoreLogoHandler,
 } = require('../../controllers/tenant/settingsController');
+const tenantResolver = require('../../middleware/tenantResolver');
+const uploadStoreLogo = require('../../middleware/uploadStoreLogo');
 
-router.get('/profile',         auth, getProfile);
-router.put('/profile',         auth, updateProfile);
-router.put('/password',        auth, updatePassword);
-router.put('/logo',            auth, updateLogo);
-router.get('/users',           auth, getUsers);
-router.post('/add-user',       auth, addUser);
-router.delete('/users/:user_id', auth, removeUser);
-router.get('/users-log',       auth, getUsersLog);
+
+router.get('/profile',              auth, tenantResolver, getProfile);
+router.put('/profile',              auth, tenantResolver, updateProfile);
+router.put('/password',             auth, tenantResolver, updatePassword);
+router.put('/logo',                 auth, tenantResolver, updateLogo);
+router.get('/users',                auth, tenantResolver, getUsers);   
+router.post('/add-user',            auth, tenantResolver, addUser);
+router.delete('/users/:user_id',    auth, tenantResolver, removeUser);
+router.get('/users-log',            auth, getUsersLog);
+router.post('/logo-upload', auth, uploadStoreLogo.single('logo'), uploadStoreLogoHandler);
+
 
 module.exports = router;
