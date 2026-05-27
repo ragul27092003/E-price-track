@@ -12,7 +12,8 @@ export const createAuthSlice = (set, get) => ({
   user:            null,
   activeStoreId:   null,
   activeShopName:  null,
-  exportType:      '',
+  exportType:      localStorage.getItem('exportType') || '',
+  showLsp:         localStorage.getItem('showLsp') === 'true',
 
   // ── Actions ────────────────────────────────────────────────────────
   login: (data) => {
@@ -30,10 +31,17 @@ export const createAuthSlice = (set, get) => ({
       localStorage.setItem('activeStoreId', activeStoreId);
     }
 
+    const exportType = data.export_type ?? 'A';
+    const showLsp    = data.show_lsp    ?? false;
+    localStorage.setItem('exportType', exportType);
+    localStorage.setItem('showLsp',    String(showLsp));
+
     set({
       token: data.token,
       activeStoreId,
       activeShopName,
+      exportType,
+      showLsp,
       user: {
         user_id:       decoded?.user_id,
         user_type:     decoded?.user_type,
@@ -51,7 +59,9 @@ export const createAuthSlice = (set, get) => ({
     localStorage.removeItem('token');
     localStorage.removeItem('activeStoreId');
     localStorage.removeItem('activeShopName');
-    set({ token: null, user: null, activeStoreId: null, activeShopName: null, exportType: '' });
+    localStorage.removeItem('exportType');
+    localStorage.removeItem('showLsp');
+    set({ token: null, user: null, activeStoreId: null, activeShopName: null, exportType: '', showLsp: false });
   },
 
   setExportType: (type) => set({ exportType: type }),
@@ -63,10 +73,14 @@ export const createAuthSlice = (set, get) => ({
     try {
       const { getMerchant } = await import('../../services/authService');
       const merchant = await getMerchant(targetCompanyId);
-      set({ exportType: merchant.payment === 'yes' ? 'A' : '' });
+      const exportType = merchant.export_type ?? 'A';
+      const showLsp    = merchant.show_lsp    ?? false;
+      localStorage.setItem('exportType', exportType);
+      localStorage.setItem('showLsp',    String(showLsp));
+      set({ exportType, showLsp });
     } catch (error) {
       console.error('Failed to fetch merchant:', error);
-      set({ exportType: '' });
+      set({ exportType: '', showLsp: false });
     }
   },
 
@@ -79,6 +93,7 @@ export const createAuthSlice = (set, get) => ({
       activeStoreId:  companyId,
       activeShopName: companyName,
       exportType:     '',
+      showLsp:        false,
       // Clear stale data so pages re-fetch from new tenant DB
       competitors:    [],
       products:       [],

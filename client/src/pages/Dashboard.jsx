@@ -135,6 +135,7 @@ export default function Dashboard() {
   const [selectedCategory, setSelectedCategory] = useState('');
 
   const currentStoreId = useStore(selectCurrentStoreId);
+  const showLsp        = useStore((s) => s.showLsp);
 
   const {
     sapUpdateStatus, sapUpdateStatusLoading,
@@ -207,6 +208,13 @@ export default function Dashboard() {
     : null;
 
   const { date: rankDate, competitors: rankCompetitors } = extractRankData(rankAnalysis);
+
+  // LSP panel — only visible when merchant.show_lsp is true AND data exists
+  const lspEntries = (showLsp && stats?.recent_lsp_hsp_data && typeof stats.recent_lsp_hsp_data === 'object')
+    ? Object.entries(stats.recent_lsp_hsp_data).filter(([, v]) => v != null)
+    : [];
+  const hasLspData = lspEntries.length > 0;
+  const lspDate    = stats?.lsp_hsp_date || '--';
 
   const goToReport = (tab) => navigate('/smart-reports', { state: { tab } });
 
@@ -448,40 +456,60 @@ export default function Dashboard() {
       </div>
 
       {/* ── Rank & Trend Analysis Section ── */}
-      <motion.div variants={itemVariants}>
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <motion.div variants={itemVariants} className="flex flex-col lg:flex-row gap-4 items-start">
 
-          {/* RANK1 Panel — spans both trend rows */}
-          <div className="lg:row-span-2 bg-card rounded-xl overflow-hidden card-shadow border border-border flex flex-col">
-            <div className="bg-teal-500 px-4 py-3.5">
-              <p className="text-white font-bold text-sm tracking-wide">
-                {rankAnalysisLoading ? 'RANK1: Loading…' : `RANK1: ${rankDate}`}
-              </p>
-            </div>
-            <div className="flex-1 divide-y divide-border">
-              {rankAnalysisLoading ? (
-                <p className="text-sm text-muted-foreground animate-pulse p-4">Loading…</p>
-              ) : rankCompetitors.length === 0 ? (
-                <p className="text-sm text-muted-foreground p-4 text-center">No data</p>
-              ) : (
-                rankCompetitors.map((comp) => (
-                  <div key={comp.name} className="flex justify-between items-center px-4 py-3">
-                    <span className="text-sm text-foreground font-medium">{comp.name}</span>
+        {/* RANK1 / LSP Panel — independent fixed-height column */}
+        <div className="w-full lg:w-56 shrink-0 bg-card rounded-xl overflow-hidden card-shadow border border-border">
+          {hasLspData ? (
+            <>
+              <div className="bg-indigo-500 px-4 py-3">
+                <p className="text-white font-bold text-sm tracking-wide">LSP: {lspDate}</p>
+              </div>
+              <div className="max-h-72 overflow-y-auto divide-y divide-border">
+                {lspEntries.map(([name, count]) => (
+                  <div key={name} className="flex justify-between items-center px-4 py-2.5">
+                    <span className="text-sm text-foreground font-medium">{name}</span>
                     <span className="bg-secondary text-foreground text-xs font-bold px-2.5 py-1 rounded-full min-w-[32px] text-center">
-                      {comp.count}
+                      {count}
                     </span>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="bg-teal-500 px-4 py-3">
+                <p className="text-white font-bold text-sm tracking-wide">
+                  {rankAnalysisLoading ? 'RANK1: Loading…' : `RANK1: ${rankDate}`}
+                </p>
+              </div>
+              <div className="max-h-72 overflow-y-auto divide-y divide-border">
+                {rankAnalysisLoading ? (
+                  <p className="text-sm text-muted-foreground animate-pulse p-4">Loading…</p>
+                ) : rankCompetitors.length === 0 ? (
+                  <p className="text-sm text-muted-foreground p-4 text-center">No data</p>
+                ) : (
+                  rankCompetitors.map((comp) => (
+                    <div key={comp.name} className="flex justify-between items-center px-4 py-2.5">
+                      <span className="text-sm text-foreground font-medium">{comp.name}</span>
+                      <span className="bg-secondary text-foreground text-xs font-bold px-2.5 py-1 rounded-full min-w-[32px] text-center">
+                        {comp.count}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
-          {/* 6 Trend Cards — 3 per row filling the remaining 3 columns */}
+        {/* Trend Cards — independent 2×3 grid */}
+        <div className="flex-1 grid grid-cols-2 lg:grid-cols-3 gap-4">
           {trendCards.map((card) => (
             <TrendCard key={card.key} {...card} loading={statsLoading} />
           ))}
-
         </div>
+
       </motion.div>
     </motion.div>
   );

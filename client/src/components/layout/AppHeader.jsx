@@ -46,10 +46,11 @@ export function AppHeader() {
     if (!isSuperAdmin) return;
     fetchAllStores()
       .then((data) => {
-        setStores(data);
-        if (!activeShopName && data.length > 0) {
+        const active = data.filter((s) => s.archived === 0);
+        setStores(active);
+        if (!activeShopName && active.length > 0) {
           const defaultStore =
-            data.find((s) => s.companyId === 'sathya') || data[0];
+            active.find((s) => s.companyId === 'sathya') || active[0];
           switchStore(defaultStore.companyId, defaultStore.companyName);
         }
       })
@@ -221,17 +222,19 @@ export function AppHeader() {
                     {stores.length === 0 ? (
                       <p className="px-3 py-2 text-sm text-muted-foreground">No stores yet</p>
                     ) : (
-                      stores.map((store) => (
-                        <button
-                          key={store._id}
-                          onClick={() => handleStoreSelect(store)}
-                          className={`w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors ${
-                            activeShopName === store.companyName ? "bg-accent font-medium" : ""
-                          }`}
-                        >
-                          {store.companyName}
-                        </button>
-                      ))
+                      <div className="max-h-48 overflow-y-auto">
+                        {stores.map((store) => (
+                          <button
+                            key={store._id}
+                            onClick={() => handleStoreSelect(store)}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors ${
+                              activeShopName === store.companyName ? "bg-accent font-medium" : ""
+                            }`}
+                          >
+                            {store.companyName}
+                          </button>
+                        ))}
+                      </div>
                     )}
                     <div className="my-1 border-t" />
                   </>

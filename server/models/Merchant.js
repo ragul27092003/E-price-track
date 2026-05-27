@@ -27,6 +27,8 @@ const merchantSchema = new mongoose.Schema({
   account_type:        { type: String, default: 'live_account' },
   addedon:             { type: Date, default: Date.now },
   payment:             { type: String, default: 'yes' },
+  export_type:         { type: String, default: 'A' },
+  show_lsp:            { type: Boolean, default: false },
   feed_info:           { type: feedInfoSchema },
 }, { collection: 'plm_admin_cmp_merchant_accounts' });
 

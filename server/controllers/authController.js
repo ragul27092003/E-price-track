@@ -84,6 +84,8 @@ exports.login = async (req, res) => {
       website:       user.website         || '',
       email_address: user.email_address,
       shopName:      merchant?.feed_info?.store_name || '',
+      export_type:   merchant?.export_type ?? 'A',
+      show_lsp:      merchant?.show_lsp    ?? false,
     });
 
     const { device, browser } = parseUA(req.headers['user-agent']);
