@@ -1,20 +1,24 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useStore } from '../store';
+import { useAuth } from '../context/AuthContext';
 import { loginUser } from '../services/authService';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { Rss, Loader2 } from 'lucide-react';
+import { Rss, Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 
 const Login = () => {
-  const [email,    setEmail]    = useState('');
-  const [password, setPassword] = useState('');
-  const [error,    setError]    = useState('');
-  const [loading,  setLoading]  = useState(false);
+  const [email,      setEmail]      = useState('');
+  const [password,   setPassword]   = useState('');
+  const [error,      setError]      = useState('');
+  const [loading,    setLoading]    = useState(false);
+  const [showPass,   setShowPass]   = useState(false);
+  const [capsLock,   setCapsLock]   = useState(false);
 
-  const login    = useStore((s) => s.login);
+  const login        = useStore((s) => s.login);
+  const { login: authLogin } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -24,6 +28,7 @@ const Login = () => {
     try {
       const data = await loginUser(email, password);
       login(data);
+      authLogin(data);
       await useStore.getState().fetchMerchant();
       navigate('/');
     } catch (err) {
@@ -58,9 +63,34 @@ const Login = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" type="password" placeholder="••••••••" value={password}
-                  autoComplete="new-password"
-                  onChange={(e) => setPassword(e.target.value)} required />
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPass ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={password}
+                    autoComplete="new-password"
+                    className="pr-10"
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={(e) => setCapsLock(e.getModifierState('CapsLock'))}
+                    onKeyUp={(e) => setCapsLock(e.getModifierState('CapsLock'))}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                    tabIndex={-1}
+                  >
+                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {capsLock && (
+                  <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Caps Lock is on
+                  </div>
+                )}
               </div>
 
               {error && (
