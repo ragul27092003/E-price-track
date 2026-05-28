@@ -17,12 +17,19 @@ function fmt(v) {
   return `₹${Number(v).toLocaleString("en-IN")}`;
 }
 
+// ── Resolve logo URL safely (mirrors MarketCompetitor) ────────────────────────
+function resolveLogoUrl(logo) {
+  if (!logo) return null;
+  if (logo.startsWith("blob:") || logo.startsWith("http://") || logo.startsWith("https://")) return logo;
+  return `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5100"}${logo}`;
+}
+
 // ── Competitor Logo Component ─────────────────────────────────────────────────
 function CompetitorLogo({ competitor, size = 28, showName = false }) {
   const [imgErr, setImgErr] = useState(false);
   const bg       = competitor.color || "#475e77";
   const initials = (competitor.name || competitor.slug || "").substring(0, 2).toUpperCase();
-  const imgSrc   = competitor.logo ? `http://localhost:5100${competitor.logo}` : null;
+  const imgSrc   = resolveLogoUrl(competitor.logo);
 
   return (
     <div className="flex items-center gap-2">

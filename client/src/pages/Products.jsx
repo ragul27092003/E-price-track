@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useStore } from "../store";
 import { fetchProducts, fetchProductsMeta, configureProduct, removeProductConfiguration } from "../services/productsService";
+import { fetchCompetitors } from "../services/competitorsService";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -65,17 +66,25 @@ function ProductImage({ src, alt }) {
   );
 }
 
+// Safely resolves a logo path to a full URL (mirrors MarketCompetitor — the working reference)
+function resolveLogoUrl(logo) {
+  if (!logo) return null;
+  if (logo.startsWith("blob:") || logo.startsWith("http://") || logo.startsWith("https://")) return logo;
+  return `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5100"}${logo}`;
+}
+
 // Shows actual logo image if available, falls back to colored text badge
 function CompetitorLogo({ name = "", slug = "", logo = "" }) {
   const [imgErr, setImgErr] = useState(false);
   const bg = slugColor(slug || name);
   const label = (name || slug).slice(0, 8).toLowerCase();
+  const logoSrc = resolveLogoUrl(logo);
 
-  if (logo && !imgErr) {
+  if (logoSrc && !imgErr) {
     return (
       <div className="flex h-6 w-6 items-center justify-center rounded overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0">
         <img
-          src={`http://localhost:5100${logo}`}
+          src={logoSrc}
           alt={name}
           onError={() => setImgErr(true)}
           className="w-full h-full object-contain"
@@ -814,8 +823,9 @@ export default function Products() {
   const setProductsError      = useStore((s) => s.setProductsError);
   const setProductsTotalPages = useStore((s) => s.setProductsTotalPages);
   const setProductsMeta       = useStore((s) => s.setProductsMeta);
-  const competitors   = useStore((s) => s.competitors);
-  const activeStoreId = useStore((s) => s.activeStoreId);
+  const competitors    = useStore((s) => s.competitors);
+  const setCompetitors = useStore((s) => s.setCompetitors);
+  const activeStoreId  = useStore((s) => s.activeStoreId);
   const currentUserId = useStore((s) => s.user?.user_id);
   const exportType    = useStore((s) => s.exportType) || "A";
 
@@ -886,6 +896,16 @@ export default function Products() {
   };
 
   // Fetch filter-dropdown metadata once per store
+  // Always fetch fresh competitors on mount / store change —
+  // mirrors MarketCompetitor (the proven working pattern).
+  // Do NOT guard with `if (!competitors.length)`: stale store data
+  // without logos would silently skip the fetch.
+  useEffect(() => {
+    fetchCompetitors()
+      .then((data) => setCompetitors(data || []))
+      .catch(() => {});
+  }, [activeStoreId]);
+
   useEffect(() => {
     fetchProductsMeta()
       .then((meta) => setProductsMeta(meta))
@@ -1027,7 +1047,7 @@ export default function Products() {
               {competitorMeta[competitorSlug]?.logo ? (
                 <div className="flex h-7 w-7 items-center justify-center rounded overflow-hidden border border-blue-200 bg-white dark:bg-slate-800 shrink-0">
                   <img
-                    src={`http://localhost:5100${competitorMeta[competitorSlug].logo}`}
+                    src={resolveLogoUrl(competitorMeta[competitorSlug].logo)}
                     alt={competitorName}
                     className="w-full h-full object-contain"
                     onError={(e) => { e.target.style.display = "none"; }}

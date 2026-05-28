@@ -65,16 +65,25 @@ function ProductImage({ src, alt }) {
   );
 }
 
+// Safely resolves a logo path to a full URL — handles relative paths, full
+// URLs, and blob: URLs without double-prefixing (mirrors MarketCompetitor).
+function resolveLogoUrl(logo: string): string | null {
+  if (!logo) return null;
+  if (logo.startsWith("blob:") || logo.startsWith("http://") || logo.startsWith("https://")) return logo;
+  return `${(import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:5100"}${logo}`;
+}
+
 function CompetitorLogo({ name = "", slug = "", logo = "" }) {
   const [imgErr, setImgErr] = useState(false);
   const bg    = slugColor(slug || name);
   const label = (name || slug).slice(0, 8).toLowerCase();
+  const logoSrc = resolveLogoUrl(logo);
 
-  if (logo && !imgErr) {
+  if (logoSrc && !imgErr) {
     return (
       <div className="flex h-6 w-6 items-center justify-center rounded overflow-hidden border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 shrink-0">
         <img
-          src={`http://localhost:5100${logo}`}
+          src={logoSrc}
           alt={name}
           onError={() => setImgErr(true)}
           className="w-full h-full object-contain"

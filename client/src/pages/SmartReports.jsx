@@ -140,15 +140,23 @@ function ProductImage({ src, alt }) {
   );
 }
 
+// Safely resolves a logo path to a full URL (mirrors MarketCompetitor behaviour)
+function resolveLogoUrl(logo) {
+  if (!logo) return null;
+  if (logo.startsWith("blob:") || logo.startsWith("http://") || logo.startsWith("https://")) return logo;
+  return `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5100"}${logo}`;
+}
+
 function CompetitorLogo({ name = "", slug = "", logo = "" }) {
   const [imgErr, setImgErr] = useState(false);
   const bg = slugColor(slug || name);
   const label = (name || slug).slice(0, 8).toLowerCase();
-  if (logo && !imgErr) {
+  const logoSrc = resolveLogoUrl(logo);
+  if (logoSrc && !imgErr) {
     return (
       <div className="flex h-6 w-6 items-center justify-center rounded overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0">
         <img
-          src={`http://localhost:5100${logo}`}
+          src={logoSrc}
           alt={name}
           onError={() => setImgErr(true)}
           className="w-full h-full object-contain"

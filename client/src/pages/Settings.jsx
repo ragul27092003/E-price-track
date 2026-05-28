@@ -30,7 +30,7 @@ function Avatar({ size = "lg", primaryColor, companyName = "", photoUrl = null }
   const sizeClass = size === "lg" ? "h-[60px] w-[60px] md:h-[72px] md:w-[72px] text-sm" : "h-9 w-9 text-xs";
   const firstLetter = companyName.trim().charAt(0).toUpperCase() || "?";
   const subLabel = companyName.trim().split(/\s+/).slice(1).join(" ").toUpperCase();
-  
+
   if (photoUrl) {
     return (
       <div className={`${sizeClass} rounded-full overflow-hidden shadow-sm shrink-0`}>
@@ -39,8 +39,10 @@ function Avatar({ size = "lg", primaryColor, companyName = "", photoUrl = null }
     );
   }
   return (
-    <div className={`${sizeClass} rounded-full flex flex-col items-center justify-center text-white font-bold shadow-sm tracking-widest leading-none shrink-0`}
-      style={{ backgroundColor: primaryColor }}>
+    <div
+      className={`${sizeClass} rounded-full flex flex-col items-center justify-center text-white font-bold shadow-sm tracking-widest leading-none shrink-0`}
+      style={{ backgroundColor: primaryColor }}
+    >
       <span>{firstLetter}</span>
       {size === "lg" && subLabel && (
         <span className="text-[6px] font-normal tracking-normal mt-0.5 hidden md:block">{subLabel}</span>
@@ -74,7 +76,6 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
   const [savingPass, setSavingPass] = useState(false);
   const isUser = user?.user_type === "user";
 
-  // Current store key for logo map
   const currentStoreKey = (user?.user_type === 'super_admin' ? activeStoreId : user?.cmpid) || "default";
   const savedLogo = storeLogoMap?.[currentStoreKey] || null;
 
@@ -90,7 +91,6 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
         setCompanyName(data.companyName || data.cmpid || "");
         setUserName(data.user_name || "");
         setCurrentPassword(data.password_new || "");
-        // Load logo from DB and sync to store
         const dbLogo = data.logoUrl || null;
         setPhotoUrl(dbLogo);
         if (dbLogo) setStoreLogo(currentStoreKey, dbLogo);
@@ -103,7 +103,6 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
     load();
   }, [user?.user_id, activeStoreId]);
 
-  // Sync photoUrl from global store on store switch (before DB fetch completes)
   useEffect(() => {
     const cached = storeLogoMap?.[currentStoreKey] || null;
     setPhotoUrl(cached);
@@ -126,21 +125,16 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Show a local preview immediately while the upload is in flight
     const previewUrl = URL.createObjectURL(file);
     setPhotoUrl(previewUrl);
 
     try {
-      // Upload the raw file → Cloudinary → get back a permanent URL
       const result = await uploadStoreLogo(file);
       const cloudinaryUrl = result.logoUrl;
-
-      // Replace the temporary blob URL with the real Cloudinary URL
       setPhotoUrl(cloudinaryUrl);
       setStoreLogo(currentStoreKey, cloudinaryUrl);
       toast.success("Store logo saved!");
     } catch {
-      // Roll back preview on failure
       setPhotoUrl(savedLogo || null);
       toast.error("Failed to save logo to server");
     } finally {
@@ -177,23 +171,30 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
 
   const ValidatedInput = ({ value, readOnly, onChange }) => (
     <div className="relative">
-      <Input value={value} readOnly={readOnly} onChange={onChange}
-        className={`bg-white dark:bg-slate-800 border-gray-300  dark:border-slate-700 text-gray-900 dark:text-white pr-10 focus-visible:ring-blue-500 ${readOnly ? "cursor-default text-gray-700 dark:text-slate-300 dark:text-slate-600 bg-slate-50 dark:bg-[#151a2a]" : ""}`} />
-      {readOnly && <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-slate-500 pointer-events-none" />}
+      <Input
+        value={value}
+        readOnly={readOnly}
+        onChange={onChange}
+        className={`bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-white pr-10 focus-visible:ring-blue-500 ${
+          readOnly ? "cursor-default text-gray-700 dark:text-slate-300 bg-slate-50 dark:bg-[#151a2a]" : ""
+        }`}
+      />
+      {readOnly && (
+        <Check className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-slate-500 pointer-events-none" />
+      )}
     </div>
   );
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-full pb-10 pt-2">
       {/* Branding Section */}
-      <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200  dark:border-slate-700 rounded-xl p-4 md:p-6">
+      <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200 dark:border-slate-700 rounded-xl p-4 md:p-6">
         <h3 className="text-sm font-bold text-gray-800 dark:text-white mb-4">Company Branding</h3>
         <div className="flex flex-col sm:flex-row sm:items-start gap-6">
           {/* Logo Upload */}
           <div className="flex flex-col gap-3">
             <label className="text-xs font-bold text-gray-600 dark:text-slate-400 block">Store Logo</label>
             <div className="flex items-center gap-4">
-              {/* Logo preview / placeholder */}
               <div className="relative group shrink-0">
                 {photoUrl ? (
                   <div className="h-[72px] w-[72px] rounded-xl overflow-hidden border-2 border-dashed border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm">
@@ -206,7 +207,6 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
                   </div>
                 )}
               </div>
-              {/* Upload / Remove buttons */}
               <div className="flex flex-col gap-2">
                 <label className="cursor-pointer">
                   <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
@@ -216,7 +216,10 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
                   </span>
                 </label>
                 {photoUrl && (
-                  <button onClick={handleRemoveLogo} className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors">
+                  <button
+                    onClick={handleRemoveLogo}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors"
+                  >
                     <X className="h-3.5 w-3.5" />
                     Remove Logo
                   </button>
@@ -239,11 +242,16 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
           </div>
 
           <div className="sm:ml-auto">
-            <label className="text-xs font-bold text-gray-600 dark:text-slate-400 dark:text-slate-500 block mb-1.5">Primary Brand Color</label>
-            <div className="relative flex items-center gap-2 border border-gray-300  dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md px-3 py-1.5 cursor-pointer hover:bg-gray-100  dark:hover:bg-slate-700/60 w-fit">
-              <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+            <label className="text-xs font-bold text-gray-600 dark:text-slate-400 block mb-1.5">Primary Brand Color</label>
+            <div className="relative flex items-center gap-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md px-3 py-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700/60 w-fit">
+              <input
+                type="color"
+                value={primaryColor}
+                onChange={(e) => setPrimaryColor(e.target.value)}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
               <div className="w-5 h-5 rounded-sm shadow-inner" style={{ backgroundColor: primaryColor }} />
-              <span className="text-sm text-gray-700 dark:text-slate-300 dark:text-slate-600 mx-1">{primaryColor}</span>
+              <span className="text-sm text-gray-700 dark:text-slate-300 mx-1">{primaryColor}</span>
               <ChevronDown className="w-4 h-4 text-gray-400 dark:text-slate-500" />
             </div>
           </div>
@@ -251,7 +259,7 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
       </div>
 
       {/* Info Section */}
-      <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200  dark:border-slate-700 rounded-xl p-4 md:p-6">
+      <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200 dark:border-slate-700 rounded-xl p-4 md:p-6">
         <h3 className="text-sm font-bold text-gray-800 dark:text-white mb-5">Basic Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 md:gap-y-5">
           <div className="space-y-1.5">
@@ -272,15 +280,26 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
           </div>
         </div>
         <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
-          <Button variant="outline" onClick={() => setPhone("")} className="order-2 sm:order-1 border-gray-300  dark:border-slate-700 text-gray-700 dark:text-slate-300 dark:text-slate-600 font-semibold bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-[#151a2a]">Cancel</Button>
-          <Button onClick={handleUpdate} disabled={saving} style={{ backgroundColor: primaryColor }} className="order-1 sm:order-2 text-white font-semibold hover:bg-opacity-90">
+          <Button
+            variant="outline"
+            onClick={() => setMobileNumber(profile?.mobile_number || "")}
+            className="order-2 sm:order-1 border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-300 font-semibold bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-[#151a2a]"
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleUpdate}
+            disabled={saving}
+            style={{ backgroundColor: primaryColor }}
+            className="order-1 sm:order-2 text-white font-semibold hover:bg-opacity-90"
+          >
             {saving ? "Updating..." : "Update Account"}
           </Button>
         </div>
       </div>
 
       {/* Security Section */}
-      <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200  dark:border-slate-700 rounded-xl p-4 md:p-6">
+      <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200 dark:border-slate-700 rounded-xl p-4 md:p-6">
         <h3 className="text-sm font-bold text-gray-800 dark:text-white mb-5">Security</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
           <div className="md:col-span-2">
@@ -305,9 +324,18 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-800 dark:text-white block">New Password</label>
             <div className="relative">
-              <Input type={showNew ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="New Password" ring-color={primaryColor} className="border-gray-300  dark:border-slate-700 pr-10 bg-white dark:bg-slate-800" />
-              <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500">
+              <Input
+                type={showNew ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="New Password"
+                className="border-gray-300 dark:border-slate-700 pr-10 bg-white dark:bg-slate-800"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNew(!showNew)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500"
+              >
                 {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
@@ -315,19 +343,39 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
           <div className="space-y-1.5">
             <label className="text-xs font-bold text-gray-800 dark:text-white block">Confirm New Password</label>
             <div className="relative">
-              <Input type={showConfirm ? "text" : "password"} value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)}
-                placeholder="Confirm New Password" className="border-gray-300  dark:border-slate-700 pr-10 bg-white dark:bg-slate-800" />
-              <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500">
+              <Input
+                type={showConfirm ? "text" : "password"}
+                value={confirmPass}
+                onChange={(e) => setConfirmPass(e.target.value)}
+                placeholder="Confirm New Password"
+                className="border-gray-300 dark:border-slate-700 pr-10 bg-white dark:bg-slate-800"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm(!showConfirm)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500"
+              >
                 {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
         </div>
         <div className="flex flex-col sm:flex-row justify-start gap-3 mt-6">
-          <Button onClick={handlePasswordUpdate} disabled={savingPass} style={{ backgroundColor: primaryColor }} className="text-white font-semibold px-6 hover:bg-opacity-90">
+          <Button
+            onClick={handlePasswordUpdate}
+            disabled={savingPass}
+            style={{ backgroundColor: primaryColor }}
+            className="text-white font-semibold px-6 hover:bg-opacity-90"
+          >
             {savingPass ? "Updating..." : "Update Password"}
           </Button>
-          <Button variant="outline" onClick={() => { setNewPassword(""); setConfirmPass(""); }} className="border-gray-300  dark:border-slate-700 text-gray-700 dark:text-slate-300 dark:text-slate-600 font-semibold px-6 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-[#151a2a]">Cancel</Button>
+          <Button
+            variant="outline"
+            onClick={() => { setNewPassword(""); setConfirmPass(""); }}
+            className="border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-300 font-semibold px-6 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:bg-[#151a2a]"
+          >
+            Cancel
+          </Button>
         </div>
       </div>
     </motion.div>
@@ -337,10 +385,10 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
 // ── AddUserModal ─────────────────────────────────────────────────────────────
 function AddUserModal({ onClose, onSuccess, companyName }) {
   const [email_address, setEmailAddress] = useState("");
-  const [user_name,     setUserName]     = useState("");
-  const [password,      setPassword]     = useState("");
-  const [showPass,      setShowPass]     = useState(false);
-  const [saving,        setSaving]       = useState(false);
+  const [user_name, setUserName] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const handleAdd = async () => {
     if (!email_address || !password) { toast.error("Email and password are required"); return; }
@@ -385,7 +433,9 @@ function AddUserModal({ onClose, onSuccess, companyName }) {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-800 dark:text-white block">Name <span className="font-normal text-gray-400">(optional)</span></label>
+              <label className="text-xs font-bold text-gray-800 dark:text-white block">
+                Name <span className="font-normal text-gray-400">(optional)</span>
+              </label>
               <Input
                 placeholder="Full name"
                 value={user_name}
@@ -403,15 +453,22 @@ function AddUserModal({ onClose, onSuccess, companyName }) {
                   onChange={(e) => setPassword(e.target.value)}
                   className="border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 pr-10"
                 />
-                <button type="button" onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500">
+                <button
+                  type="button"
+                  onClick={() => setShowPass(!showPass)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500"
+                >
                   {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
           </div>
           <div className="flex gap-3 mt-6">
-            <Button variant="outline" onClick={onClose} className="flex-1 border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-800">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="flex-1 border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-800"
+            >
               Cancel
             </Button>
             <Button onClick={handleAdd} disabled={saving} className="flex-1 bg-[#1864ab] hover:bg-blue-800 text-white">
@@ -439,7 +496,14 @@ function ManageUsersTab() {
     setLoading(true);
     try {
       const data = await fetchUsers();
-      setStoreUsers(data);
+      // ✅ FIX 1: Deduplicate by _id (MongoDB ObjectId — guaranteed unique)
+      const seen = new Set();
+      const unique = data.filter((u) => {
+        if (seen.has(u._id)) return false;
+        seen.add(u._id);
+        return true;
+      });
+      setStoreUsers(unique);
     } catch {
       toast.error("Failed to load users");
     } finally {
@@ -467,18 +531,17 @@ function ManageUsersTab() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-2 gap-4">
         <div>
           <h3 className="font-bold text-gray-900 dark:text-white">Team Members</h3>
-          <p className="text-xs text-gray-500 dark:text-slate-400 dark:text-slate-500 mt-0.5">{storeUsers.length} users in your company</p>
+          <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">{storeUsers.length} users in your company</p>
         </div>
         <Button onClick={() => setShowModal(true)} size="sm" className="gap-2 bg-[#1864ab] hover:bg-blue-800 text-white w-full sm:w-fit">
           <UserPlus className="h-4 w-4" /> Add User
         </Button>
       </div>
 
-      <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200  dark:border-slate-700 rounded-xl overflow-hidden">
-        {/* Table Container for horizontal scrolling on mobile */}
+      <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <div className="min-w-[800px] md:min-w-full">
-            <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-slate-50 dark:bg-[#151a2a] border-b border-gray-200  dark:border-slate-700 text-xs font-bold text-gray-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+            <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-slate-50 dark:bg-[#151a2a] border-b border-gray-200 dark:border-slate-700 text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">
               <div className="col-span-4">Email</div>
               <div className="col-span-3">Name</div>
               <div className="col-span-2">Role</div>
@@ -493,35 +556,53 @@ function ManageUsersTab() {
             ) : storeUsers.length === 0 ? (
               <div className="py-12 flex flex-col items-center justify-center gap-3">
                 <Users className="h-10 w-10 text-gray-300" />
-                <p className="text-sm text-gray-500 dark:text-slate-400 dark:text-slate-500">No users yet</p>
+                <p className="text-sm text-gray-500 dark:text-slate-400">No users yet</p>
               </div>
             ) : (
               <AnimatePresence>
                 {storeUsers.map((u, i) => (
-                  <motion.div key={u.user_id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} transition={{ delay: i * 0.05 }}
-                    className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-gray-200  dark:border-slate-700 last:border-0 hover:bg-gray-100  dark:hover:bg-slate-700/60 transition-colors items-center">
+                  // ✅ FIX 2: Use _id as key — MongoDB ObjectId, always unique
+                  <motion.div
+                    key={u._id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-gray-200 dark:border-slate-700 last:border-0 hover:bg-gray-100 dark:hover:bg-slate-700/60 transition-colors items-center"
+                  >
                     <div className="col-span-4 flex items-center gap-3">
                       <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center text-xs font-bold text-[#1864ab] shrink-0">
                         {u.email_address.slice(0, 2).toUpperCase()}
                       </div>
                       <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{u.email_address}</span>
                     </div>
-                    <div className="col-span-3 text-sm text-gray-600 dark:text-slate-400 dark:text-slate-500 truncate">{u.user_name || "-"}</div>
+                    <div className="col-span-3 text-sm text-gray-600 dark:text-slate-400 truncate">{u.user_name || "-"}</div>
                     <div className="col-span-2">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tight ${u.user_type === "store_admin" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600 dark:text-slate-400 dark:text-slate-500"}`}>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tight ${
+                        u.user_type === "store_admin" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"
+                      }`}>
                         {u.user_type === "store_admin" ? "Admin" : "User"}
                       </span>
                     </div>
                     <div className="col-span-2">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tight ${u.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tight ${
+                        u.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                      }`}>
                         {u.status}
                       </span>
                     </div>
                     <div className="col-span-1 flex justify-end">
-                      <Button size="sm" variant="ghost" onClick={() => handleRemove(u.user_id)}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleRemove(u.user_id)}
                         disabled={removing === u.user_id || u.user_id === user?.user_id}
-                        className="h-8 w-8 p-0 text-gray-400 dark:text-slate-500 hover:text-red-600 hover:bg-red-50">
-                        {removing === u.user_id ? <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        className="h-8 w-8 p-0 text-gray-400 dark:text-slate-500 hover:text-red-600 hover:bg-red-50"
+                      >
+                        {removing === u.user_id
+                          ? <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          : <Trash2 className="h-3.5 w-3.5" />
+                        }
                       </Button>
                     </div>
                   </motion.div>
@@ -531,8 +612,15 @@ function ManageUsersTab() {
           </div>
         </div>
       </div>
+
       <AnimatePresence>
-        {showModal && <AddUserModal onClose={() => setShowModal(false)} onSuccess={loadUsers} companyName={user?.companyName} />}
+        {showModal && (
+          <AddUserModal
+            onClose={() => setShowModal(false)}
+            onSuccess={loadUsers}
+            companyName={user?.companyName}
+          />
+        )}
       </AnimatePresence>
     </motion.div>
   );
@@ -560,10 +648,10 @@ function UsersLogTab() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="pt-2">
-      <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200  dark:border-slate-700 rounded-xl overflow-hidden">
+      <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <div className="min-w-[800px] md:min-w-full">
-            <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-slate-50 dark:bg-[#151a2a] border-b border-gray-200  dark:border-slate-700 text-xs font-bold text-gray-500 dark:text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+            <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-slate-50 dark:bg-[#151a2a] border-b border-gray-200 dark:border-slate-700 text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">
               <div className="col-span-4">Email</div>
               <div className="col-span-2">Role</div>
               <div className="col-span-2">Company</div>
@@ -577,15 +665,21 @@ function UsersLogTab() {
             ) : usersLog.length === 0 ? (
               <div className="py-12 flex flex-col items-center justify-center gap-3">
                 <FileText className="h-10 w-10 text-gray-300" />
-                <p className="text-sm text-gray-500 dark:text-slate-400 dark:text-slate-500">No logs yet</p>
+                <p className="text-sm text-gray-500 dark:text-slate-400">No logs yet</p>
               </div>
             ) : (
+              // ✅ FIX 3: Use _id for log keys too (falling back to index only if _id missing)
               usersLog.map((log, i) => (
-                <div key={i} className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-gray-200  dark:border-slate-700 last:border-0 text-sm hover:bg-gray-100  dark:hover:bg-slate-700/60 items-center">
+                <div
+                  key={log._id || i}
+                  className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-gray-200 dark:border-slate-700 last:border-0 text-sm hover:bg-gray-100 dark:hover:bg-slate-700/60 items-center"
+                >
                   <div className="col-span-4 text-gray-900 dark:text-white font-medium truncate">{log.email_address}</div>
-                  <div className="col-span-2 text-gray-600 dark:text-slate-400 dark:text-slate-500 capitalize">{log.user_type}</div>
-                  <div className="col-span-2 text-gray-600 dark:text-slate-400 dark:text-slate-500 truncate">{log.cmpid}</div>
-                  <div className="col-span-4 text-gray-500 dark:text-slate-400 dark:text-slate-500 text-xs">{new Date(log.loginAt).toLocaleString()}</div>
+                  <div className="col-span-2 text-gray-600 dark:text-slate-400 capitalize">{log.user_type}</div>
+                  <div className="col-span-2 text-gray-600 dark:text-slate-400 truncate">{log.cmpid}</div>
+                  <div className="col-span-4 text-gray-500 dark:text-slate-400 text-xs">
+                    {new Date(log.loginAt).toLocaleString()}
+                  </div>
                 </div>
               ))
             )}
@@ -611,23 +705,34 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0b101e] p-4 md:p-10 font-sans transition-colors duration-200">
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 w-full max-w-[1200px] mx-auto">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-6 w-full max-w-[1200px] mx-auto"
+      >
         <div className="flex items-center gap-4 md:gap-5 mb-8 pt-2">
           <Avatar primaryColor={primaryColor} companyName={user?.companyName || ""} photoUrl={photoUrl} />
           <div>
             <h1 className="text-xl md:text-[22px] font-bold text-gray-900 dark:text-white leading-tight">Settings</h1>
-            <p className="text-xs md:text-sm text-gray-500 dark:text-slate-400 dark:text-slate-500 mt-0.5 capitalize">{user?.user_type?.replace('_', ' ')}</p>
+            <p className="text-xs md:text-sm text-gray-500 dark:text-slate-400 mt-0.5 capitalize">
+              {user?.user_type?.replace('_', ' ')}
+            </p>
           </div>
         </div>
 
-        {/* Tab Navigation - Scrollable on Mobile */}
+        {/* Tab Navigation */}
         <div className="flex items-center gap-4 md:gap-6 border-b border-gray-200 dark:border-gray-800 overflow-x-auto no-scrollbar">
           {visibleTabs.map(({ id, label, icon: Icon }) => (
-            <button key={id} onClick={() => setActiveTab(id)}
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
               className={`flex items-center gap-2 pb-3 text-sm font-bold transition-colors border-b-2 -mb-[1.5px] whitespace-nowrap ${
-                activeTab === id ? "text-[#1864ab] border-[#1864ab]" : "border-transparent text-gray-500 dark:text-slate-400 dark:text-slate-500 hover:text-gray-900 dark:text-gray-400 dark:text-slate-500"
+                activeTab === id
+                  ? "text-[#1864ab] border-[#1864ab]"
+                  : "border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200"
               }`}
-              style={activeTab === id ? { color: primaryColor, borderColor: primaryColor } : {}}>
+              style={activeTab === id ? { color: primaryColor, borderColor: primaryColor } : {}}
+            >
               <Icon className="h-4 w-4" />{label}
             </button>
           ))}
@@ -635,7 +740,15 @@ export default function Settings() {
 
         <div className="pt-2">
           <AnimatePresence mode="wait">
-            {activeTab === "account" && <MyAccountTab key="account" primaryColor={primaryColor} setPrimaryColor={setPrimaryColor} photoUrl={photoUrl} setPhotoUrl={setPhotoUrl} />}
+            {activeTab === "account" && (
+              <MyAccountTab
+                key="account"
+                primaryColor={primaryColor}
+                setPrimaryColor={setPrimaryColor}
+                photoUrl={photoUrl}
+                setPhotoUrl={setPhotoUrl}
+              />
+            )}
             {activeTab === "users" && <ManageUsersTab key="users" />}
             {activeTab === "log" && <UsersLogTab key="log" />}
           </AnimatePresence>
