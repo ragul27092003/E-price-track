@@ -6,6 +6,7 @@ import {
   toggleCompetitorSync,
   uploadCompetitorLogo,
 } from '../services/competitorsService';
+import API from '../hooks/useApi';
 
 // ─── Icons ─────────────────────────────────────────────────────────────────────
 const SearchIcon = () => (
@@ -107,7 +108,7 @@ const LogoCell = ({ data, isSuperAdmin, onLogoUploaded }) => {
   const logoSrc = localLogo
     ? (localLogo.startsWith('blob:') || localLogo.startsWith('http')
         ? localLogo
-        : `http://localhost:5100${localLogo}`)
+        : `${API}${localLogo}`)
     : null;
 
   return (

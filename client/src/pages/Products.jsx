@@ -70,7 +70,7 @@ function ProductImage({ src, alt }) {
 function resolveLogoUrl(logo) {
   if (!logo) return null;
   if (logo.startsWith("blob:") || logo.startsWith("http://") || logo.startsWith("https://")) return logo;
-  return `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5100"}${logo}`;
+  return `${API}${logo}`;
 }
 
 // Shows actual logo image if available, falls back to colored text badge

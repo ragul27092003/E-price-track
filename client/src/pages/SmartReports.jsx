@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useStore } from "../store";
 import { fetchProducts } from "../services/productsService";
 import { fetchCompetitors } from "../services/competitorsService";
-
+import API from "../hooks/useApi";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function parsePrice(raw) {
@@ -144,7 +144,7 @@ function ProductImage({ src, alt }) {
 function resolveLogoUrl(logo) {
   if (!logo) return null;
   if (logo.startsWith("blob:") || logo.startsWith("http://") || logo.startsWith("https://")) return logo;
-  return `${import.meta.env.VITE_API_BASE_URL || "http://localhost:5100"}${logo}`;
+  return `${API}${logo}`;
 }
 
 function CompetitorLogo({ name = "", slug = "", logo = "" }) {

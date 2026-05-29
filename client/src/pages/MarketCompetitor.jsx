@@ -2,13 +2,14 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { fetchCompetitors } from '../services/competitorsService';
+import API from '../hooks/useApi';
 
 // ─── Resolve logo URL safely ──────────────────────────────────────────────────
 // Cloudinary URLs are absolute (https://…); local assets start with /assets/…
 const resolveLogoUrl = (logo) => {
   if (!logo) return null;
   if (logo.startsWith('http://') || logo.startsWith('https://')) return logo;
-  return `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5100'}${logo}`;
+  return `${API}${logo}`;
 };
 
 // ─── Single competitor row ────────────────────────────────────────────────────
