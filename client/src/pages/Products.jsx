@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useStore } from "../store";
 import { fetchProducts, fetchProductsMeta, configureProduct, removeProductConfiguration } from "../services/productsService";
 import { fetchCompetitors } from "../services/competitorsService";
-
+import API from "../hooks/useApi";
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function parsePrice(raw) {
