@@ -10,7 +10,7 @@ function decodeToken(token) {
 }
 
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5100/api',
+  baseURL: import.meta.env.VITE_API_URL,
 });
 
 // Auto-attach JWT token and x-tenant-id on every request

@@ -10,11 +10,7 @@ const app = express();
 
 app.use(cors({
   origin: [
-    'http://localhost:8080',
-    'http://localhost:5173', 
-    'http://localhost:3000',
-    'http://13.234.228.110',        // ← add this
-    'https://epricetrack.com',      // ← and your domain
+    'http://13.234.228.110:3001', 'http://localhost:8080', 'http://localhost:5173', 'http://localhost:3000',      // ← and your domain
   ],
   credentials: true,
 }));
