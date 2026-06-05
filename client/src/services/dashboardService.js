@@ -17,3 +17,5 @@ export const fetchBrandAnalytics = (brand, category) => {
   if (category) params.set('category', category);
   return API.get(`/dashboard/brand-analytics?${params}`).then((r) => r.data);
 };
+export const fetchCompetitorCountsData = () =>
+  API.get('/dashboard/competitor-counts').then((r) => r.data);

@@ -7,7 +7,6 @@ import {
   uploadCompetitorLogo,
 } from '../services/competitorsService';
 import API from '../hooks/useApi';
-
 // ─── Icons ─────────────────────────────────────────────────────────────────────
 const SearchIcon = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -32,15 +31,29 @@ const UploadIcon = () => (
 
 // ─── Sparkline ─────────────────────────────────────────────────────────────────
 const generateTrend = (seed, delta) => {
-  const base = (seed || 20) % 50 || 20;
+  // Map productsTracked to a base value between 30-70 for better visualization
+  const normalizedSeed = Math.max(1, seed || 1);
+  const base = 30 + ((normalizedSeed * 7919) % 40); // Spread across 30-70 range
+  
   const isNeg = String(delta || '').includes('-');
   const deltaNum = parseFloat(String(delta || '0').replace('%', '')) || 0;
   const isFlat = deltaNum === 0 || !seed;
+  
+  // Trend strength based on delta magnitude (scaled down for large numbers)
+  const trendStrength = Math.min(Math.abs(deltaNum) / 100, 3) * 0.5;
+  
   return Array.from({ length: 7 }, (_, i) => {
     if (isFlat) return 50;
-    const noise = (((seed || 1) * (i + 3)) % 15) - 7;
-    const trend = isNeg ? -i * 0.6 : i * 0.6;
-    return Math.max(5, Math.min(95, base + noise + trend));
+    
+    // Generate varied noise
+    const noise = (((seed || 1) * (i + 3)) % 20) - 10;
+    
+    // Create a trend that moves in the direction of delta
+    const trend = isNeg 
+      ? -i * trendStrength - (i * i) * 0.1  // Negative delta moves down
+      : i * trendStrength + (i * i) * 0.05;  // Positive delta moves up
+    
+    return Math.max(10, Math.min(90, base + noise + trend));
   });
 };
 
@@ -71,22 +84,18 @@ const Sparkline = ({ productsTracked, avgPriceDelta }) => {
 };
 
 // ─── Logo cell ─────────────────────────────────────────────────────────────────
-// For super_admin: shows logo (or initials) + a clearly visible upload button below.
-// For store_admin / user: shows logo or initials only, no upload affordance at all.
 const LogoCell = ({ data, isSuperAdmin, onLogoUploaded }) => {
   const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [localLogo, setLocalLogo] = useState(data.logo || '');
   const safeName = data.name || 'Unknown';
 
-  // Sync if parent updates logo (e.g. after store switch)
   useEffect(() => { setLocalLogo(data.logo || ''); }, [data.logo]);
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Optimistic preview immediately
     const objectUrl = URL.createObjectURL(file);
     setLocalLogo(objectUrl);
 
@@ -97,7 +106,7 @@ const LogoCell = ({ data, isSuperAdmin, onLogoUploaded }) => {
       onLogoUploaded(data.slug, result.logoUrl);
     } catch (err) {
       console.error('Logo upload failed:', err);
-      setLocalLogo(data.logo || ''); // revert on error
+      setLocalLogo(data.logo || '');
       alert(err?.response?.data?.message || 'Logo upload failed. Please try again.');
     } finally {
       setUploading(false);
@@ -113,7 +122,6 @@ const LogoCell = ({ data, isSuperAdmin, onLogoUploaded }) => {
 
   return (
     <div className="flex items-center gap-3 w-full md:w-[20%]">
-      {/* Avatar */}
       <div
         className="w-10 h-10 rounded border border-gray-200 flex items-center justify-center overflow-hidden shrink-0"
         style={{ backgroundColor: data.color || '#475e77' }}
@@ -127,7 +135,6 @@ const LogoCell = ({ data, isSuperAdmin, onLogoUploaded }) => {
       <div className="flex flex-col min-w-0">
         <span className="text-sm font-medium text-gray-800 dark:text-white truncate">{safeName}</span>
 
-        {/* Upload button — only super_admin sees this, always visible */}
         {isSuperAdmin && (
           <>
             <button
@@ -388,6 +395,10 @@ const Competitors = () => {
         />
       )}
 
+      {eanList.length === 0 && nonEanList.length === 0 && (
+        <div className="py-20 text-center text-sm text-gray-400 dark:text-slate-500">No competitors found.</div>
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
           <div className="bg-white dark:bg-[#151a2a] rounded-lg w-full max-w-3xl overflow-hidden shadow-2xl">
@@ -418,6 +429,17 @@ const Competitors = () => {
                   value={newCompetitor.searchUrl}
                   onChange={(e) => setNewCompetitor({ ...newCompetitor, searchUrl: e.target.value })}
                 />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-gray-500 dark:text-slate-400 uppercase">Mapping Type</label>
+                <select
+                  className="bg-white dark:bg-[#1e2535] text-gray-800 dark:text-slate-200 w-full p-2 border border-gray-200 dark:border-slate-700 rounded text-sm focus:ring-1 focus:ring-blue-400 outline-none"
+                  value={newCompetitor.mappingType}
+                  onChange={(e) => setNewCompetitor({ ...newCompetitor, mappingType: e.target.value })}
+                >
+                  <option value="EAN">EAN</option>
+                  <option value="NON_EAN">NON EAN</option>
+                </select>
               </div>
             </div>
             <div className="px-6 py-4 bg-slate-50 dark:bg-[#151a2a] flex justify-end gap-3 border-t dark:border-slate-700">

@@ -9,9 +9,10 @@ import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { useStore, selectCurrentStoreId } from "@/store";
+import { fetchCompetitorCountsData } from '../services/dashboardService';
+import API from "../hooks/useApi"; // Ensure this matches your API hook path
 
 // ─── animation presets ─────────────────────────────────────────────────────────
-
 const containerVariants = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { staggerChildren: 0.06 } },
@@ -22,7 +23,6 @@ const itemVariants = {
 };
 
 // ─── helpers ───────────────────────────────────────────────────────────────────
-
 function parseSapTime(varEndTime) {
   if (!varEndTime) return { date: '--', time: '--' };
   const [date = '--', timeRaw = ''] = varEndTime.split(' ');
@@ -36,7 +36,6 @@ const fmtINR = (n) =>
 const fmtCategory = (cat) =>
   cat.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-// Backend returns { date, competitors: [{ name, count }] } already normalised
 function extractRankData(doc) {
   if (!doc) return { date: '--', competitors: [] };
   return {
@@ -45,8 +44,14 @@ function extractRankData(doc) {
   };
 }
 
-// ─── sub-components ────────────────────────────────────────────────────────────
+// Default colors for the pie chart slices
+const CHART_COLORS = [
+  "#0284c7", "#ea580c", "#16a34a", "#dc2626", 
+  "#9333ea", "#ca8a04", "#475569", "#0d9488", 
+  "#be123c", "#1d4ed8"
+];
 
+// ─── sub-components ────────────────────────────────────────────────────────────
 function KpiCard({ label, value, subtext, icon: Icon, color, bg, loading }) {
   return (
     <motion.div variants={itemVariants} className="bg-card rounded-xl p-5 card-shadow border border-border h-full hover:border-primary/30 transition-colors">
@@ -114,25 +119,45 @@ function TrendCard({ title, count, percent, total, progressColor, btnClass, titl
   );
 }
 
-const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value }) => {
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
   const RADIAN = Math.PI / 180;
   const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  if (value < 4) return null;
+  if (percent < 0.04) return null; // Don't show labels for tiny slices
   return (
-    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-xs font-medium">
-      {`${value}%`}
+    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-[10px] font-bold">
+      {`${(percent * 100).toFixed(1)}%`}
     </text>
   );
 };
+// ─── Custom Pie Chart Tooltip ──────────────────────────────────────────────
+const CustomTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-[#1a1a1a] text-white text-xs px-3 py-1.5 rounded-md flex items-center gap-2 shadow-xl border border-[#333]">
+        <span 
+          className="w-2 h-2 rounded-full" 
+          style={{ backgroundColor: data.color }}
+        ></span>
+        <span className="capitalize font-medium">{data.name}</span>
+        <span className="font-bold">{data.displayPercent}%</span>
+      </div>
+    );
+  }
+  return null;
+};
 
 // ─── main ──────────────────────────────────────────────────────────────────────
-
 export default function Dashboard() {
   const navigate = useNavigate();
   const [selectedBrand, setSelectedBrand] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [hoveredComp, setHoveredComp] = useState(null);
+  // Local state for the new Competitor Counts component
+  const [compCounts, setCompCounts] = useState([]);
+  const [compCountsLoading, setCompCountsLoading] = useState(true);
 
   const currentStoreId = useStore(selectCurrentStoreId);
   const showLsp        = useStore((s) => s.showLsp);
@@ -150,15 +175,26 @@ export default function Dashboard() {
     fetchBrandAnalytics,
   } = useStore();
 
-  // Initial data fetch on mount
   useEffect(() => {
     fetchSapUpdateStatus();
     fetchOverallStatistics();
     fetchRankAnalysis();
     fetchBrandAnalyticsBrands();
+
+   // Fetch the competitor counts for the list and pie chart
+    const fetchCompetitorCounts = async () => {
+      try {
+        const data = await fetchCompetitorCountsData();
+        setCompCounts(data);
+      } catch (err) {
+        console.error("Failed to fetch competitor counts", err);
+      } finally {
+        setCompCountsLoading(false);
+      }
+    };
+    fetchCompetitorCounts();
   }, []);
 
-  // When the active store changes, reset brand/category so auto-select fires for the new store
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
@@ -166,7 +202,6 @@ export default function Dashboard() {
     setSelectedCategory('');
   }, [currentStoreId]);
 
-  // Auto-select first brand once brands load
   useEffect(() => {
     if (brandAnalyticsBrands.length > 0 && !selectedBrand) {
       const first = brandAnalyticsBrands[0];
@@ -175,7 +210,6 @@ export default function Dashboard() {
     }
   }, [brandAnalyticsBrands]);
 
-  // Auto-select first category when categories refresh after brand change
   useEffect(() => {
     if (brandAnalyticsCategories.length > 0 && !selectedCategory) {
       setSelectedCategory(brandAnalyticsCategories[0]);
@@ -209,7 +243,6 @@ export default function Dashboard() {
 
   const { date: rankDate, competitors: rankCompetitors } = extractRankData(rankAnalysis);
 
-  // LSP panel — only visible when merchant.show_lsp is true AND data exists
   const lspEntries = (showLsp && stats?.recent_lsp_hsp_data && typeof stats.recent_lsp_hsp_data === 'object')
     ? Object.entries(stats.recent_lsp_hsp_data).filter(([, v]) => v != null)
     : [];
@@ -228,19 +261,14 @@ export default function Dashboard() {
     { key: 'negTrend',  title: 'Negative Trend',  count: stats?.varNegativeTrendingCount, percent: stats?.varNegativeTrendingPercent, total, progressColor: 'bg-red-500',    btnClass: 'bg-red-500 hover:bg-red-600',      titleColor: 'text-red-500',          onView: () => goToReport('Negative Trend')  },
   ];
 
-  const statisticsData = stats
-    ? [
-      { name: "Positive Trending", value: parseFloat(stats.varPostiveTrendingPercent) || 0, color: "#10b981" },
-      { name: "Equal Trending", value: parseFloat(stats.varEqualTrendingPercent) || 0, color: "#3b82f6" },
-      { name: "Negative Trending", value: parseFloat(stats.varNegativeTrendingPercent) || 0, color: "#ef4444" },
-      { name: "Non Competitor", value: parseFloat(stats.varNonCompetitorPercent) || 0, color: "#ca8a04" },
-    ]
-    : [
-      { name: "Segment A", value: 25, color: "#3b82f6" },
-      { name: "Segment B", value: 25, color: "#475569" },
-      { name: "Segment C", value: 25, color: "#ef4444" },
-      { name: "Segment D", value: 25, color: "#ca8a04" },
-    ];
+  // Map API data into Pie Chart structure
+  const totalCompetitorProducts = compCounts.reduce((acc, curr) => acc + curr.count, 0);
+  const pieData = compCounts.map((comp, i) => ({
+    name: comp.name,
+    value: comp.count,
+    color: comp.color || CHART_COLORS[i % CHART_COLORS.length],
+    displayPercent: totalCompetitorProducts ? ((comp.count / totalCompetitorProducts) * 100).toFixed(1) : 0
+  }));
 
   return (
     <motion.div
@@ -271,7 +299,7 @@ export default function Dashboard() {
         />
         <KpiCard
           label="Total Products"
-          value={stats?.varTotalProductsCount ?? '--'}
+          value={stats?.varActiveInactiveProductsCount ?? '--'}
           subtext="Analytics for total active & inactive products"
           icon={Package} color="text-foreground" bg="bg-secondary"
           loading={statsLoading}
@@ -320,13 +348,11 @@ export default function Dashboard() {
         />
       </div>
 
+      {/* ── Charts & Analytics Section (12 Column Grid) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-
-      {/* ── Charts & Analytics Section ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Brand Analytics */}
-        <motion.div variants={itemVariants} className="bg-card rounded-xl p-6 card-shadow border border-border flex flex-col">
+        {/* 1. Brand Analytics (Wider) */}
+        <motion.div variants={itemVariants} className="lg:col-span-6 bg-card rounded-xl p-6 card-shadow border border-border flex flex-col">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-2">
               <BarChart className="h-5 w-5 text-primary" />
@@ -407,50 +433,112 @@ export default function Dashboard() {
           </div>
         </motion.div>
 
-        {/* Overall Statistics Donut Chart */}
-        <motion.div variants={itemVariants} className="bg-card rounded-xl p-6 card-shadow border border-border flex flex-col">
-          <div className="flex items-center gap-2 mb-2">
+        {/* 2. Competitor Products Count List */}
+        <motion.div variants={itemVariants} className="lg:col-span-3 bg-card rounded-xl p-0 card-shadow border border-border flex flex-col overflow-hidden">
+          <div className="bg-[#48b2ad] px-4 py-3">
+            <h3 className="text-white font-semibold text-center text-[15px]">Competitor Products Count</h3>
+          </div>
+          <div className="flex-1 overflow-y-auto max-h-[350px] divide-y divide-border p-2">
+            {compCountsLoading ? (
+              <p className="text-sm text-muted-foreground animate-pulse p-4 text-center">Loading...</p>
+            ) : compCounts.map((comp) => {
+              const isDimmed = hoveredComp && hoveredComp !== comp.name;
+              
+              return (
+                <div 
+                  key={comp.name} 
+                  onMouseEnter={() => setHoveredComp(comp.name)}
+                  onMouseLeave={() => setHoveredComp(null)}
+                  className={`flex justify-between items-center px-3 py-3 rounded-lg cursor-pointer transition-all duration-300 ${
+                    hoveredComp === comp.name ? 'bg-secondary/80 scale-[1.02] shadow-sm' : 'hover:bg-secondary/50'
+                  } ${isDimmed ? 'opacity-30 grayscale' : 'opacity-100'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 flex items-center justify-center bg-white rounded shadow-sm border border-slate-100 overflow-hidden shrink-0">
+                      <img 
+                        src={comp.logo} 
+                        alt={comp.name} 
+                        className="max-w-full max-h-full object-contain" 
+                        onError={(e) => e.target.style.display='none'} 
+                      />
+                    </div>
+                    <span className="text-sm text-foreground font-medium capitalize">{comp.name}</span>
+                  </div>
+                  <span className="bg-[#48b2ad] text-white text-[11px] tracking-wide font-bold px-2 py-1 rounded-sm min-w-[36px] text-center">
+                    {comp.count}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+
+      {/* 3. Overall Statistics Donut Chart */}
+        <motion.div variants={itemVariants} className="lg:col-span-3 bg-card rounded-xl p-6 card-shadow border border-border flex flex-col items-center justify-center">
+          <div className="w-full flex items-center gap-2 mb-2">
             <BarChart3 className="h-5 w-5 text-primary" />
             <h3 className="font-semibold text-lg text-foreground">Overall Statistics</h3>
           </div>
 
-          <div className="flex-1 w-full min-h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={statisticsData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={80}
-                  outerRadius={120}
-                  dataKey="value"
-                  stroke="none"
-                  labelLine={false}
-                  label={renderCustomizedLabel}
-                >
-                  {statisticsData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(val) => [`${val}%`, "Share"]}
-                  contentStyle={{ borderRadius: 8, fontSize: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">
+            {compCountsLoading ? (
+              <div className="text-sm text-muted-foreground animate-pulse">Loading Chart...</div>
+            ) : pieData.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No Competitor Data</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={65}
+                    outerRadius={105}
+                    dataKey="value"
+                    stroke="none"
+                    labelLine={false}
+                    label={renderCustomizedLabel}
+                  >
+                    {pieData.map((entry, i) => {
+                      const isDimmed = hoveredComp && hoveredComp !== entry.name;
+                      return (
+                        <Cell 
+                          key={i} 
+                          fill={entry.color} 
+                          opacity={isDimmed ? 0.25 : 1}
+                          style={{ cursor: 'pointer', transition: 'opacity 0.3s ease', outline: 'none' }}
+                          onMouseEnter={() => setHoveredComp(entry.name)}
+                          onMouseLeave={() => setHoveredComp(null)}
+                        />
+                      );
+                    })}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
-          {stats && (
-            <div className="grid grid-cols-2 gap-2 mt-3">
-              {statisticsData.map((seg) => (
-                <div key={seg.name} className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }} />
-                  <span className="text-xs text-muted-foreground truncate">{seg.name}</span>
-                  <span className="text-xs font-semibold ml-auto">{seg.value}%</span>
+          {/* Interactive Bottom Legend */}
+          <div className="grid grid-cols-2 gap-x-2 gap-y-3 mt-4 w-full px-2">
+            {pieData.map((seg) => {
+              const isDimmed = hoveredComp && hoveredComp !== seg.name;
+              return (
+                <div 
+                  key={seg.name} 
+                  onMouseEnter={() => setHoveredComp(seg.name)}
+                  onMouseLeave={() => setHoveredComp(null)}
+                  className={`flex items-center gap-2 cursor-pointer transition-opacity duration-300 ${
+                    isDimmed ? 'opacity-30' : 'opacity-100'
+                  }`}
+                >
+                  <span className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }} />
+                  <span className="text-[11px] text-muted-foreground truncate capitalize">{seg.name}</span>
+                  <span className="text-[11px] font-semibold ml-auto">{seg.displayPercent}%</span>
                 </div>
-              ))}
-            </div>
-          )}
+              );
+            })}
+          </div>
         </motion.div>
 
       </div>

@@ -71,67 +71,73 @@ async function computeAvgPriceDelta(db, slug, ourPriceMap) {
 //   the exact join + price-null-check logic from productsController.enrichProducts
 //   so both pages show the same count.
 // ─────────────────────────────────────────────────────────────────────────────
-async function computeProductsTracked(db, slug, ourProducts) {
-  const colName = `ept_product_details_new_${slug}`;
-
-  // Build lookup keys from our product list (mirrors enrichProducts)
-  const eanIds       = [...new Set(ourProducts.map(p => p.product_ean_id).filter(Boolean))];
-  const productCodes = [...new Set(ourProducts.map(p => p.product_code).filter(Boolean))];
+// ─── FIX: compute productsTracked using an Advanced MongoDB JOIN ($lookup) ───
+async function computeProductsTracked(db, slug) {
+  const compColName = `ept_product_details_new_${slug}`;
   const uniqueIdField = `${slug}_unique_id`;
-  const uniqueIds    = [...new Set(ourProducts.map(p => p[uniqueIdField]).filter(Boolean))];
 
-  const conditions = [];
-  if (eanIds.length)       conditions.push({ product_ean_id:          { $in: eanIds       } });
-  if (uniqueIds.length)    conditions.push({ [uniqueIdField]:          { $in: uniqueIds    } });
-  if (productCodes.length) conditions.push({ competitor_product_code: { $in: productCodes } });
-  if (!conditions.length)  return 0;
+  const pipeline = [
+    // 1. Only look at our ACTIVE and COMPLETED products
+    {
+      $match: {
+        status: 'active',
+        ean_product_data_details_scrap_status: 'completed'
+      }
+    },
+    
+    // 2. JOIN with the competitor collection using EAN, Unique ID, or Code
+    {
+      $lookup: {
+        from: compColName,
+        let: { 
+          main_ean: "$product_ean_id", 
+          main_uid: `$${uniqueIdField}`, 
+          main_code: "$product_code" 
+        },
+        pipeline: [
+          {
+            $match: {
+              // Competitor product MUST be active, have a price, and be in stock
+              status: 'active',
+              product_price: { $exists: true, $nin: ['No Result', null, '', 'no result'] },
+              product_stock: { $nin: ['Out Of Stock', 'Out of stock', 'out of stock', '0', 0] },
+              
+              // MUST match at least one of the IDs (ignoring nulls/empty strings)
+              $expr: {
+                $or: [
+                  { $and: [ { $ne: ["$$main_ean", null] }, { $ne: ["$$main_ean", ""] }, { $eq: ["$product_ean_id", "$$main_ean"] } ] },
+                  { $and: [ { $ne: ["$$main_uid", null] }, { $ne: ["$$main_uid", ""] }, { $eq: [`$${uniqueIdField}`, "$$main_uid"] } ] },
+                  { $and: [ { $ne: ["$$main_code", null] }, { $ne: ["$$main_code", ""] }, { $eq: ["$competitor_product_code", "$$main_code"] } ] }
+                ]
+              }
+            }
+          }
+        ],
+        as: 'competitor_data'
+      }
+    },
+    
+    // 3. ONLY keep products that successfully found a match in the competitor DB
+    {
+      $match: {
+        "competitor_data.0": { $exists: true } 
+      }
+    },
+    
+    // 4. Count the total
+    {
+      $count: "trackedCount"
+    }
+  ];
 
   try {
-    const docs = await db.collection(colName).find(
-      conditions.length === 1 ? conditions[0] : { $or: conditions },
-      {
-        projection: {
-          product_ean_id:          1,
-          [uniqueIdField]:         1,
-          competitor_product_code: 1,
-          product_price:           1,
-        },
-      }
-    ).toArray();
-
-    // Build reverse EAN maps (same as enrichProducts)
-    const eanByUniqueId = {};
-    const eanByCode     = {};
-    for (const p of ourProducts) {
-      if (p[uniqueIdField] && p.product_ean_id) eanByUniqueId[p[uniqueIdField]] = p.product_ean_id;
-      if (p.product_code   && p.product_ean_id) eanByCode[p.product_code]       = p.product_ean_id;
-    }
-
-    // Collect EANs that have a valid (non-null) competitor price
-    const matchedEans = new Set();
-    for (const d of docs) {
-      const ean = d.product_ean_id
-               || eanByUniqueId[d[uniqueIdField]]
-               || eanByCode[d.competitor_product_code]
-               || null;
-      const price = toPrice(d.product_price);
-      if (ean && price !== null) {
-        matchedEans.add(ean);
-      }
-    }
-
-    // Count our products whose EAN was matched with a valid price
-    // This is exactly what the Products page filter produces.
-    return ourProducts.filter(
-      p => p.product_ean_id && matchedEans.has(p.product_ean_id)
-    ).length;
-
+    const result = await db.collection('ept_product_details_new').aggregate(pipeline).toArray();
+    return result.length > 0 ? result[0].trackedCount : 0;
   } catch (err) {
     console.error(`computeProductsTracked(${slug}) error:`, err.message);
     return 0;
   }
 }
-
 // ─── GET /api/competitors ─────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
   try {
@@ -167,9 +173,16 @@ exports.getAll = async (req, res) => {
       console.warn('Could not read from plm_admin_manage_info.competitors:', e.message);
     }
 
-    // 3. Our own product prices → { product_code: price } (for avgPriceDelta)
+   // 3. Our own product prices → { product_code: price } (for avgPriceDelta)
     //    Also used as the full product list for productsTracked computation.
-    const ourProducts = await db.collection('ept_product_details_new').find({}).toArray();
+    
+    // ── THE FIX: Only pull active & completed products (the 1,940 items) ──
+    const ourProducts = await db.collection('ept_product_details_new').find({
+      status: 'active',
+      ean_product_data_details_scrap_status: 'completed'
+    }).toArray();
+    // ──────────────────────────────────────────────────────────────────────
+
     const ourPriceMap = {};
     ourProducts.forEach(p => {
       const price = parseFloat(String(p.product_store_price || p.product_sap_price || '').replace(/[₹,\s]/g, ''));
@@ -200,7 +213,7 @@ exports.getAll = async (req, res) => {
       console.log(`[competitors] slug=${slug} | main.mapping_type=${main.mapping_type} | c.mapping_type=${c.mapping_type} | resolved=${mappingType}`);
 
       // FIX: use live join count instead of ept_dashbaord_statics
-      const productsTracked = await computeProductsTracked(db, slug, ourProducts);
+      const productsTracked = await computeProductsTracked(db, slug);
 
       const avgPriceDelta = await computeAvgPriceDelta(db, slug, ourPriceMap);
 

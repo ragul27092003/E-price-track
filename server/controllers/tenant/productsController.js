@@ -152,9 +152,15 @@ exports.getAll = async (req, res) => {
     const page  = Math.max(1, parseInt(req.query.page  || '1', 10));
     const limit = Math.max(1, parseInt(req.query.limit || '5', 10));
     const skip  = (page - 1) * limit;
+    
     const { competitor: filterSlug, search, brand, category, rank, itemGroup } = req.query;
 
-    const mongoFilter = {};
+    // 1. MUST include BOTH 'active' and 'completed' to hit exactly 1,940
+    const mongoFilter = {
+      status: 'active',
+      ean_product_data_details_scrap_status: 'completed'
+    };
+
     if (search) {
       const re = { $regex: search, $options: 'i' };
       mongoFilter.$or = [
@@ -164,16 +170,21 @@ exports.getAll = async (req, res) => {
         { product_code:   re },
       ];
     }
+    
     if (brand)         mongoFilter.product_brand    = brand;
     if (category)      mongoFilter.product_category = category;
     else if (itemGroup) {
       const escaped = itemGroup.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       mongoFilter.product_category = { $regex: `^${escaped}`, $options: 'i' };
     }
+    
     if (rank) mongoFilter.rank_by = rank;
 
     const col      = db.collection('ept_product_details_new');
-    const total    = await col.countDocuments(mongoFilter);
+    
+    // This will now perfectly match the 1,940 from your dashboard
+    const total    = await col.countDocuments(mongoFilter); 
+    
     const products = await col.find(mongoFilter).skip(skip).limit(limit).toArray();
     let enriched   = await enrichProducts(db, products);
 

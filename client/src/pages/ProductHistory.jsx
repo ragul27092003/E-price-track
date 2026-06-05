@@ -116,7 +116,7 @@ function PriceChart({ history, competitors, visibleSlugs }) {
   const yTickCount = 4;
   const rawTicks = Array.from({ length: yTickCount }, (_, i) => chartMin + (span / (yTickCount - 1)) * i);
   const yTicks = [...new Set(rawTicks.map(t => Math.round(t)))];
-
+  
   const series = [
     {
       slug:   "our_price",
@@ -332,10 +332,11 @@ export default function ProductHistory() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [visibleSlugs,  setVisibleSlugs]  = useState(new Set());
   const [imgErrors,     setImgErrors]     = useState({});
-  const [daysRange,     setDaysRange]     = useState(30);
-
   const [searchParams] = useSearchParams();
-  const eanFromUrl = searchParams.get("ean") || "";
+const eanFromUrl = searchParams.get("ean") || "";
+const rangeFromUrl = searchParams.get("range") || "30";
+
+const [daysRange,     setDaysRange]     = useState(Number(rangeFromUrl));
 
   useEffect(() => {
     const load = async () => {
@@ -396,7 +397,13 @@ export default function ProductHistory() {
   useEffect(() => {
     setSelectedIndex(0);
   }, [searchQuery]);
-
+// Update daysRange when URL range parameter changes
+useEffect(() => {
+  const rangeFromUrl = searchParams.get("range");
+  if (rangeFromUrl) {
+    setDaysRange(Number(rangeFromUrl));
+  }
+}, [searchParams]);
   const onlineCompetitors = storeCompetitors.filter((c) => c.isActive !== false);
 
   const activeHistory = useMemo(() => {

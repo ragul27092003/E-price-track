@@ -97,3 +97,29 @@ exports.getOverallStatistics = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+// ─── GET /api/dashboard/competitor-counts ───────────────────────────────────
+exports.getCompetitorCounts = async (req, res) => {
+  try {
+    const docs = await req.tenantDb
+      .collection('ept_dashbaord_statics')
+      .find({ status: 'active' })
+      .toArray();
+
+    const formatted = docs.map((d) => {
+      const rawCount = d.competitor_count?.$numberLong || d.competitor_count?.toString() || 0;
+      return {
+        id: d._id,
+        name: d.competitors || d.competitor_name,
+        logo: d.competitor_logo,
+        count: parseInt(rawCount, 10) || 0,
+        color: d.competitor_color
+      };
+    });
+
+    formatted.sort((a, b) => b.count - a.count);
+    res.json(formatted);
+  } catch (err) {
+    console.error('dashboardController.getCompetitorCounts error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
