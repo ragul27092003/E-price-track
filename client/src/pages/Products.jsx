@@ -117,7 +117,10 @@ function RankBadge({ product }) {
 
   let displayRank = rank;
   if (!String(rank).includes('/')) {
-    const active = (product.competitor_prices || []).filter((c) => c.price !== null).length;
+    // Only count active competitors that are NOT out of stock
+    const active = (product.competitor_prices || []).filter(
+      (c) => c.price !== null && !String(c.stock).toLowerCase().includes('out of stock') && String(c.stock) !== '0'
+    ).length;
     displayRank = `${rank}/${active + 1}`;
   }
 
@@ -216,9 +219,10 @@ function MarketGapCell({ product, competitorMeta }) {
   const ourPrice = parsePrice(product.product_price);
   if (ourPrice === null) return <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>;
 
+  // Only compare against valid prices that are in stock
   const active = (product.competitor_prices || [])
     .map((c) => ({ ...c, price: parsePrice(c.price) }))
-    .filter((c) => c.price !== null);
+    .filter((c) => c.price !== null && !String(c.stock).toLowerCase().includes('out of stock') && String(c.stock) !== '0');
 
   if (!active.length) return <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>;
 
@@ -231,7 +235,7 @@ function MarketGapCell({ product, competitorMeta }) {
   if (gap === 0) {
     return (
       <div className="flex flex-col gap-1">
-        <span className="inline-flex items-center text-[11px] font-bold text-slate-500 dark:text-slate-400 dark:text-slate-500 bg-slate-100 rounded-full px-2.5 py-1 w-fit">Same price</span>
+        <span className="inline-flex items-center text-[11px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 rounded-full px-2.5 py-1 w-fit">Same price</span>
         <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">{fmtAmt(lowest.price)} ({compName}) = {fmtAmt(ourPrice)} mine</span>
       </div>
     );
@@ -259,25 +263,43 @@ function MarketGapCell({ product, competitorMeta }) {
     </div>
   );
 }
-
 function CompetitorPrices({ product, competitorMeta }) {
-  const active = (product.competitor_prices || [])
-    .filter((c) => c.price !== null)
-    .sort((a, b) => a.price - b.price);
-  const { low, avg, high } = marketStats(product);
-  if (active.length === 0) {
+  // Get all competitors that actually have this product listed (even if out of stock)
+  const listed = (product.competitor_prices || []).filter(c => c.is_listed);
+
+  if (listed.length === 0) {
+    const { low, avg, high } = marketStats(product);
     return <MarketCap low={low} avg={avg} high={high} />;
   }
 
+  // Sort: Valid in-stock prices first, then Out Of Stock
+  const sorted = [...listed].sort((a, b) => {
+    const aOos = a.price === null || String(a.stock).toLowerCase().includes('out of stock') || String(a.stock) === '0';
+    const bOos = b.price === null || String(b.stock).toLowerCase().includes('out of stock') || String(b.stock) === '0';
+    
+    if (!aOos && bOos) return -1;
+    if (aOos && !bOos) return 1;
+    if (!aOos && !bOos) return a.price - b.price;
+    return 0;
+  });
+
   return (
     <div className="flex items-center gap-6 flex-wrap">
-      {active.map((c) => {
+      {sorted.map((c) => {
         const meta = competitorMeta?.[c.slug] || {};
+        const isOos = c.price === null || String(c.stock).toLowerCase().includes('out of stock') || String(c.stock) === '0';
+        
         return (
-          <div key={c.slug} className="flex items-center gap-2">
+          <div key={c.slug} className={`flex items-center gap-2 ${isOos ? 'opacity-60 grayscale' : ''}`}>
             <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
-            <span className="font-bold text-slate-800 dark:text-white text-[13px]">₹{c.price.toLocaleString("en-IN")}</span>
-            <Sparkline data={trendFor(product, c.slug)} color="#0ea5e9" />
+            {isOos ? (
+              <span className="font-bold text-slate-400 dark:text-slate-500 text-[10px] uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">Out of Stock</span>
+            ) : (
+              <>
+                <span className="font-bold text-slate-800 dark:text-white text-[13px]">₹{c.price.toLocaleString("en-IN")}</span>
+                <Sparkline data={trendFor(product, c.slug)} color="#0ea5e9" />
+              </>
+            )}
           </div>
         );
       })}

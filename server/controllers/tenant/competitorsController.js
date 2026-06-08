@@ -147,9 +147,6 @@ exports.getAll = async (req, res) => {
     const clientComps = await db.collection('ept_competitor_info').find({}).toArray();
 
     // 2. Main DB: mapping_type + color + website + logos per competitor slug
-    //    Both mapping_type and logos are now stored in plm_admin_manage_info.competitors
-    //    (mongoose.connection.db = MONGO_URI).  The old eprice_main_admin_db is no longer used.
-    //    uploadLogo also writes to this same collection, so a single read covers everything.
     const mainMap    = {};
     const adminLogoMap = {};
     try {
@@ -173,15 +170,26 @@ exports.getAll = async (req, res) => {
       console.warn('Could not read from plm_admin_manage_info.competitors:', e.message);
     }
 
-   // 3. Our own product prices → { product_code: price } (for avgPriceDelta)
-    //    Also used as the full product list for productsTracked computation.
-    
-    // ── THE FIX: Only pull active & completed products (the 1,940 items) ──
+    // 3. Fetch pre-calculated static counts directly to match Dashboard numbers (e.g., MyG = 809)
+    const staticCountsMap = {};
+    try {
+      const staticDocs = await db.collection('ept_dashbaord_statics').find({ status: 'active' }).toArray();
+      staticDocs.forEach(doc => {
+        const slug = doc.competitor_name || '';
+        const rawCount = doc.competitor_count?.$numberLong || doc.competitor_count?.toString() || 0;
+        if (slug) {
+          staticCountsMap[slug.toLowerCase().trim()] = parseInt(rawCount, 10) || 0;
+        }
+      });
+    } catch (e) {
+      console.warn('Could not read from ept_dashbaord_statics:', e.message);
+    }
+
+    // 4. Our own product prices → { product_code: price } (for avgPriceDelta)
     const ourProducts = await db.collection('ept_product_details_new').find({
       status: 'active',
       ean_product_data_details_scrap_status: 'completed'
     }).toArray();
-    // ──────────────────────────────────────────────────────────────────────
 
     const ourPriceMap = {};
     ourProducts.forEach(p => {
@@ -191,29 +199,24 @@ exports.getAll = async (req, res) => {
       }
     });
 
-    // 4. Build response for each competitor
+    // 5. Build response for each competitor
     const data = await Promise.all(clientComps.map(async (c) => {
       const slug = c.competitor_slug || '';
       const main = mainMap[slug] || {};
 
-      // mapping_type priority:
-      //   1. plm_admin_manage_info.competitors (main DB, set by admin)
-      //   2. ept_competitor_info (tenant DB)    (fallback — may store it locally)
-      //   3. default → 'ean'
       const rawType = (
         main.mapping_type ||
         c.mapping_type    ||
         'ean'
       ).toLowerCase().trim();
 
-      // Accept all variants: 'ean', 'non_ean', 'non-ean', 'nonean'
       const mappingType = (rawType === 'ean') ? 'EAN' : 'NON_EAN';
 
-      // Debug — remove after confirming separation works
-      console.log(`[competitors] slug=${slug} | main.mapping_type=${main.mapping_type} | c.mapping_type=${c.mapping_type} | resolved=${mappingType}`);
-
-      // FIX: use live join count instead of ept_dashbaord_statics
-      const productsTracked = await computeProductsTracked(db, slug);
+      // Use the static pre-calculated collection count to ensure it reflects 809
+      const normalizedSlug = slug.toLowerCase().trim();
+      const productsTracked = staticCountsMap[normalizedSlug] !== undefined 
+        ? staticCountsMap[normalizedSlug] 
+        : 0;
 
       const avgPriceDelta = await computeAvgPriceDelta(db, slug, ourPriceMap);
 
@@ -228,7 +231,7 @@ exports.getAll = async (req, res) => {
         mappingType,
         isActive:        c.competitor_status === 'enable',
         avgPriceDelta,
-        productsTracked,  // ← now matches Products page count exactly
+        productsTracked,  // ← Now matches your Dashboard Overview list exactly!
         lastSync:        c.modified_date || 'Never',
         slug,
       };
@@ -240,7 +243,6 @@ exports.getAll = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
 // ─── POST /api/competitors ────────────────────────────────────────────────────
 exports.create = async (req, res) => {
   try {

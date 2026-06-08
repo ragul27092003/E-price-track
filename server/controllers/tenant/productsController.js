@@ -15,7 +15,7 @@ async function enrichProducts(db, products) {
   const allCompetitors    = await db.collection('ept_competitor_info').find({}).toArray();
   const onlineCompetitors = allCompetitors.filter((c) => c.competitor_status === 'enable');
 
-  const eanIds      = [...new Set(products.map((p) => p.product_ean_id).filter(Boolean))];
+  const eanIds       = [...new Set(products.map((p) => p.product_ean_id).filter(Boolean))];
   const productCodes = [...new Set(products.map((p) => p.product_code).filter(Boolean))];
 
   // Build per-competitor price map
@@ -43,7 +43,7 @@ async function enrichProducts(db, products) {
                 competitor_product_code: 1,
                 product_price:           1,
                 product_url:             1,
-                product_stock_status:    1,
+                product_stock:           1, // FIX: Changed from product_stock_status to match DB
                 product_image:           1,
             }}
           )
@@ -96,6 +96,7 @@ async function enrichProducts(db, products) {
   }
 
   // Enrich
+  // Enrich
   return products.map((product) => {
     const ean      = product.product_ean_id;
     const ourPrice = toPrice(product.product_price);
@@ -104,14 +105,25 @@ async function enrichProducts(db, products) {
       const slug      = comp.competitor_slug;
       const cd        = competitorMap[slug]?.[ean];
       const compPrice = toPrice(cd?.product_price);
+      
+      // ── THE FIX: Smart "is_listed" logic ──
+      // 1. Check if the database explicitly says it's out of stock
+      const stockStr = String(cd?.product_stock || '').toLowerCase();
+      const isExplicitlyOos = stockStr.includes('out of stock') || stockStr === '0';
+      
+      // 2. Only consider it "listed" if we have a real price OR it is explicitly out of stock.
+      // This forces "No Result" scraping errors to be ignored and hidden from the UI.
+      const is_listed = !!cd && (compPrice !== null || isExplicitlyOos);
+
       return {
         slug,
         name:      comp.competitor_name || slug,
         price:     compPrice,
         price_gap: compPrice !== null && ourPrice !== null ? compPrice - ourPrice : null,
-        url:       cd?.product_url          || null,
-        stock:     cd?.product_stock_status || null,
-        image:     cd?.product_image        || null,
+        url:       cd?.product_url   || null,
+        stock:     cd?.product_stock || null,
+        is_listed: is_listed, 
+        image:     cd?.product_image || null,
       };
     });
 
@@ -150,25 +162,50 @@ exports.getAll = async (req, res) => {
   try {
     const db    = req.tenantDb;
     const page  = Math.max(1, parseInt(req.query.page  || '1', 10));
-    const limit = Math.max(1, parseInt(req.query.limit || '5', 10));
+    const limit = Math.max(1, parseInt(req.query.limit || '20', 10)); // Match frontend 20 limit
     const skip  = (page - 1) * limit;
     
     const { competitor: filterSlug, search, brand, category, rank, itemGroup } = req.query;
 
-    // 1. MUST include BOTH 'active' and 'completed' to hit exactly 1,940
+    // 1. Initial filter for Active & Completed products
     const mongoFilter = {
       status: 'active',
       ean_product_data_details_scrap_status: 'completed'
     };
 
+    // ── THE FIX: USE DASHBOARD STATICS TO GUARANTEE EXACT COUNT (e.g. 809) ──
+    if (filterSlug) {
+      const staticDoc = await db.collection('ept_dashbaord_statics').findOne({
+        competitor_name: filterSlug.toLowerCase().trim(),
+        status: 'active'
+      });
+
+      if (staticDoc && Array.isArray(staticDoc.productEanIds) && staticDoc.productEanIds.length > 0) {
+        // Force MongoDB to ONLY pull the exact EANs that make up the 809 count
+        mongoFilter.product_ean_id = { $in: staticDoc.productEanIds };
+      } else {
+        // Fallback if competitor has 0 products
+        mongoFilter._id = null; 
+      }
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
     if (search) {
       const re = { $regex: search, $options: 'i' };
-      mongoFilter.$or = [
-        { product_name:   re },
-        { product_brand:  re },
-        { product_ean_id: re },
-        { product_code:   re },
-      ];
+      const searchOr = {
+        $or: [
+          { product_name:   re },
+          { product_brand:  re },
+          { product_ean_id: re },
+          { product_code:   re },
+        ]
+      };
+      
+      if (mongoFilter.$and) {
+        mongoFilter.$and.push(searchOr);
+      } else {
+        mongoFilter.$or = searchOr.$or;
+      }
     }
     
     if (brand)         mongoFilter.product_brand    = brand;
@@ -180,19 +217,20 @@ exports.getAll = async (req, res) => {
     
     if (rank) mongoFilter.rank_by = rank;
 
-    const col      = db.collection('ept_product_details_new');
+    const col = db.collection('ept_product_details_new');
     
-    // This will now perfectly match the 1,940 from your dashboard
-    const total    = await col.countDocuments(mongoFilter); 
+    // Total count will now accurately reflect the exact number from dashboard (e.g. 809)
+    const total = await col.countDocuments(mongoFilter); 
     
+    // Pagination happens perfectly on the filtered items
     const products = await col.find(mongoFilter).skip(skip).limit(limit).toArray();
-    let enriched   = await enrichProducts(db, products);
+    
+    // Enrich with competitor prices
+    let enriched = await enrichProducts(db, products);
 
-    if (filterSlug) {
-      enriched = enriched.filter((p) =>
-        p.competitor_prices.some((c) => c.slug === filterSlug && c.price !== null)
-      );
-    }
+    // * WE REMOVED THE JAVASCRIPT FILTER HERE! *
+    // Now, a full 20 items will be sent to the frontend, even if they are "Out of Stock"
+    // or missing prices, perfectly maintaining your pagination layout.
 
     res.json({ data: enriched, total, page, totalPages: Math.ceil(total / limit) });
   } catch (error) {
