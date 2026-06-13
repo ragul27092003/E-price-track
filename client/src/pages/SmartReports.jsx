@@ -4,6 +4,7 @@ import { useStore } from "../store";
 import { fetchProducts } from "../services/productsService";
 import { fetchCompetitors } from "../services/competitorsService";
 import API from "../hooks/useApi";
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function parsePrice(raw) {
@@ -28,7 +29,9 @@ function computeRank(product) {
   if (ourPrice === null) return null;
   const compPrices = getCompPrices(product).map((c) => c.price);
   if (!compPrices.length) return 1;
-  return compPrices.filter((p) => p < ourPrice).length + 1;
+  
+  // Changed '<' to '<=' so tied competitors push our rank down to match the DB
+  return compPrices.filter((p) => p <= ourPrice).length + 1;
 }
 
 function getMarketAvg(product) {
@@ -41,21 +44,6 @@ function getLowestComp(product) {
   const comps = getCompPrices(product);
   if (!comps.length) return null;
   return comps.reduce((min, c) => (c.price < min.price ? c : min));
-}
-
-function getOurPriceStats(product) {
-  const prices = (product.price_history_30days || [])
-    .map((h) => parsePrice(h.product_price))
-    .filter((v) => v !== null);
-  if (!prices.length) {
-    const p = parsePrice(product.product_price);
-    return { low: p, avg: p, high: p };
-  }
-  return {
-    low: Math.min(...prices),
-    avg: Math.round(prices.reduce((a, b) => a + b, 0) / prices.length),
-    high: Math.max(...prices),
-  };
 }
 
 function marketStats(product) {
@@ -84,40 +72,7 @@ function slugColor(slug = "") {
   return BRAND_COLORS[h % BRAND_COLORS.length];
 }
 
-// High-contrast palette for chart lines — each hue is visually distinct
 const COMP_COLORS = ["#dc2626", "#16a34a", "#d97706", "#9333ea", "#0891b2", "#be185d", "#65a30d"];
-
-// ─── Tab filter functions ─────────────────────────────────────────────────────
-
-const TAB_FILTERS = {
-  "Easy Gain": (p) => computeRank(p) === 1 && getCompPrices(p).length > 0,
-  "Clever Move": (p) => {
-    const ourPrice = parsePrice(p.product_price);
-    const comps = getCompPrices(p);
-    if (!comps.length || ourPrice === null) return false;
-    return comps.some((c) => Math.abs(c.price - ourPrice) / Math.max(ourPrice, 1) < 0.01);
-  },
-  "Non Competitors": (p) => getCompPrices(p).length === 0,
-  "Positive Trend": (p) => {
-    if (computeRank(p) !== 1) return false;
-    const ourPrice = parsePrice(p.product_price);
-    const low = getLowestComp(p);
-    if (!low || ourPrice === null) return false;
-    return (low.price - ourPrice) / ourPrice > 0.05;
-  },
-  "Neutral Trend": (p) => {
-    if (computeRank(p) !== 1) return false;
-    const ourPrice = parsePrice(p.product_price);
-    const low = getLowestComp(p);
-    if (!low || ourPrice === null) return false;
-    const marginPct = (low.price - ourPrice) / ourPrice;
-    return marginPct >= 0 && marginPct <= 0.05;
-  },
-  "Negative Trend": (p) => {
-    const r = computeRank(p);
-    return r !== null && r >= 2;
-  },
-};
 
 // ─── UI Components ────────────────────────────────────────────────────────────
 
@@ -132,15 +87,12 @@ function ProductImage({ src, alt }) {
   }
   return (
     <img
-      src={src}
-      alt={alt}
-      onError={() => setErr(true)}
+      src={src} alt={alt} onError={() => setErr(true)}
       className="h-10 w-10 shrink-0 rounded-lg border border-slate-100 dark:border-slate-700/50 object-contain bg-slate-50 dark:bg-[#151a2a]"
     />
   );
 }
 
-// Safely resolves a logo path to a full URL (mirrors MarketCompetitor behaviour)
 function resolveLogoUrl(logo) {
   if (!logo) return null;
   if (logo.startsWith("blob:") || logo.startsWith("http://") || logo.startsWith("https://")) return logo;
@@ -155,24 +107,18 @@ function CompetitorLogo({ name = "", slug = "", logo = "" }) {
   if (logoSrc && !imgErr) {
     return (
       <div className="flex h-6 w-6 items-center justify-center rounded overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0">
-        <img
-          src={logoSrc}
-          alt={name}
-          onError={() => setImgErr(true)}
-          className="w-full h-full object-contain"
-        />
+        <img src={logoSrc} alt={name} onError={() => setImgErr(true)} className="w-full h-full object-contain" />
       </div>
     );
   }
   return (
-    <div
-      className="flex h-6 min-w-[52px] items-center justify-center rounded px-1 text-[8px] font-bold uppercase tracking-wider text-white shrink-0"
-      style={{ backgroundColor: bg }}
-    >
+    <div className="flex h-6 min-w-[52px] items-center justify-center rounded px-1 text-[8px] font-bold uppercase tracking-wider text-white shrink-0" style={{ backgroundColor: bg }}>
       {label}
     </div>
   );
 }
+
+// ─── Charts ───────────────────────────────────────────────────────────────────
 
 function Sparkline({ data, width = 50, height = 18, color = "#3b82f6" }) {
   if (!data || data.length < 2) return null;
@@ -199,7 +145,7 @@ function StockBadge({ stock }) {
     ? { label: `Low (${qty})`, dot: "bg-amber-400" }
     : { label: `In Stock (${qty})`, dot: "bg-emerald-500" };
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 dark:text-slate-600">
+    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-300">
       <span className={`h-2 w-2 rounded-full ${dot}`} />
       {label}
     </span>
@@ -233,9 +179,7 @@ function MetricCard({ label, value, sub, accent }) {
 }
 
 function PriceGapBadge({ value }) {
-  if (value === null || value === undefined) {
-    return <span className="text-xs text-slate-400 dark:text-slate-500">No data</span>;
-  }
+  if (value === null || value === undefined || value === 0) return null;
   const isNeg      = value < 0;
   const baseColors = isNeg ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700";
   const barColor   = isNeg ? "bg-emerald-500" : "bg-amber-500";
@@ -281,14 +225,12 @@ function HigherByBadge({ amount, label = "higher" }) {
 
 // ─── Historical Price Chart ────────────────────────────────────────────────────
 
-// Compact tick formatter: ₹1.2L / ₹14.9k / ₹999
 function fmtTick(v) {
   if (v >= 100000) return `₹${(v / 100000).toFixed(1)}L`;
   if (v >= 1000)   return `₹${(v / 1000).toFixed(1)}k`;
   return `₹${v}`;
 }
 
-// Smooth bezier path through points [{x,y}]
 function smoothPath(pts) {
   if (!pts || pts.length < 2) return "";
   let d = `M${pts[0].x},${pts[0].y}`;
@@ -333,13 +275,11 @@ function HistoricalPriceChart({ product, days, competitorMeta }) {
     [chartData, dataKeys]
   );
 
-  // Chart geometry constants (viewBox units)
   const PL = 62, PR = 12, PT = 12, PB = 26;
   const W  = 540, H = 220;
-  const PW = W - PL - PR;   // plot width
-  const PH = H - PT - PB;   // plot height
+  const PW = W - PL - PR;   
+  const PH = H - PT - PB;   
 
-  // Y-axis nice ticks
   const { yTicks, yMin, yMax } = useMemo(() => {
     if (!allVals.length) return { yTicks: [], yMin: 0, yMax: 1 };
     const rawMin = Math.min(...allVals);
@@ -347,30 +287,26 @@ function HistoricalPriceChart({ product, days, competitorMeta }) {
     const span   = rawMax - rawMin || 1;
     const mag    = Math.pow(10, Math.floor(Math.log10(span / 4)));
     const step   = Math.ceil((span / 4) / mag) * mag;
-    const yMin   = Math.floor(rawMin / step) * step;
-    const count  = Math.ceil((rawMax - yMin) / step) + 1;
-    const ticks  = Array.from({ length: Math.min(count, 6) }, (_, i) => yMin + i * step);
-    return { yTicks: ticks, yMin, yMax: ticks[ticks.length - 1] };
+    const yMinCalc   = Math.floor(rawMin / step) * step;
+    const count  = Math.ceil((rawMax - yMinCalc) / step) + 1;
+    const ticks  = Array.from({ length: Math.min(count, 6) }, (_, i) => yMinCalc + i * step);
+    return { yTicks: ticks, yMin: yMinCalc, yMax: ticks[ticks.length - 1] };
   }, [allVals]);
 
   const yRange = yMax - yMin || 1;
-  // Plain functions — called only during render, no stale-closure risk
   const getX = (i) => PL + (i / Math.max(chartData.length - 1, 1)) * PW;
   const getY = (v) => PT + PH - ((v - yMin) / yRange) * PH;
 
-  // X-axis ticks: at most 7
   const xTicks = useMemo(() => {
     const step = Math.max(Math.ceil(chartData.length / 7), 1);
     return chartData.map((d, i) => ({ i, date: d.date })).filter((_, i) => i % step === 0);
   }, [chartData]);
 
-  // Mouse → hovered index via SVG coordinate transform
   const handleMouseMove = (e) => {
     const svg = svgRef.current;
     if (!svg || !chartData.length) return;
     const pt  = svg.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
+    pt.x = e.clientX; pt.y = e.clientY;
     const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
     if (svgPt.x < PL || svgPt.x > W - PR) { setHoverIdx(null); return; }
     const idx = Math.round(((svgPt.x - PL) / PW) * (chartData.length - 1));
@@ -387,7 +323,6 @@ function HistoricalPriceChart({ product, days, competitorMeta }) {
     );
   }
 
-  // Build paths for each series
   const seriesPaths = dataKeys.map((key) => {
     const pts = chartData
       .map((d, i) => (d[key] !== null && d[key] !== undefined ? { x: getX(i), y: getY(d[key]) } : null))
@@ -395,22 +330,18 @@ function HistoricalPriceChart({ product, days, competitorMeta }) {
     return { key, pts, path: smoothPath(pts) };
   });
 
-  // Area under "My Price"
   const mePts   = seriesPaths[0].pts;
   const mePath  = seriesPaths[0].path;
   const areaPath = mePts.length > 1
     ? `${mePath} L${mePts[mePts.length - 1].x},${PT + PH} L${mePts[0].x},${PT + PH} Z`
     : "";
 
-  // Tooltip data for hovered index
   const hovered = hoverIdx !== null ? chartData[hoverIdx] : null;
-  // Position tooltip: keep it from going off screen
   const tooltipSvgX = hoverIdx !== null ? getX(hoverIdx) : 0;
   const tooltipLeftPct = (tooltipSvgX / W) * 100;
 
   return (
     <div className="flex flex-col h-full w-full">
-      {/* Legend */}
       <div className="mb-3 flex flex-wrap gap-5">
         {dataKeys.map((k, i) => (
           <span key={k} className="flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: colors[i] }}>
@@ -426,10 +357,7 @@ function HistoricalPriceChart({ product, days, competitorMeta }) {
         ))}
       </div>
 
-      {/* Chart wrapper */}
       <div className="flex-1 relative w-full min-h-[180px]" ref={wrapperRef}>
-
-        {/* Hover tooltip — positioned above cursor */}
         {hovered && (
           <div
             className="absolute z-20 pointer-events-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl px-3 py-2.5 text-[11px] min-w-[140px]"
@@ -439,13 +367,13 @@ function HistoricalPriceChart({ product, days, competitorMeta }) {
               transform: "translateY(calc(-100% - 8px))",
             }}
           >
-            <p className="font-bold text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1.5 border-b border-slate-100 dark:border-slate-700/50 pb-1">{hovered.date}</p>
+            <p className="font-bold text-slate-600 dark:text-slate-400 mb-1.5 border-b border-slate-100 dark:border-slate-700/50 pb-1">{hovered.date}</p>
             {dataKeys.map((k, i) => {
               const val = hovered[k];
               if (val === null || val === undefined) return null;
               return (
                 <div key={k} className="flex items-center justify-between gap-3 mt-0.5">
-                  <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 dark:text-slate-500">
+                  <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                     <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: colors[i] }} />
                     {labels[i]}
                   </span>
@@ -469,53 +397,35 @@ function HistoricalPriceChart({ product, days, competitorMeta }) {
               <stop offset="0%"   stopColor="#2B86C5" stopOpacity="0.18" />
               <stop offset="100%" stopColor="#2B86C5" stopOpacity="0.01" />
             </linearGradient>
-            {/* Clip so lines don't overflow into the axis padding */}
             <clipPath id="hpt-plot-clip">
               <rect x={PL} y={PT} width={PW} height={PH} />
             </clipPath>
           </defs>
 
-          {/* ── Y-axis grid lines + labels ── */}
           {yTicks.map((v) => {
             const y = getY(v);
             return (
               <g key={v}>
-                <line
-                  x1={PL} y1={y} x2={W - PR} y2={y}
-                  stroke="#e2e8f0" strokeWidth="1"
-                />
-                <text
-                  x={PL - 6} y={y}
-                  textAnchor="end" dominantBaseline="middle"
-                  fontSize="9.5" fill="#94a3b8" fontFamily="system-ui,sans-serif"
-                >
+                <line x1={PL} y1={y} x2={W - PR} y2={y} stroke="#e2e8f0" strokeWidth="1" />
+                <text x={PL - 6} y={y} textAnchor="end" dominantBaseline="middle" fontSize="9.5" fill="#94a3b8" fontFamily="system-ui,sans-serif">
                   {fmtTick(v)}
                 </text>
               </g>
             );
           })}
 
-          {/* ── X-axis labels ── */}
           {xTicks.map(({ i, date }) => (
-            <text
-              key={i}
-              x={getX(i)} y={H - 6}
-              textAnchor="middle"
-              fontSize="9.5" fill="#94a3b8" fontFamily="system-ui,sans-serif"
-            >
+            <text key={i} x={getX(i)} y={H - 6} textAnchor="middle" fontSize="9.5" fill="#94a3b8" fontFamily="system-ui,sans-serif">
               {date}
             </text>
           ))}
 
-          {/* ── Left axis border ── */}
           <line x1={PL} y1={PT} x2={PL} y2={PT + PH} stroke="#e2e8f0" strokeWidth="1" />
 
-          {/* ── Area fill under My Price ── */}
           {areaPath && (
             <path d={areaPath} fill="url(#hpt-area-grad)" clipPath="url(#hpt-plot-clip)" />
           )}
 
-          {/* ── Series lines ── */}
           {seriesPaths.map(({ key, path }, ki) =>
             path ? (
               <path
@@ -532,25 +442,14 @@ function HistoricalPriceChart({ product, days, competitorMeta }) {
             ) : null
           )}
 
-          {/* ── Hover crosshair + dots ── */}
           {hoverIdx !== null && hovered && (
             <g>
-              <line
-                x1={getX(hoverIdx)} y1={PT}
-                x2={getX(hoverIdx)} y2={PT + PH}
-                stroke="#94a3b8" strokeWidth="1" strokeDasharray="4,3"
-              />
+              <line x1={getX(hoverIdx)} y1={PT} x2={getX(hoverIdx)} y2={PT + PH} stroke="#94a3b8" strokeWidth="1" strokeDasharray="4,3" />
               {dataKeys.map((key, ki) => {
                 const val = hovered[key];
                 if (val === null || val === undefined) return null;
                 return (
-                  <circle
-                    key={key}
-                    cx={getX(hoverIdx)} cy={getY(val)}
-                    r="4.5"
-                    fill={colors[ki]}
-                    stroke="#fff" strokeWidth="2"
-                  />
+                  <circle key={key} cx={getX(hoverIdx)} cy={getY(val)} r="4.5" fill={colors[ki]} stroke="#fff" strokeWidth="2" />
                 );
               })}
             </g>
@@ -587,7 +486,7 @@ function PriceGapChart({ product }) {
 
   const PL = 48, PR = 12, PT = 16, PB = 20;
   const W = 320;
-  const H = 120;
+  const H = 140; 
   const PW = W - PL - PR;
   const PH = H - PT - PB;
 
@@ -602,15 +501,13 @@ function PriceGapChart({ product }) {
   const getY = (v) => midY - (v / maxAbs) * (PH / 2);
 
   const linePath = data.map((d, i) => `${i === 0 ? "M" : "L"}${getX(i)} ${getY(d.gap)}`).join(" ");
-
   const yTicks = [maxAbs, 0, -maxAbs];
 
   const handleMouseMove = (e) => {
     const svg = svgRef.current;
     if (!svg || !data.length) return;
     const pt  = svg.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
+    pt.x = e.clientX; pt.y = e.clientY;
     const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
     if (svgPt.x < PL || svgPt.x > W - PR) { setHoverIdx(null); return; }
     const idx = Math.round(((svgPt.x - PL) / PW) * (data.length - 1));
@@ -622,14 +519,11 @@ function PriceGapChart({ product }) {
   const hovered = hoverIdx !== null ? data[hoverIdx] : null;
   const tooltipSvgX = hoverIdx !== null ? getX(hoverIdx) : 0;
   const tooltipLeftPct = (tooltipSvgX / W) * 100;
-
   const areaPath = `${linePath} L${getX(data.length - 1)} ${midY} L${getX(0)} ${midY} Z`;
 
   return (
     <div className="flex flex-col h-full w-full">
-      <div className="flex-1 relative w-full h-full min-h-[120px]" ref={wrapperRef}>
-
-        {/* Tooltip — positioned above cursor */}
+      <div className="flex-1 relative w-full h-full min-h-[130px]" ref={wrapperRef}>
         {hovered && (
           <div
             className="absolute z-20 pointer-events-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl px-3 py-2.5 text-[11px] min-w-[130px]"
@@ -639,10 +533,10 @@ function PriceGapChart({ product }) {
               transform: "translateY(calc(-100% - 8px))",
             }}
           >
-            <p className="font-bold text-slate-600 dark:text-slate-400 dark:text-slate-500 mb-1.5 border-b border-slate-100 dark:border-slate-700/50 pb-1">{hovered.date}</p>
+            <p className="font-bold text-slate-600 dark:text-slate-400 mb-1.5 border-b border-slate-100 dark:border-slate-700/50 pb-1">{hovered.date}</p>
             <div className="flex items-center justify-between gap-3 mt-0.5">
-              <span className="text-slate-500 dark:text-slate-400 dark:text-slate-500">Gap vs Avg</span>
-              <span className={`font-bold ${hovered.gap < 0 ? "text-emerald-600" : hovered.gap > 0 ? "text-rose-600" : "text-slate-600 dark:text-slate-400 dark:text-slate-500"}`}>
+              <span className="text-slate-500 dark:text-slate-400">Gap vs Avg</span>
+              <span className={`font-bold ${hovered.gap < 0 ? "text-emerald-600" : hovered.gap > 0 ? "text-rose-600" : "text-slate-600"}`}>
                 {hovered.gap > 0 ? "+" : ""}{fmt(hovered.gap)}
               </span>
             </div>
@@ -658,106 +552,36 @@ function PriceGapChart({ product }) {
           onMouseLeave={() => setHoverIdx(null)}
         >
           <defs>
-            {/* Clip to above zero line → red zone (cost higher than market) */}
-            <clipPath id="pgc-above-zero">
-              <rect x={PL} y={PT} width={PW} height={midY - PT} />
-            </clipPath>
-            {/* Clip to below zero line → green zone (cost cheaper than market) */}
-            <clipPath id="pgc-below-zero">
-              <rect x={PL} y={midY} width={PW} height={PT + PH - midY} />
-            </clipPath>
+            <clipPath id="pgc-above-zero"><rect x={PL} y={PT} width={PW} height={midY - PT} /></clipPath>
+            <clipPath id="pgc-below-zero"><rect x={PL} y={midY} width={PW} height={PT + PH - midY} /></clipPath>
           </defs>
 
-          {/* Y-axis grid lines — zero line drawn bold as market reference */}
           {yTicks.map(v => (
             <g key={v}>
-              <line
-                x1={PL} y1={getY(v)} x2={W - PR} y2={getY(v)}
-                stroke={v === 0 ? "#475569" : "#e2e8f0"}
-                strokeWidth={v === 0 ? 2.5 : 1}
-                strokeDasharray={v === 0 ? "" : "4,3"}
-              />
+              <line x1={PL} y1={getY(v)} x2={W - PR} y2={getY(v)} stroke={v === 0 ? "#475569" : "#e2e8f0"} strokeWidth={v === 0 ? 2.5 : 1} strokeDasharray={v === 0 ? "" : "4,3"} />
               <text x={PL - 8} y={getY(v)} textAnchor="end" dominantBaseline="middle" fontSize="9.5" fill={v === 0 ? "#475569" : "#94a3b8"} fontFamily="system-ui,sans-serif" fontWeight={v === 0 ? "600" : "normal"}>
                 {v > 0 ? `+${fmtTick(v)}` : v < 0 ? `-${fmtTick(Math.abs(v))}` : "0"}
               </text>
             </g>
           ))}
 
-          {/* Red shadow: our cost HIGHER than market (gap > 0, above zero) */}
           <path d={areaPath} fill="rgba(239,68,68,0.18)" clipPath="url(#pgc-above-zero)" />
-
-          {/* Green shadow: our cost CHEAPER than market (gap < 0, below zero) */}
           <path d={areaPath} fill="rgba(34,197,94,0.18)" clipPath="url(#pgc-below-zero)" />
-
-          {/* Price gap line */}
           <path d={linePath} fill="none" stroke="#2B86C5" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
 
-          {data.map((d, i) => (
-            <circle key={i} cx={getX(i)} cy={getY(d.gap)} r="2.5" fill="#2B86C5" stroke="#fff" strokeWidth="1" />
-          ))}
+          {data.map((d, i) => <circle key={i} cx={getX(i)} cy={getY(d.gap)} r="2.5" fill="#2B86C5" stroke="#fff" strokeWidth="1" />)}
 
           {hoverIdx !== null && hovered && (
             <g>
-              <line
-                x1={getX(hoverIdx)} y1={PT}
-                x2={getX(hoverIdx)} y2={PT + PH}
-                stroke="#94a3b8" strokeWidth="1" strokeDasharray="4,3"
-              />
-              <circle
-                cx={getX(hoverIdx)} cy={getY(hovered.gap)}
-                r="4.5" fill={hovered.gap < 0 ? "#16a34a" : hovered.gap > 0 ? "#dc2626" : "#2B86C5"} stroke="#fff" strokeWidth="2"
-              />
+              <line x1={getX(hoverIdx)} y1={PT} x2={getX(hoverIdx)} y2={PT + PH} stroke="#94a3b8" strokeWidth="1" strokeDasharray="4,3" />
+              <circle cx={getX(hoverIdx)} cy={getY(hovered.gap)} r="4.5" fill={hovered.gap < 0 ? "#16a34a" : "#dc2626"} stroke="#fff" strokeWidth="2" />
             </g>
           )}
 
-          {data.map((d, i) =>
-            i % Math.max(Math.ceil(data.length / 5), 1) === 0 ? (
-              <text key={i} x={getX(i)} y={H - 4} textAnchor="middle" fontSize="9.5" fill="#94a3b8" fontFamily="system-ui,sans-serif">
-                {d.date}
-              </text>
-            ) : null
-          )}
+          {data.map((d, i) => i % Math.max(Math.ceil(data.length / 5), 1) === 0 ? (
+            <text key={i} x={getX(i)} y={H - 4} textAnchor="middle" fontSize="9.5" fill="#94a3b8" fontFamily="system-ui,sans-serif">{d.date}</text>
+          ) : null)}
         </svg>
-      </div>
-    </div>
-  );
-}
-
-// ─── Inventory Forecast (dummy data) ─────────────────────────────────────────
-
-const INVENTORY_DATA = [
-  { m: "Jan", cur: 80, pred: 90 }, { m: "Feb", cur: 60, pred: 75 },
-  { m: "Mar", cur: 90, pred: 85 }, { m: "Apr", cur: 70, pred: 80 },
-  { m: "May", cur: 50, pred: 70 }, { m: "Jun", cur: 85, pred: 95 },
-  { m: "Jul", cur: 75, pred: 88 }, { m: "Aug", cur: 65, pred: 80 },
-];
-
-function InventoryForecast() {
-  const W = 240; const H = 100;
-  const maxV = 150;
-  const bw = W / INVENTORY_DATA.length;
-  const bw2 = bw * 0.35;
-  return (
-    <div className="flex flex-col h-full w-full">
-      <div className="mb-2 flex gap-4 text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">
-        <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-blue-400 inline-block" />Current</span>
-        <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-emerald-400 inline-block" />Predicted</span>
-      </div>
-      <div className="flex-1 relative w-full">
-        <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-          {INVENTORY_DATA.map((d, i) => {
-            const x = i * bw + bw * 0.1;
-            return (
-              <g key={d.m}>
-                <rect x={x} y={H - (d.cur / maxV) * H} width={bw2} height={(d.cur / maxV) * H} fill="#60a5fa" rx="2" />
-                <rect x={x + bw2 + 2} y={H - (d.pred / maxV) * H} width={bw2} height={(d.pred / maxV) * H} fill="#34d399" rx="2" />
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-      <div className="mt-1 flex justify-between text-[10px] text-slate-400 dark:text-slate-500">
-        {INVENTORY_DATA.map((d) => <span key={d.m}>{d.m}</span>)}
       </div>
     </div>
   );
@@ -769,7 +593,7 @@ function CompetitorTable({ product, tab, competitorMeta }) {
   const ourPrice = parsePrice(product.product_price);
   const comps = getCompPrices(product);
 
-  const allEntries = [
+ const allEntries = [
     { name: "My Price", slug: "me", price: ourPrice, isMe: true },
     ...comps.map((c) => ({
       ...c,
@@ -779,45 +603,37 @@ function CompetitorTable({ product, tab, competitorMeta }) {
     })),
   ]
     .filter((e) => e.price !== null)
-    .sort((a, b) => a.price - b.price);
+    .sort((a, b) => {
+      if (a.price !== b.price) return a.price - b.price;
+      // Tie-breaker: Place competitors (isMe: false) before our store (isMe: true)
+      return a.isMe ? 1 : -1;
+    });
 
   const rank1Price = allEntries[0]?.price;
-
-  const colLabel =
-    tab === "Negative Trend"
-      ? "Higher By"
-      : tab === "Positive Trend"
-      ? "Higher By"
-      : tab === "Neutral Trend"
-      ? "Price Diff"
-      : "Cheaper By";
+  const colLabel = tab === "Negative Trend" ? "Higher By" : tab === "Positive Trend" ? "Higher By" : tab === "Neutral Trend" ? "Price Status" : "Cheaper By";
 
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-slate-50 dark:bg-[#151a2a] border-b border-slate-200 dark:border-slate-700">
-            <th className="text-left px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 text-xs uppercase tracking-wide">Competitor</th>
-            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 text-xs uppercase tracking-wide">Price</th>
-            <th className="text-center px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 text-xs uppercase tracking-wide">Rank</th>
-            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 dark:text-slate-500 text-xs uppercase tracking-wide">{colLabel}</th>
+            <th className="text-left px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">Competitor</th>
+            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">Price</th>
+            <th className="text-center px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">Rank</th>
+            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">{colLabel}</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
           {allEntries.map((entry, i) => {
             const rankNum = i + 1;
-            let diffVal = null;
-            let diffLabel = "";
-            let diffColor = "";
+            let diffVal = null; let diffLabel = ""; let diffColor = "";
 
             if (entry.isMe) {
               if (tab === "Negative Trend" && rank1Price !== null) {
                 diffVal = ourPrice - rank1Price;
                 diffLabel = diffVal > 0 ? `${fmt(diffVal)} higher` : "—";
                 diffColor = "text-rose-600";
-              } else {
-                diffLabel = "—";
-              }
+              } else { diffLabel = "—"; }
             } else {
               if (tab === "Positive Trend" || tab === "Easy Gain" || tab === "Neutral Trend" || tab === "Clever Move") {
                 diffVal = entry.price - (ourPrice || 0);
@@ -827,36 +643,21 @@ function CompetitorTable({ product, tab, competitorMeta }) {
                 diffVal = entry.price - (ourPrice || 0);
                 diffLabel = diffVal >= 0 ? `${fmt(diffVal)} lower` : `${fmt(Math.abs(diffVal))} higher`;
                 diffColor = diffVal >= 0 ? "text-emerald-600" : "text-rose-600";
-              } else {
-                diffLabel = "—";
-              }
+              } else { diffLabel = "—"; }
             }
 
             return (
-              <tr
-                key={entry.slug}
-                className={`transition-colors ${entry.isMe ? "bg-blue-50/60 font-semibold" : "hover:bg-slate-50 dark:bg-[#151a2a]"}`}
-              >
+              <tr key={entry.slug} className={`transition-colors ${entry.isMe ? "bg-blue-50/60 dark:bg-blue-950/20 font-semibold" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    {entry.isMe ? (
-                      <div className="flex h-6 w-6 items-center justify-center rounded bg-[#2B86C5] text-[8px] font-bold text-white uppercase shrink-0">
-                        ME
-                      </div>
-                    ) : (
-                      <CompetitorLogo name={entry.name} slug={entry.slug} logo={entry.logo} />
-                    )}
+                    {entry.isMe ? <div className="flex h-6 w-6 items-center justify-center rounded bg-[#2B86C5] text-[8px] font-bold text-white uppercase shrink-0">ME</div> : <CompetitorLogo name={entry.name} slug={entry.slug} logo={entry.logo} />}
                     <span className="text-slate-800 dark:text-white">{entry.name}</span>
-                    {rankNum === 1 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 rounded-full px-1.5 py-0.5">Rank 1</span>}
+                    {rankNum === 1 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 rounded-full px-1.5 py-0.5">Rank 1</span>}
                   </div>
                 </td>
                 <td className="px-4 py-3 text-right font-bold text-slate-800 dark:text-white">{fmt(entry.price)}</td>
-                <td className="px-4 py-3 text-center">
-                  <RankBadge rank={rankNum} total={allEntries.length} />
-                </td>
-                <td className={`px-4 py-3 text-right text-xs font-semibold ${diffColor}`}>
-                  {diffLabel}
-                </td>
+                <td className="px-4 py-3 text-center"><RankBadge rank={rankNum} total={allEntries.length} /></td>
+                <td className={`px-4 py-3 text-right text-xs font-semibold ${diffColor}`}>{diffLabel}</td>
               </tr>
             );
           })}
@@ -874,89 +675,63 @@ function HeaderMetrics({ product, tab }) {
   const rankTotal = getCompPrices(product).length + 1;
   const marketAvg = getMarketAvg(product);
   const lowestComp = getLowestComp(product);
-  const { low, avg, high } = getOurPriceStats(product);
 
   if (tab === "Non Competitors") {
     return (
       <div className="flex items-center flex-wrap gap-8">
         <MetricCard label="Current Price" value={fmt(ourPrice)} />
-        <div className="h-10 w-px bg-slate-200" />
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Rank</p>
-          <RankBadge rank={1} total={1} />
-        </div>
-        <div className="h-10 w-px bg-slate-200" />
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Stock</p>
-          <StockBadge stock={product.product_stock} />
-        </div>
+        <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
+        <div><p className="text-[11px] font-bold uppercase text-slate-400 mb-1">Rank</p><RankBadge rank={1} total={1} /></div>
+        <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
+        <div><p className="text-[11px] font-bold uppercase text-slate-400 mb-1">Stock</p><StockBadge stock={product.product_stock} /></div>
       </div>
     );
   }
 
-  // All tabs except Non Competitors share the same Price Gap badge
   const gap = priceGap(product);
-
-  let extraLabel = "Cheaper By";
-  let extraContent = null;
+  let extraLabel = "Cheaper By"; let extraContent = null;
 
   if (tab === "Easy Gain") {
-    extraLabel = "Cheaper By";
-    const cheaperBy = lowestComp ? lowestComp.price - ourPrice : null;
-    extraContent = <CheaperByBadge amount={cheaperBy} />;
-  } else if (tab === "Clever Move") {
-    extraLabel = "Cheaper By";
-    const cleverRank = computeRank(product);
-    const cheaperBy = cleverRank === 1
-      ? 1
-      : lowestComp ? ourPrice - lowestComp.price + 1 : null;
-    extraContent = <CheaperByBadge amount={cheaperBy} />;
+    extraLabel = "Cheaper By"; extraContent = <CheaperByBadge amount={lowestComp ? lowestComp.price - ourPrice : null} />;
+  }  else if (tab === "Clever Move") {
+    // Calculates how much cheaper we are compared to the most expensive competitor
+    const compPrices = getCompPrices(product).map((c) => c.price);
+    const highestCompPrice = Math.max(...compPrices);
+    
+    extraLabel = "Cheaper By"; 
+    extraContent = (
+      <CheaperByBadge 
+        amount={highestCompPrice && ourPrice !== null ? highestCompPrice - ourPrice : null} 
+      />
+    );
   } else if (tab === "Positive Trend") {
-    extraLabel = "Higher By";
-    const higherBy = lowestComp && ourPrice !== null ? lowestComp.price - ourPrice : null;
-    extraContent = <HigherByBadge amount={higherBy} label="higher" />;
-  } else if (tab === "Neutral Trend") {
-    extraLabel = "Price Diff";
-    const diff = lowestComp && ourPrice !== null ? lowestComp.price - ourPrice : null;
-    extraContent = <CheaperByBadge amount={diff} />;
+    extraLabel = "Higher By"; extraContent = <HigherByBadge amount={lowestComp && ourPrice !== null ? lowestComp.price - ourPrice : null} label="higher" />;
+  }  else if (tab === "Neutral Trend") {
+    extraLabel = "Price Status"; extraContent = <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-[12px] font-bold text-blue-700">Tied Price</span>;
   } else if (tab === "Negative Trend") {
-    extraLabel = "Higher By";
-    const higherBy = lowestComp && ourPrice !== null ? ourPrice - lowestComp.price : null;
-    extraContent = <HigherByBadge amount={higherBy} label="above rank 1" />;
+    extraLabel = "Higher By"; extraContent = <HigherByBadge amount={lowestComp && ourPrice !== null ? ourPrice - lowestComp.price : null} label="above rank 1" />;
   }
 
   return (
     <div className="flex items-center flex-wrap gap-8">
       <MetricCard label="Current Price" value={fmt(ourPrice)} />
-      <div className="h-10 w-px bg-slate-200" />
+      <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
       <MetricCard label="Market Average" value={fmt(marketAvg)} />
-      <div className="h-10 w-px bg-slate-200" />
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5">Price Gap</p>
-        <PriceGapBadge value={gap} />
-      </div>
-      <div className="h-10 w-px bg-slate-200" />
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5">{extraLabel}</p>
-        {extraContent}
-      </div>
-      <div className="h-10 w-px bg-slate-200" />
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Rank</p>
-        <RankBadge rank={rank} total={rankTotal} />
-      </div>
-      <div className="h-10 w-px bg-slate-200" />
-      <div>
-        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1">Stock</p>
-        <StockBadge stock={product.product_stock} />
-      </div>
+      <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
+      <div><p className="text-[11px] font-bold uppercase text-slate-400 mb-1.5">Price Gap</p><PriceGapBadge value={gap} /></div>
+      <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
+      <div><p className="text-[11px] font-bold uppercase text-slate-400 mb-1.5">{extraLabel}</p>{extraContent}</div>
+      <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
+      <div><p className="text-[11px] font-bold uppercase text-slate-400 mb-1">Rank</p><RankBadge rank={rank} total={rankTotal} /></div>
+      <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
+      <div><p className="text-[11px] font-bold uppercase text-slate-400 mb-1">Stock</p><StockBadge stock={product.product_stock} /></div>
     </div>
   );
 }
 
 // ─── Sidebar Product Card ────────────────────────────────────────────────────
 
-function SidebarProduct({ product, isSelected, onClick, tab }) {
+function SidebarProduct({ product, isSelected, onClick }) {
   const ourPrice = parsePrice(product.product_price);
   const rank = computeRank(product);
   const rankTotal = getCompPrices(product).length + 1;
@@ -969,26 +744,26 @@ function SidebarProduct({ product, isSelected, onClick, tab }) {
     <button
       onClick={onClick}
       className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-all ${
-        isSelected ? "bg-[#ebf5fb] ring-1 ring-[#2B86C5]/30" : "hover:bg-slate-100 dark:hover:bg-slate-700/60"
+        isSelected ? "bg-[#ebf5fb] dark:bg-blue-950/40 ring-1 ring-[#2B86C5]/30" : "hover:bg-slate-100 dark:hover:bg-slate-800/50"
       }`}
     >
       <ProductImage src={product.product_image} alt={product.product_name} />
       <div className="flex-1 min-w-0">
-        <p className={`font-semibold text-[13px] truncate ${isSelected ? "text-[#1e6191]" : "text-slate-800 dark:text-white"}`}>
+        <p className={`font-semibold text-[13px] truncate ${isSelected ? "text-[#1e6191] dark:text-blue-400" : "text-slate-800 dark:text-white"}`}>
           {product.product_name}
         </p>
         <div className="flex items-center gap-2 mt-0.5">
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">{product.product_ean_id}</p>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">{product.product_ean_id}</p>
           {rank && <RankBadge rank={rank} total={rankTotal} />}
         </div>
-        <p className="text-[12px] font-bold text-slate-700 dark:text-slate-300 dark:text-slate-600 mt-0.5">{fmt(ourPrice)}</p>
+        <p className="text-[12px] font-bold text-slate-700 dark:text-slate-300 mt-0.5">{fmt(ourPrice)}</p>
       </div>
       <Sparkline data={sparkData} color={isSelected ? "#2B86C5" : "#94a3b8"} />
     </button>
   );
 }
 
-// ─── Export ───────────────────────────────────────────────────────────────────
+// ─── Export Logic ───────────────────────────────────────────────────────────
 
 function exportSmartReportCSV(products, tab, competitorMeta, exportType = "A") {
   const escape = (val) => {
@@ -1012,7 +787,6 @@ function exportSmartReportCSV(products, tab, competitorMeta, exportType = "A") {
     URL.revokeObjectURL(url);
   };
 
-  // For Type B: collect unique competitor slugs across all products
   let slugMap = {};
   if (exportType === "B" && !isNonComp) {
     products.forEach((p) => {
@@ -1052,291 +826,382 @@ function exportSmartReportCSV(products, tab, competitorMeta, exportType = "A") {
 
     let row;
     if (isNonComp) {
-      row = [
-        p.product_name || "",
-        p.product_ean_id || p.product_code || "",
-        fmtNum(ourPrice), sap, store,
-        p.product_brand || "", pGroup,
-        fmtNum(low), fmtNum(avg), fmtNum(high),
-        p.product_stock ?? "",
-      ];
+      row = [p.product_name || "", p.product_ean_id || p.product_code || "", fmtNum(ourPrice), sap, store, p.product_brand || "", pGroup, fmtNum(low), fmtNum(avg), fmtNum(high), p.product_stock ?? ""];
     } else if (exportType === "B") {
       const compMap = {};
       (p.competitor_prices || []).forEach((c) => {
         const outOfStock = c.price === null || c.price === undefined || c.stock === 0;
         compMap[c.slug] = outOfStock ? "Out Of Stock" : c.price;
       });
-      row = [
-        p.product_name || "",
-        p.product_ean_id || p.product_code || "",
-        rank !== null ? `="${rank}/${rankTotal}"` : "",
-        fmtNum(ourPrice), sap, store,
-        fmtNum(gapAmount),
-        lowestName,
-        fmtNum(lowest?.price),
-        p.product_brand || "", pGroup,
-        p.product_stock ?? "",
-        ...bSlugs.map((s) => compMap[s] ?? "Out Of Stock"),
-      ];
+      row = [p.product_name || "", p.product_ean_id || p.product_code || "", rank !== null ? `="${rank}/${rankTotal}"` : "", fmtNum(ourPrice), sap, store, fmtNum(gapAmount), lowestName, fmtNum(lowest?.price), p.product_brand || "", pGroup, p.product_stock ?? "", ...bSlugs.map((s) => compMap[s] ?? "Out Of Stock")];
     } else {
-      // Type A
-      const compDetail = comps
-        .map((c) => {
-          const m = competitorMeta?.[c.slug] || {};
-          return `${m.name || c.name || c.slug}: ₹${c.price.toLocaleString("en-IN")}`;
-        })
-        .join(" | ");
-      row = [
-        p.product_name || "",
-        p.product_ean_id || p.product_code || "",
-        rank !== null ? `="${rank}/${rankTotal}"` : "",
-        fmtNum(ourPrice), sap, store,
-        fmtNum(gapAmount),
-        lowestName,
-        fmtNum(lowest?.price),
-        p.product_brand || "", pGroup,
-        compDetail,
-        p.product_stock ?? "",
-      ];
+      const compDetail = comps.map((c) => { const m = competitorMeta?.[c.slug] || {}; return `${m.name || c.name || c.slug}: ₹${c.price.toLocaleString("en-IN")}`; }).join(" | ");
+      row = [p.product_name || "", p.product_ean_id || p.product_code || "", rank !== null ? `="${rank}/${rankTotal}"` : "", fmtNum(ourPrice), sap, store, fmtNum(gapAmount), lowestName, fmtNum(lowest?.price), p.product_brand || "", pGroup, compDetail, p.product_stock ?? ""];
     }
-
     return row.map(escape).join(",");
   });
 
   triggerDownload([headers.map(escape).join(","), ...rows].join("\r\n"));
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 const TABS = ["Easy Gain", "Clever Move", "Non Competitors", "Positive Trend", "Neutral Trend", "Negative Trend"];
 const HISTORY_FILTERS = [
-  { label: "Last 5 Days", value: 5 },
-  { label: "Last 7 Days", value: 7 },
-  { label: "Last 10 Days", value: 10 },
-  { label: "Last 20 Days", value: 20 },
+  { label: "Last 5 Days", value: 5 }, { label: "Last 7 Days", value: 7 },
+  { label: "Last 10 Days", value: 10 }, { label: "Last 20 Days", value: 20 },
   { label: "Last 30 Days", value: 30 },
 ];
 
 export default function SmartReports() {
   const location = useLocation();
-  const { products, productsLoading, productsError, setProducts, setProductsLoading, setProductsError, competitors, setCompetitors } = useStore();
+  const { competitors, setCompetitors, overallStatistics, fetchOverallStatistics, activeStoreId } = useStore();
   const exportType = useStore((s) => s.exportType) || "A";
+
   const [activeTab, setActiveTab] = useState(location.state?.tab || "Easy Gain");
   const [selectedEan, setSelectedEan] = useState(null);
   const [historyDays, setHistoryDays] = useState(30);
 
+  // ── PROGRESSIVE BATCH DRIVEN STATES ──
+  const [allProducts, setAllProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState(""); 
+  const [displayLimit, setDisplayLimit] = useState(40);
+
+  const sidebarRef = useRef(null);
+
+  // 1. Progressive loader: Streams products page by page dynamically
   useEffect(() => {
-    if (!products.length) {
-      setProductsLoading(true);
-      fetchProducts()
-  .then((data) => {
-    const arr = Array.isArray(data) ? data : (data?.products ?? data?.data ?? data?.items ?? []);
-    setProducts(arr);
-    setProductsLoading(false);
-  })
-        .catch((e) => {
-          setProductsError(e?.message || "Failed to load products");
-          setProductsLoading(false);
-        });
-    }
+    let isMounted = true;
+    setAllProducts([]);
+    setLoading(true);
+
+    const loadBatch = async (pageNo) => {
+      try {
+        const res = await fetchProducts({ page: pageNo, limit: 200 });
+        if (!isMounted) return;
+
+        const arr = Array.isArray(res) ? res : (res?.data || res?.products || []);
+        
+        if (arr.length === 0) {
+          setLoading(false);
+          return;
+        }
+
+        setAllProducts((prev) => [...prev, ...arr]);
+        
+        if (pageNo === 1) {
+          setLoading(false); 
+        }
+
+        if (arr.length === 200) {
+          loadBatch(pageNo + 1); 
+        }
+      } catch (err) {
+        console.error("Error loading smart report batch:", err);
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadBatch(1);
+
     if (!competitors.length) {
-      fetchCompetitors()
-        .then((data) => setCompetitors(data))
-        .catch(() => {});
+      fetchCompetitors().then((data) => setCompetitors(data)).catch(() => {});
     }
-  }, []);
+    if (!overallStatistics) {
+      fetchOverallStatistics();
+    }
 
-  const competitorMeta = useMemo(
-    () => Object.fromEntries((competitors || []).map((c) => [c.slug, c])),
-    [competitors]
-  );
+    return () => { isMounted = false; };
+  }, [activeStoreId]);
 
- const tabProducts = useMemo(
-  () => (Array.isArray(products) ? products : []).filter(TAB_FILTERS[activeTab] || (() => false)),
-  [products, activeTab]
-);
+  // 2. Exact requested criteria computations + front-end search filtering
+  const filteredProducts = useMemo(() => {
+    let result = allProducts.filter((p) => {
+      const activeComps = (p.competitor_prices || []).filter((c) => {
+        const hasPrice = parsePrice(c.price) !== null;
+        const isOos = !c.stock || String(c.stock).toLowerCase().includes("out of stock") || String(c.stock) === "0";
+        return c.is_listed && hasPrice && !isOos;
+      });
 
-  const selectedProduct = useMemo(() => {
-    if (!tabProducts.length) return null;
-    return tabProducts.find((p) => p.product_ean_id === selectedEan) || tabProducts[0];
-  }, [tabProducts, selectedEan]);
+      const ourPrice = parsePrice(p.product_price);
 
-  // Reset selection when tab changes
+      // CRITERIA 1: Non Competitors
+      if (activeTab === "Non Competitors") {
+        return activeComps.length === 0;
+      }
+
+      if (ourPrice === null) return false;
+      const compPrices = activeComps.map((c) => parsePrice(c.price)).filter((v) => v !== null);
+      const rank = compPrices.filter((price) => price < ourPrice).length + 1;
+
+      // CRITERIA 2: Positive Trend (Must be active, scrap completed, and Rank 1)
+      if (activeTab === "Positive Trend") {
+        const isActive = p.status === "active";
+        const isScrapCompleted = p.ean_product_data_details_scrap_status === "completed";
+        if (!isActive || !isScrapCompleted) return false;
+        return rank === 1;
+      }
+
+      // CRITERIA 3: Negative Trend (Must be active, scrap completed, and trailing with higher prices)
+      if (activeTab === "Negative Trend") {
+        const isActive = p.status === "active";
+        const isScrapCompleted = p.ean_product_data_details_scrap_status === "completed";
+        if (!isActive || !isScrapCompleted) return false;
+        return activeComps.length > 0 && rank >= 2;
+      }
+
+      // CRITERIA 4: Easy Gain (Must be active, scrap completed, Rank 1, and have active competitors)
+      if (activeTab === "Easy Gain") {
+        const isActive = p.status === "active";
+        const isScrapCompleted = p.ean_product_data_details_scrap_status === "completed";
+        if (!isActive || !isScrapCompleted) return false;
+        return rank === 1 && activeComps.length > 0;
+      }
+      
+// CRITERIA 4: Clever Move (Strategic Match with 1 Rupee Undercut Tolerance)
+      if (activeTab === "Clever Move") {
+        const isActive = p.status === "active";
+        const isScrapCompleted = p.ean_product_data_details_scrap_status === "completed";
+        if (!isActive || !isScrapCompleted) return false;
+
+        if (compPrices.length === 0 || ourPrice === null) return false;
+
+        const lowestCompPrice = Math.min(...compPrices);
+
+        // Rule 1: We must never be Rank 1 (must be higher than the absolute lowest price)
+        if (ourPrice <= lowestCompPrice) return false;
+
+        // Rule 2: Check if our price matches a competitor tier exactly OR undercuts it by up to 1 rupee
+        const matchesCompetitorTier = compPrices.some((price) => {
+          const priceDiff = price - ourPrice;
+          // Returns true if same price (0) or if we are 1 rupee cheaper (1)
+          return priceDiff >= 0 && priceDiff <= 1;
+        });
+
+        return matchesCompetitorTier;
+      }
+      // CRITERIA 5: Neutral Trend (Tied exactly with the lowest competitor price)
+if (activeTab === "Neutral Trend") {
+  if (compPrices.length === 0) return false;
+  
+  // This automatically finds the Rank 1 competitor price
+  const lowestCompPrice = Math.min(...compPrices);
+  
+  // Checks if our price matches them exactly (whether we're tied at Rank 2, 3, or 4)
+  return ourPrice === lowestCompPrice;
+}
+
+      return true;
+    });
+
+    // Apply Live Search Box Filter string check logic
+    if (search.trim() !== "") {
+      const query = search.toLowerCase().trim();
+      result = result.filter((p) => 
+        (p.product_name || "").toLowerCase().includes(query) ||
+        (p.product_brand || "").toLowerCase().includes(query) ||
+        (p.product_ean_id || "").toLowerCase().includes(query) ||
+        (p.product_code || "").toLowerCase().includes(query)
+      );
+    }
+
+    return result;
+  }, [allProducts, activeTab, search]);
+
+  // Reset states on tab switch alterations 
   useEffect(() => {
+    setDisplayLimit(40);
     setSelectedEan(null);
+    setSearch(""); // Automatically clear search text whenever users switch tabs
+    if (sidebarRef.current) sidebarRef.current.scrollTop = 0;
   }, [activeTab]);
 
-  const tabCounts = useMemo(
-    () =>
-      Object.fromEntries(
-        TABS.map((tab) => [tab, (products || []).filter(TAB_FILTERS[tab] || (() => false)).length])
-      ),
-    [products]
-  );
+  const handleSidebarScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop <= clientHeight + 50 && displayLimit < filteredProducts.length) {
+      setDisplayLimit((prev) => prev + 40);
+    }
+  };
+
+  const competitorMeta = useMemo(() => Object.fromEntries((competitors || []).map((c) => [c.slug, c])), [competitors]);
+  
+  const paginatedProducts = useMemo(() => {
+    return filteredProducts.slice(0, displayLimit);
+  }, [filteredProducts, displayLimit]);
+
+  const selectedProduct = useMemo(() => {
+    if (!paginatedProducts.length) return null;
+    return paginatedProducts.find((p) => p.product_ean_id === selectedEan) || paginatedProducts[0];
+  }, [paginatedProducts, selectedEan]);
+
+  // Maps the backend statistics directly into tab counts instantly on load
+  const tabCounts = useMemo(() => {
+    const s = overallStatistics;
+    if (s) {
+      return {
+        "Easy Gain":       s.varEasyGainCount        ?? 0,
+        "Clever Move":     s.varCleverMoveCount       ?? 0,
+        "Non Competitors": s.varNonCompetitorCount    ?? 0,
+        "Positive Trend":  s.varPostiveTrendingCount  ?? 0,
+        "Neutral Trend":   s.varEqualTrendingCount    ?? 0,
+        "Negative Trend":  s.varNegativeTrendingCount ?? 0,
+      };
+    }
+    return Object.fromEntries(TABS.map((tab) => [tab, 0]));
+  }, [overallStatistics]);
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0b101e] text-slate-800 dark:text-white p-3 md:p-6 lg:p-8">
       <div className="mx-auto max-w-[1400px]">
         <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+          
+          {/* Header Action Section Bar */}
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-xl md:text-2xl font-bold text-slate-800 dark:text-white">Smart Reports</h2>
-            {tabProducts.length > 0 && (
-              <button
-                onClick={() => exportSmartReportCSV(tabProducts, activeTab, competitorMeta, exportType)}
-                className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors"
-              >
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
+            
+            {/* Search Input Box Layout Container */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+              <div className="flex w-full sm:max-w-xs items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-blue-100 dark:focus-within:ring-blue-900/40">
+                <svg className="text-slate-400 shrink-0" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
                 </svg>
-                Export {activeTab}
-              </button>
-            )}
+                <input
+                  type="text" 
+                  placeholder="Search product name, brand or code…" 
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full border-0 bg-transparent text-sm text-slate-800 dark:text-white outline-none placeholder:text-slate-400 bg-transparent"
+                />
+                {search && (
+                  <button onClick={() => setSearch("")} className="text-slate-400 hover:text-slate-600 shrink-0">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                  </button>
+                )}
+              </div>
+
+              {filteredProducts.length > 0 && (
+                <button
+                  onClick={() => exportSmartReportCSV(filteredProducts, activeTab, competitorMeta, exportType)}
+                  className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors whitespace-nowrap"
+                >
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Export {activeTab}
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Tab Navigation */}
-          <div className="mb-8 flex overflow-x-auto border-b border-slate-200 dark:border-slate-700 gap-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {/* Tab Navigation header line */}
+          <div className="mb-8 flex overflow-x-auto border-b border-slate-200 dark:border-slate-700 gap-0 [scrollbar-width:none]">
             {TABS.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`pb-3 text-sm font-semibold transition-all relative flex shrink-0 items-center gap-2 mr-5 whitespace-nowrap ${
-                  activeTab === tab ? "text-[#1e6191]" : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:text-slate-400 dark:text-slate-500"
+                  activeTab === tab ? "text-[#1e6191] dark:text-blue-400" : "text-slate-400 hover:text-slate-600"
                 }`}
               >
                 {tab}
-                {tabCounts[tab] > 0 && (
-                  <span className={`text-[10px] rounded-full px-1.5 py-0.5 font-bold ${activeTab === tab ? "bg-[#dbeafe] text-[#1e6191]" : "bg-slate-100 text-slate-500 dark:text-slate-400 dark:text-slate-500"}`}>
-                    {tabCounts[tab]}
-                  </span>
-                )}
-                {activeTab === tab && (
-                  <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#2B86C5] rounded-t-md" />
-                )}
+                <span className={`text-[10px] rounded-full px-1.5 py-0.5 font-bold ${activeTab === tab ? "bg-[#dbeafe] text-[#1e6191]" : "bg-slate-100 text-slate-500"}`}>
+                  {tabCounts[tab]}
+                </span>
+                {activeTab === tab && <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#2B86C5] rounded-t-md" />}
               </button>
             ))}
           </div>
 
-          {/* Loading / Error */}
-          {productsLoading && (
-            <div className="flex items-center justify-center py-24 text-slate-400 dark:text-slate-500">
+          {allProducts.length === 0 && loading ? (
+            <div className="flex items-center justify-center py-24 text-slate-400">
               <svg className="animate-spin h-6 w-6 mr-3 text-[#2B86C5]" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
               </svg>
               Loading products…
             </div>
-          )}
+          ) : filteredProducts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+              <p className="font-medium">No matching products found</p>
+            </div>
+          ) : (
+            <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+              {/* Left Paginated Scroll Sidebar */}
+              <div
+                ref={sidebarRef}
+                onScroll={handleSidebarScroll}
+                className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 shadow-sm h-[680px] overflow-y-auto flex flex-col gap-1"
+              >
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">
+                  {search.trim() !== "" 
+                    ? `${filteredProducts.length} Match${filteredProducts.length !== 1 ? "es" : ""}`
+                    : `${tabCounts[activeTab]} Product${tabCounts[activeTab] !== 1 ? "s" : ""}`
+                  }
+                </p>
+                
+                {paginatedProducts.map((p) => (
+                  <SidebarProduct
+                    key={p.product_ean_id || p.product_code || p._id}
+                    product={p}
+                    isSelected={selectedProduct?.product_ean_id === p.product_ean_id}
+                    onClick={() => setSelectedEan(p.product_ean_id)}
+                  />
+                ))}
+              </div>
 
-          {productsError && !productsLoading && (
-            <div className="rounded-lg bg-rose-50 border border-rose-200 p-4 text-rose-700 text-sm">{productsError}</div>
-          )}
-
-          {!productsLoading && !productsError && (
-            <div key={activeTab} className="animate-in fade-in slide-in-from-right-4 duration-500">
-              {tabProducts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-24 text-slate-400 dark:text-slate-500">
-                  <svg className="h-12 w-12 mb-4 opacity-30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM16 3H8a2 2 0 00-2 2v2h12V5a2 2 0 00-2-2z" />
-                  </svg>
-                  <p className="font-medium">No products in this category</p>
-                </div>
-              ) : (
-                <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
-                  {/* Left: Product Sidebar */}
-                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 shadow-sm h-[300px] md:h-[680px] overflow-y-auto flex flex-col gap-1">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-2 py-1">
-                      {tabProducts.length} Product{tabProducts.length !== 1 ? "s" : ""}
-                    </p>
-                    {tabProducts.map((p) => (
-                      <SidebarProduct
-                        key={p.product_ean_id}
-                        product={p}
-                        isSelected={selectedProduct?.product_ean_id === p.product_ean_id}
-                        onClick={() => setSelectedEan(p.product_ean_id)}
-                        tab={activeTab}
-                      />
-                    ))}
+              {/* Right Side Metrics & Visualization Panel */}
+              {selectedProduct && (
+                <div className="space-y-5">
+                  <div className="flex items-center gap-4">
+                    <ProductImage src={selectedProduct.product_image} alt={selectedProduct.product_name} />
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-800 dark:text-white">{selectedProduct.product_name}</h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">{selectedProduct.product_brand} · EAN: {selectedProduct.product_ean_id || selectedProduct.product_code}</p>
+                    </div>
                   </div>
 
-                  {/* Right: Detail Panel */}
-                  {selectedProduct && (
-                    <div className="space-y-5">
-                      {/* Product Title */}
-                      <div className="flex items-center gap-4">
-                        <ProductImage src={selectedProduct.product_image} alt={selectedProduct.product_name} />
-                        <div>
-                          <h3 className="text-lg font-bold text-slate-800 dark:text-white">{selectedProduct.product_name}</h3>
-                          <p className="text-sm text-slate-500 dark:text-slate-400 dark:text-slate-500">{selectedProduct.product_brand} · EAN: {selectedProduct.product_ean_id}</p>
-                        </div>
-                      </div>
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 md:p-5 shadow-sm">
+                    <HeaderMetrics product={selectedProduct} tab={activeTab} />
+                  </div>
 
-                      {/* Header Metrics */}
-                      <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 md:p-5 shadow-sm">
-                        <HeaderMetrics product={selectedProduct} tab={activeTab} />
-                      </div>
-
-                      {/* Competitor Table (not for Non Competitors tab) */}
-                      {activeTab !== "Non Competitors" && getCompPrices(selectedProduct).length > 0 && (
-                        <div className="overflow-x-auto rounded-xl">
-                        <CompetitorTable
-                          product={selectedProduct}
-                          tab={activeTab}
-                          competitorMeta={competitorMeta}
-                        />
-                        </div>
-                      )}
-
-                      {/* Charts Row */}
-                      <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
-                        {/* Historical Price Trends */}
-                        <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 md:p-5 shadow-sm flex flex-col min-h-[260px] md:min-h-[300px]">
-                          <div className="mb-4 flex items-center justify-between">
-                            <h3 className="text-sm font-bold text-slate-800 dark:text-white">Historical Price Trends</h3>
-                            <select
-                              value={historyDays}
-                              onChange={(e) => setHistoryDays(Number(e.target.value))}
-                              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 dark:text-slate-500 outline-none focus:border-blue-300"
-                            >
-                              {HISTORY_FILTERS.map((f) => (
-                                <option key={f.value} value={f.value}>{f.label}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="flex-1 relative">
-                            <HistoricalPriceChart
-                              product={selectedProduct}
-                              days={historyDays}
-                              competitorMeta={competitorMeta}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Right column charts */}
-                        <div className="flex flex-col gap-5">
-                          {/* Inventory Forecast */}
-                          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 md:p-5 shadow-sm flex flex-col min-h-[160px] md:min-h-[180px]">
-                            <h3 className="mb-3 text-sm font-bold text-slate-800 dark:text-white">Inventory Forecast</h3>
-                            <div className="flex-1 relative w-full min-h-[100px]">
-                              <InventoryForecast />
-                            </div>
-                          </div>
-
-                          {/* Price Gap History */}
-                          <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 md:p-5 shadow-sm flex flex-col min-h-[140px] md:min-h-[160px]">
-                            <div className="flex items-center justify-between mb-3">
-                              <h3 className="text-sm font-bold text-slate-800 dark:text-white">Price Gap History</h3>
-                              <span className="text-[10px] text-slate-400 dark:text-slate-500">30 days · vs avg competitor</span>
-                            </div>
-                            <div className="flex-1 relative w-full min-h-[80px]">
-                              <PriceGapChart product={selectedProduct} />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                  {activeTab !== "Non Competitors" && getCompPrices(selectedProduct).length > 0 && (
+                    <div className="overflow-x-auto rounded-xl">
+                      <CompetitorTable product={selectedProduct} tab={activeTab} competitorMeta={competitorMeta} />
                     </div>
                   )}
+
+                  <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+                    {/* Historical Trends Graph */}
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 md:p-5 shadow-sm flex flex-col min-h-[300px]">
+                      <div className="mb-4 flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-white">Historical Price Trends</h3>
+                        <select
+                          value={historyDays}
+                          onChange={(e) => setHistoryDays(Number(e.target.value))}
+                          className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 outline-none"
+                        >
+                          {HISTORY_FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                        </select>
+                      </div>
+                      <div className="flex-1 relative">
+                        <HistoricalPriceChart product={selectedProduct} days={historyDays} competitorMeta={competitorMeta} />
+                      </div>
+                    </div>
+
+                    {/* Price Gap History Graph */}
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 md:p-5 shadow-sm flex flex-col justify-between min-h-[300px]">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-white">Price Gap History</h3>
+                        <span className="text-[10px] text-slate-400">30 days · vs avg competitor</span>
+                      </div>
+                      <div className="flex-1 relative w-full flex items-center">
+                        <PriceGapChart product={selectedProduct} />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

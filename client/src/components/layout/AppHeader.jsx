@@ -167,12 +167,12 @@ export function AppHeader() {
           >
             {profilePicture ? (
               <img
-                src={profilePicture}
+                src={storeLogo}
                 alt="Profile"
-                className="h-9 w-9 rounded-full object-cover border-2 border-border"
+                className="h-10 w-10 rounded-3xl object-contain border-2 border-border"
               />
             ) : (
-              <div className="h-9 w-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold">
+              <div className="h-10 w-10 rounded-3xl bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold">
                 {initials}
               </div>
             )}

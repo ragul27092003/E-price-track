@@ -47,7 +47,7 @@ export const useStore = create(
       }),
     }
   )
-);
+); 
 
 // ── Selectors ───────────────────────────────────────────────────────────────
 // Use these in components instead of deriving values inline

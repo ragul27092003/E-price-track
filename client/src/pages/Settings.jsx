@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  User, Mail, Lock, Eye, EyeOff, Trash2, UserPlus,
-  X, Check, AlertCircle, Users, FileText, ChevronDown, Camera,
-} from "lucide-react";
+import {User, Mail, Lock, Eye, EyeOff, Trash2, UserPlus,X, Check, AlertCircle, Users, FileText, ChevronDown, Camera,} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useStore } from "@/store";
@@ -34,7 +31,7 @@ function Avatar({ size = "lg", primaryColor, companyName = "", photoUrl = null }
   if (photoUrl) {
     return (
       <div className={`${sizeClass} rounded-full overflow-hidden shadow-sm shrink-0`}>
-        <img src={photoUrl} alt="Profile" className="w-full h-full object-cover" />
+        <img src={photoUrl} alt="Profile" className="w-full h-full object-contain" />
       </div>
     );
   }
@@ -51,7 +48,8 @@ function Avatar({ size = "lg", primaryColor, companyName = "", photoUrl = null }
   );
 }
 
-// ── MyAccountTab ────────────────────────────────────────────────────────────
+
+
 function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) {
   const user = useStore((s) => s.user);
   const profile = useStore((s) => s.profile);

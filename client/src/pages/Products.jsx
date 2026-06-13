@@ -137,19 +137,20 @@ function RankBadge({ product }) {
   );
 }
 
-// ── PriceGapBadge — badge + 7d/30d links; always shows links when ean available ─────────
 function PriceGapBadge({ value, ean }) {
   const navigate = useNavigate();
 
   const hasData = value !== null && value !== undefined;
-  const isNeg = hasData && value < 0;
+  const isZero  = hasData && value === 0; // Check if the gap is exactly 0
+  const isNeg   = hasData && value < 0;
+  
   const baseColors = isNeg ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700";
   const barColor   = isNeg ? "bg-emerald-500" : "bg-amber-500";
 
   return (
     <div className="flex flex-col items-start gap-2">
-      {/* Percentage badge — only show when data exists */}
-      {hasData && (
+      {/* Percentage badge — only show when data exists AND it is not 0% */}
+      {hasData && !isZero && (
         <div className={`relative inline-flex items-center gap-1 rounded-full pr-3 pl-2 py-1 text-[11px] font-bold ${baseColors}`}>
           <svg
             className={`w-3 h-3 ${isNeg ? "text-emerald-500 rotate-180" : "text-amber-500"}`}
@@ -163,7 +164,7 @@ function PriceGapBadge({ value, ean }) {
         </div>
       )}
 
-      {/* History shortcut links — Cool segmented pill design */}
+      {/* History shortcut links — Always show if EAN exists */}
       {ean && (
         <div className="flex items-center mt-0.5 bg-white dark:bg-[#151a2a] rounded-full border border-slate-200 dark:border-slate-700/60 shadow-sm overflow-hidden w-fit transition-all hover:shadow-md hover:border-slate-300">
           <button

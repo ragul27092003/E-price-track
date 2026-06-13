@@ -51,7 +51,6 @@ const CHART_COLORS = [
   "#be123c", "#1d4ed8"
 ];
 
-// ─── sub-components ────────────────────────────────────────────────────────────
 function KpiCard({ label, value, subtext, icon: Icon, color, bg, loading }) {
   return (
     <motion.div variants={itemVariants} className="bg-card rounded-xl p-5 card-shadow border border-border h-full hover:border-primary/30 transition-colors">
@@ -60,10 +59,11 @@ function KpiCard({ label, value, subtext, icon: Icon, color, bg, loading }) {
           <Icon className={`h-5 w-5 ${color}`} />
         </div>
       </div>
-      <p className="text-2xl font-bold text-foreground">
+      {/* Changed from <p> to <div> to allow custom layouts */}
+      <div className="text-2xl font-bold text-foreground">
         {loading ? <span className="text-muted-foreground text-base animate-pulse">Loading…</span> : value}
-      </p>
-      <p className="text-xs font-semibold text-muted-foreground mt-1 uppercase tracking-wide">{label}</p>
+      </div>
+      <p className="text-sm font-semibold text-muted-foreground mt-1 uppercase tracking-wide">{label}</p>
       {subtext && <p className="text-[10px] text-muted-foreground mt-2 opacity-80">{subtext}</p>}
     </motion.div>
   );
@@ -161,6 +161,7 @@ export default function Dashboard() {
 
   const currentStoreId = useStore(selectCurrentStoreId);
   const showLsp        = useStore((s) => s.showLsp);
+  const activeShopName = useStore((s) => s.activeShopName) || "Store";
 
   const {
     sapUpdateStatus, sapUpdateStatusLoading,
@@ -293,7 +294,7 @@ export default function Dashboard() {
         <KpiCard
           label={`SAP : ${sap.date}`}
           value={sap.time}
-          subtext="Sathya Price Last Updated On This APP"
+          subtext={`${activeShopName.toUpperCase()} Price Last Updated On This App`}
           icon={Calendar} color="text-info" bg="bg-info/10"
           loading={sapUpdateStatusLoading}
         />
@@ -304,9 +305,18 @@ export default function Dashboard() {
           icon={Package} color="text-foreground" bg="bg-secondary"
           loading={statsLoading}
         />
-        <KpiCard
+       <KpiCard
           label="Active Products"
-          value={stats?.activeliveProduct ?? '--'}
+          value={
+            activeShopName?.toLowerCase() === 'nandilathgmart' ? (
+              <div className="flex flex-col leading-tight gap-1 text-[22px]">
+                <span>SAP : {stats?.activeliveProduct ?? '--'}</span>
+                <span>WEB : {stats?.varTotalWebProductsCount ?? '--'}</span>
+              </div>
+            ) : (
+              stats?.activeliveProduct ?? '--'
+            )
+          }
           subtext="Analytics for total products"
           icon={CheckSquare} color="text-primary" bg="bg-primary/10"
           loading={statsLoading}
@@ -381,7 +391,7 @@ export default function Dashboard() {
                 disabled={brandAnalyticsLoading || !brandAnalyticsCategories.length}
               >
                 {brandAnalyticsCategories.length === 0
-                  ? <option>All Category</option>
+                  ? <option value=''>All Category</option>
                   : brandAnalyticsCategories.map((cat) => (
                     <option key={cat} value={cat}>{fmtCategory(cat)}</option>
                   ))
@@ -409,13 +419,13 @@ export default function Dashboard() {
                 />
                 <StatRow
                   label="Higher by Average Price Difference"
-                  value={priceDiff != null ? fmtINR(priceDiff) : '--'}
+                  value={pd?.higherby_expansive_average ?? '--'}
                   colorClass="bg-orange-200"
                   isCurrency
                   percent={100}
                 />
                 <StatRow
-                  label="Sathya's Average Price Across the Product"
+                  label={`${activeShopName.toUpperCase()} Average Price Across the Product`}
                   value={pd ? fmtINR(pd.product_price_average) : '--'}
                   colorClass="bg-green-500"
                   isCurrency
