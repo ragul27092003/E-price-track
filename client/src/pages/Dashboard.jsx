@@ -369,7 +369,7 @@ export default function Dashboard() {
               <h3 className="font-semibold text-lg text-foreground">Brand Analytics</h3>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex-col flex gap-3">
               <select
                 className="bg-secondary text-sm rounded-md px-3 py-1.5 border-none outline-none"
                 value={selectedBrand}
