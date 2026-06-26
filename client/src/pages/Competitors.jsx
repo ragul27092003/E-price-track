@@ -117,15 +117,13 @@ const LogoCell = ({ data, isSuperAdmin, onLogoUploaded }) => {
   const logoSrc = localLogo
     ? (localLogo.startsWith('blob:') || localLogo.startsWith('http')
         ? localLogo
-        : `${API}${localLogo}`)
+        : `${API.defaults.baseURL.replace(/\/api\/?$/, '')}${localLogo}`)
     : null;
 
   return (
     <div className="flex items-center gap-3 w-full md:w-[20%]">
       <div
-        className="w-10 h-10 rounded border border-gray-200 flex items-center justify-center overflow-hidden shrink-0"
-        style={{ backgroundColor: data.color || '#475e77' }}
-      >
+        className="w-10 h-10 rounded border border-gray-200 flex items-center justify-center overflow-hidden shrink-0" >
         {logoSrc
           ? <img src={logoSrc} className="w-full h-full object-contain" alt={safeName} />
           : <span className="text-[10px] font-bold text-white uppercase">{safeName.substring(0, 2)}</span>
