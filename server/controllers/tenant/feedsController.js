@@ -123,18 +123,19 @@ exports.saveFeed = async (req, res) => {
 
 // ── GET /api/feeds/activity-log ───────────────────────────────────────────────
 exports.getActivityLog = async (req, res) => {
+  // console.log('🔥🔥🔥 NEW CODE RUNNING 🔥🔥🔥');
   try {
     const tenantDb = req.tenantDb;
 
-    // 1. Feed sync records
+    // Feed sync records only — we only care about when the feed run started/ended
     const sapDocs = await tenantDb
       .collection('ept_sap_data_update_status')
       .find({})
       .sort({ created_date: -1 })
-      .limit(10)
+      .limit(20)
       .toArray();
 
-    const sapLogs = sapDocs.map((doc) => {
+    const logs = sapDocs.map((doc) => {
       const allSuccess =
         doc.product_update_status   === 'success' &&
         doc.rank_update_status      === 'success' &&
@@ -146,36 +147,19 @@ exports.getActivityLog = async (req, res) => {
       if (doc.dashboard_update_status !== 'success') failed.push('dashboard update');
 
       return {
-        date:    formatDate(doc.created_date || doc.var_start_time),
-        status:  allSuccess ? 'Success' : 'Error',
-        message: allSuccess
-          ? `Feed sync completed. Start: ${formatDate(doc.var_start_time)} → End: ${formatDate(doc.var_end_time)}`
-          : `Sync failed: ${failed.join(', ')}`,
-        source:  'feed_sync',
+        date:      formatDate(doc.created_date || doc.var_start_time),
+        status:    allSuccess ? 'Success' : 'Failed',
+        startedAt: formatDate(doc.var_start_time),
+        endedAt:   formatDate(doc.var_end_time),
+        message:   allSuccess
+          ? `Started: ${formatDate(doc.var_start_time)}  →  Ended: ${formatDate(doc.var_end_time)}`
+          : `Failed (${failed.join(', ')}).  Started: ${formatDate(doc.var_start_time)}  →  Ended: ${formatDate(doc.var_end_time)}`,
       };
     });
 
-    // 2. Competitor cron records
-    const cronDocs = await tenantDb
-      .collection('ept_cron_time_management')
-      .find({})
-      .sort({ start_time: -1 })
-      .limit(15)
-      .toArray();
-
-    const cronLogs = cronDocs.map((doc) => ({
-      date:       formatDate(doc.start_time),
-      status:     'Success',
-      message:    `Scraped ${doc.cron_competitor_name || 'competitor'}: ${doc.update_count || 0} of ${doc.total_count || 0} products updated. Ended: ${formatDate(doc.end_time)}`,
-      source:     'cron_scrape',
-      competitor: doc.cron_competitor_name || '',
-    }));
-
-    // 3. Merge & sort newest first
-    const all = [...sapLogs, ...cronLogs]
+    const all = logs
       .filter((l) => l.date && l.date !== '—')
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 20);
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     res.json({ logs: all });
   } catch (error) {
