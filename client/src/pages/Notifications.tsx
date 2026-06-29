@@ -44,14 +44,38 @@ function priceGapPct(product) {
   return parseFloat(((ourPrice - avg) / avg * 100).toFixed(1));
 }
 
+function resolveProductImage(product: any): string | null {
+  const isValidImage = (v: any) => v && v !== "No Result";
+
+  if (isValidImage(product.product_image)) return product.product_image;
+
+  const competitors = product.competitor_prices || [];
+
+  const inStockWithImage = competitors.find(
+    (c: any) =>
+      isValidImage(c.image) &&
+      !String(c.stock).toLowerCase().includes("out of stock") &&
+      String(c.stock) !== "0"
+  );
+  if (inStockWithImage) return inStockWithImage.image;
+
+  const anyWithImage = competitors.find((c: any) => isValidImage(c.image));
+  return anyWithImage ? anyWithImage.image : null;
+}
+
+
 // ── Shared UI components ──────────────────────────────────────────────────────
 
-function ProductImage({ src, alt }) {
+function ProductImage({ src, alt }: { src: string | null; alt: string }) {
   const [err, setErr] = useState(false);
   if (!src || err) {
     return (
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-2xl shadow-sm">
-        📦
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 shadow-sm" title="No image available">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300 dark:text-slate-600">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="9" cy="9" r="1.5" fill="currentColor" stroke="none" />
+          <path d="M21 15l-5-5a2 2 0 0 0-2.8 0L3 19" />
+        </svg>
       </div>
     );
   }
@@ -325,7 +349,8 @@ export default function Notifications() {
 
                   {/* Product header */}
                   <div className="flex items-center gap-4 mb-5">
-                    <ProductImage src={p.product_image} alt={p.product_name} />
+                    {/* <ProductImage src={p.product_image} alt={p.product_name} /> */}
+                    <ProductImage src={resolveProductImage(p)} alt={p.product_name} />
                     <div className="min-w-0">
                       <h3 className="font-bold text-slate-800 dark:text-white text-[14px] leading-snug line-clamp-2">
                         {p.product_name || "Unnamed Product"}

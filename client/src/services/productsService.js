@@ -20,6 +20,20 @@ export const fetchProducts = ({
 export const fetchProductsMeta = () =>
   API.get('/products/meta').then((r) => r.data);
 
+export const exportProductsCSV = ({
+  competitorSlug = null,
+  search, brand, category, rank, itemGroup,
+} = {}) => {
+  const params = new URLSearchParams();
+  if (competitorSlug) params.set('competitor', competitorSlug);
+  if (search)         params.set('search',     search);
+  if (brand)          params.set('brand',      brand);
+  if (category)       params.set('category',   category);
+  if (rank)           params.set('rank',       rank);
+  if (itemGroup)      params.set('itemGroup',  itemGroup);
+  return API.get(`/products/export?${params}`).then((r) => r.data);
+}; 
+
 export const createProduct = (data) =>
   API.post('/products', data).then((r) => r.data);
 

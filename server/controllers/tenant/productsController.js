@@ -8,6 +8,13 @@ function toPrice(raw) {
   return isNaN(n) ? null : n;
 }
 
+// 🆕 ADD THIS — sanitizes product_stock: only valid non-negative numbers pass through
+function toStock(raw) {
+  if (raw === null || raw === undefined || raw === 'No Result' || raw === '') return null;
+  const n = typeof raw === 'number' ? raw : parseFloat(raw);
+  return (isNaN(n) || n < 0) ? null : n;
+}
+
 // ── Shared enrichment: adds competitor_prices + price_history_30days to each product ──
 async function enrichProducts(db, products) {
   if (!products.length) return [];
@@ -129,6 +136,7 @@ async function enrichProducts(db, products) {
 
     return {
       ...product,
+      product_stock: toStock(product.product_stock),
       competitor_prices,
       price_history_30days: historyMap[ean] || [],
     };
@@ -215,7 +223,12 @@ exports.getAll = async (req, res) => {
       mongoFilter.product_category = { $regex: `^${escaped}`, $options: 'i' };
     }
     
-    if (rank) mongoFilter.rank_by = rank;
+    // if (rank) mongoFilter.rank_by = rank;
+
+    if (rank) {
+      const numRank = Number(rank);
+      mongoFilter.rank_by = isNaN(numRank) ? rank : numRank;
+    }
 
     const col = db.collection('ept_product_details_new');
     
@@ -237,6 +250,63 @@ exports.getAll = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+exports.exportAll = async (req, res) => {
+  try {
+    const db = req.tenantDb;
+    const { competitor: filterSlug, search, brand, category, rank, itemGroup } = req.query;
+
+    const mongoFilter = {
+      status: 'active',
+      ean_product_data_details_scrap_status: 'completed'
+    };
+
+    if (filterSlug) {
+      const staticDoc = await db.collection('ept_dashbaord_statics').findOne({
+        competitor_name: filterSlug.toLowerCase().trim(),
+        status: 'active'
+      });
+      if (staticDoc && Array.isArray(staticDoc.productEanIds) && staticDoc.productEanIds.length > 0) {
+        mongoFilter.product_ean_id = { $in: staticDoc.productEanIds };
+      } else {
+        mongoFilter._id = null;
+      }
+    }
+
+    if (search) {
+      const re = { $regex: search, $options: 'i' };
+      mongoFilter.$or = [
+        { product_name:   re },
+        { product_brand:  re },
+        { product_ean_id: re },
+        { product_code:   re },
+      ];
+    }
+
+    if (brand)    mongoFilter.product_brand    = brand;
+    if (category) mongoFilter.product_category = category;
+    else if (itemGroup) {
+      const escaped = itemGroup.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      mongoFilter.product_category = { $regex: `^${escaped}`, $options: 'i' };
+    }
+    // if (rank) mongoFilter.rank_by = rank;
+
+    if (rank) {
+      const numRank = Number(rank);
+      mongoFilter.rank_by = isNaN(numRank) ? rank : numRank;
+    }
+
+    const col      = db.collection('ept_product_details_new');
+    const products = await col.find(mongoFilter).toArray(); // no skip/limit
+
+    const enriched = await enrichProducts(db, products);
+
+    res.json({ data: enriched, total: enriched.length });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 
 // ── GET /api/products/alert ───────────────────────────────────────────────────
 // Returns products the current user should be alerted on.

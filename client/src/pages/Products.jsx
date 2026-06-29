@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useStore } from "../store";
-import { fetchProducts, fetchProductsMeta, configureProduct, removeProductConfiguration } from "../services/productsService";
+import { fetchProducts, fetchProductsMeta, configureProduct, removeProductConfiguration,exportProductsCSV } from "../services/productsService";
 import { fetchCompetitors } from "../services/competitorsService";
 import API from "../hooks/useApi";
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -51,8 +51,22 @@ function ProductImage({ src, alt }) {
   const [err, setErr] = useState(false);
   if (!src || err) {
     return (
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#151a2a] text-lg shadow-sm">
-        📦
+      <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-[#151a2a] shadow-sm">
+        <svg
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-slate-300 dark:text-slate-600"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="9" cy="9" r="1.5" fill="currentColor" stroke="none" />
+          <path d="M21 15l-5-5a2 2 0 0 0-2.8 0L3 19" />
+        </svg>
       </div>
     );
   }
@@ -64,6 +78,53 @@ function ProductImage({ src, alt }) {
       className="h-10 w-10 shrink-0 rounded-lg border border-slate-100 dark:border-slate-700/50 object-contain shadow-sm bg-slate-50 dark:bg-[#151a2a]"
     />
   );
+}
+
+function resolveProductImage(product) {
+  const isValidImage = (v) => v && v !== "No Result";
+
+  console.log("──────────────────────────────");
+  console.log("EAN:", product.product_ean_id);
+  console.log("Step 1 - own product_image:", product.product_image);
+
+  // 1. Our own scraped image, if valid
+  if (isValidImage(product.product_image)) {
+    console.log("✅ Using own product_image:", product.product_image);
+    return product.product_image;
+  }
+  console.log("❌ Own product_image invalid/missing, checking competitors...");
+
+  const competitors = product.competitor_prices || [];
+  console.log("Step 2 - competitor list:", competitors.map(c => ({
+    slug: c.slug,
+    image: c.image,
+    stock: c.stock,
+  })));
+
+  // 2. Prefer an in-stock competitor that has a valid image
+  const inStockWithImage = competitors.find(
+    (c) =>
+      isValidImage(c.image) &&
+      !String(c.stock).toLowerCase().includes("out of stock") &&
+      String(c.stock) !== "0"
+  );
+
+  if (inStockWithImage) {
+    console.log("✅ Found in-stock competitor with image:", inStockWithImage.slug, inStockWithImage.image);
+    return inStockWithImage.image;
+  }
+  console.log("❌ No in-stock competitor has a valid image, checking any competitor...");
+
+  // 3. Fallback: any competitor with a valid image, even out of stock
+  const anyWithImage = competitors.find((c) => isValidImage(c.image));
+
+  if (anyWithImage) {
+    console.log("✅ Found out-of-stock competitor with image:", anyWithImage.slug, anyWithImage.image);
+    return anyWithImage.image;
+  }
+
+  console.log("❌ No competitor has any valid image. Returning null (placeholder will show).");
+  return null;
 }
 
 function resolveLogoUrl(logo) {
@@ -190,6 +251,7 @@ function PriceGapBadge({ value, ean }) {
     </div>
   );
 }
+
 function MarketCap({ low, avg, high }) {
   const fmt = (v) => (v !== null ? `₹${v.toLocaleString("en-IN")}` : "—");
   return (
@@ -200,7 +262,7 @@ function MarketCap({ low, avg, high }) {
       </div>
       <div className="relative">
         <span className="text-[11px] text-slate-500 dark:text-slate-400 dark:text-slate-500">Average</span><br />
-        <span className="font-bold text-slate-800 dark:text-white">{avg !== null ? `Avg: ₹${avg.toLocaleString("en-IN")}` : "—"}</span>
+        <span className="font-bold text-slate-800 dark:text-white">{avg !== null ? `₹${avg.toLocaleString("en-IN")}` : "—"}</span>
         {avg !== null && (
           <>
             <div className="absolute top-1/2 -left-4 w-2 h-0.5 bg-emerald-500" />
@@ -264,6 +326,7 @@ function MarketGapCell({ product, competitorMeta }) {
     </div>
   );
 }
+
 function CompetitorPrices({ product, competitorMeta }) {
   // Get all competitors that actually have this product listed (even if out of stock)
   const listed = (product.competitor_prices || []).filter(c => c.is_listed);
@@ -492,13 +555,35 @@ function ErrorState({ message, onRetry }) {
 function ProductCell({ product }) {
   return (
     <div className="flex items-center gap-4">
-      <ProductImage src={product.product_image} alt={product.product_name} />
+      {/* <ProductImage src={product.product_image} alt={product.product_name} /> */}
+       <ProductImage src={resolveProductImage(product)} alt={product.product_name} />
       <div>
         <p className="font-bold text-slate-800 dark:text-white text-[13px]">{product.product_name || "Unnamed Product"}</p>
         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
           {product.product_brand && <span>{product.product_brand} · </span>}
           {product.product_ean_id || product.product_code || product._id}
         </p>
+        {/* 🆕 Stock add pannunga */}
+        {product.product_stock !== null && (
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Quantity:</span>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+              product.product_stock > 0 
+                ? "text-emerald-600 bg-emerald-50" 
+                : "text-rose-600 bg-rose-50"
+            }`}>
+              {product.product_stock} units
+            </span>
+          </div>
+        )}
+        {product.product_movement && (
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">ProductMovement:</span>
+            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+              {product.product_movement}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -579,17 +664,28 @@ function exportToCSV(products, exportType = "A", competitorMeta = {}) {
     return;
   }
 
-  const headers = ["Product Name", "Item Code", "Ranking Position", "Competing With", "Price", "SAP Price", "Store Price", "Item Groups", "Competitor Detail"];
+  // ── Default (Type A) — now also splits competitors into separate columns ──
+  const slugMap = {};
+  products.forEach((p) => {
+    (p.competitor_prices || []).forEach((c) => {
+      if (!slugMap[c.slug]) slugMap[c.slug] = competitorMeta?.[c.slug]?.name || c.name || c.slug;
+    });
+  });
+  const slugs = Object.keys(slugMap);
+
+  const headers = ["Product Name", "Item Code", "Ranking Position", "Competing With", "Price", "SAP Price", "Store Price", "Item Groups", ...slugs.map((s) => slugMap[s])];
   const rows = products.map((p) => {
-    const compDetail = (p.competitor_prices || []).map((c) => {
+    const compMap = {};
+    (p.competitor_prices || []).forEach((c) => {
       const outOfStock = c.price === null || c.price === undefined || c.stock === 0;
-      return outOfStock ? `${c.name} : Out Of Stock` : `${c.name} : ${c.price}`;
-    }).join(" | ");
+      compMap[c.slug] = outOfStock ? "Out Of Stock" : c.price;
+    });
     return [
       p.product_name || "", p.product_code || p.product_ean_id || "",
       p.user_notification_data?.rank_pos || p.rank_by || "", p.user_notification_data?.Competing_with ?? "",
       p.product_price ?? "", p.product_sap_price ?? "", p.product_store_price ?? "",
-      p.product_item_group || p.product_category || "", compDetail,
+      p.product_item_group || p.product_category || "",
+      ...slugs.map((s) => compMap[s] ?? "Out Of Stock"),
     ].map(escape).join(",");
   });
   triggerDownload([headers.map(escape).join(","), ...rows].join("\r\n"));
@@ -799,6 +895,7 @@ export default function Products() {
   const [bulkSaving,      setBulkSaving]      = useState(false);
   const [removeTarget,    setRemoveTarget]    = useState(null);
   const [removing,        setRemoving]        = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const headerCheckboxRef = useRef(null);
 
@@ -980,7 +1077,7 @@ export default function Products() {
               />
             </div>
             <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-              <button
+              {/* <button
                 onClick={() => exportToCSV(filtered, exportType, competitorMeta)}
                 className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors"
               >
@@ -990,6 +1087,36 @@ export default function Products() {
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
                 Export
+              </button> */}
+              <button
+                onClick={async () => {
+                  setExporting(true);
+                  try {
+                    const result = await exportProductsCSV({
+                      competitorSlug: competitorSlug || null,
+                      search, brand: brandFilter, category: catFilter,
+                      rank: rankFilter, itemGroup: itemGroupFilter,
+                    });
+                    exportToCSV(result.data || [], exportType, competitorMeta);
+                  } catch (err) {
+                    console.error("Export failed:", err);
+                  } finally {
+                    setExporting(false);
+                  }
+                }}
+                disabled={exporting}
+                className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors disabled:opacity-60"
+              >
+                {exporting ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white inline-block" />
+                ) : (
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                )}
+                {exporting ? "Exporting…" : "Export"}
               </button>
             </div>
           </div>

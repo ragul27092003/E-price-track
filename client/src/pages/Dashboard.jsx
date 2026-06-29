@@ -363,43 +363,48 @@ export default function Dashboard() {
 
         {/* 1. Brand Analytics (Wider) */}
         <motion.div variants={itemVariants} className="lg:col-span-6 bg-card rounded-xl p-6 card-shadow border border-border flex flex-col">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-2">
-              <BarChart className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold text-lg text-foreground">Brand Analytics</h3>
-            </div>
+          <div className="flex items-center gap-2 mb-4">
+             <BarChart className="h-5 w-5 text-primary" />
+            <h3 className="font-semibold text-lg text-foreground">Brand Analytics</h3>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-center gap-4 mb-6">
 
-            <div className="flex-col flex gap-3">
+            <div className="flex gap-3 w-full">
               <select
-                className="bg-secondary text-sm rounded-md px-3 py-1.5 border-none outline-none"
+                className="flex-1 min-w-0 bg-secondary text-sm rounded-md px-3 py-2 border-none outline-none"
                 value={selectedBrand}
                 onChange={(e) => handleBrandChange(e.target.value)}
                 disabled={brandAnalyticsBrandsLoading}
               >
-                {brandAnalyticsBrandsLoading
-                  ? <option>Loading…</option>
-                  : brandAnalyticsBrands.map((b) => (
-                    <option key={b} value={b}>{b}</option>
+                {brandAnalyticsBrandsLoading ? (
+                  <option>Loading…</option>
+                ) : (
+                  brandAnalyticsBrands.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
                   ))
-                }
+                )}
               </select>
 
               <select
-                className="bg-secondary text-sm rounded-md px-3 py-1.5 border-none outline-none"
+                className="flex-1 min-w-0 bg-secondary text-sm rounded-md px-3 py-2 border-none outline-none"
                 value={selectedCategory}
                 onChange={(e) => handleCategoryChange(e.target.value)}
                 disabled={brandAnalyticsLoading || !brandAnalyticsCategories.length}
               >
-                {brandAnalyticsCategories.length === 0
-                  ? <option value=''>All Category</option>
-                  : brandAnalyticsCategories.map((cat) => (
-                    <option key={cat} value={cat}>{fmtCategory(cat)}</option>
+                {brandAnalyticsCategories.length === 0 ? (
+                  <option value="">All Category</option>
+                ) : (
+                  brandAnalyticsCategories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {fmtCategory(cat)}
+                    </option>
                   ))
-                }
+                )}
               </select>
             </div>
           </div>
-
           <div className="space-y-4 flex-1 justify-center flex flex-col">
             {brandAnalyticsLoading ? (
               <p className="text-sm text-muted-foreground animate-pulse text-center py-6">Loading analytics…</p>
@@ -448,7 +453,7 @@ export default function Dashboard() {
           <div className="bg-[#48b2ad] px-4 py-3">
             <h3 className="text-white font-semibold text-center text-[15px]">Competitor Products Count</h3>
           </div>
-          <div className="flex-1 overflow-y-auto max-h-[350px] divide-y divide-border p-2">
+          <div className="flex-1 overflow-y-auto max-h-[500px] divide-y divide-border p-2">
             {compCountsLoading ? (
               <p className="text-sm text-muted-foreground animate-pulse p-4 text-center">Loading...</p>
             ) : compCounts.map((comp) => {
