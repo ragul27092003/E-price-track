@@ -21,7 +21,7 @@ function fmt(v) {
 function resolveLogoUrl(logo) {
   if (!logo) return null;
   if (logo.startsWith("blob:") || logo.startsWith("http://") || logo.startsWith("https://")) return logo;
-  return `${API}${logo}`;
+  return `${API.defaults.baseURL.replace(/\/api\/?$/, '')}${logo}`;
 }
 
 
