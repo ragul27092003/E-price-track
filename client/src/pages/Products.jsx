@@ -344,41 +344,58 @@ function CompetitorPrices({ product, competitorMeta }) {
     return 0;
   });
 
-  return (
-    <div className="flex items-center gap-6 flex-wrap">
-      {sorted.map((c) => {
-        const meta = competitorMeta?.[c.slug] || {};
-        const isOos = c.price === null || String(c.stock).toLowerCase().includes('out of stock') || String(c.stock) === '0';
-        
-        return (
-          <div key={c.slug} className={`flex items-center gap-2 ${isOos ? 'opacity-60 grayscale' : ''}`}>
-            <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
-            {isOos ? (
+ return (
+  <div className="flex items-center gap-6 flex-wrap">
+    {sorted.map((c) => {
+      const meta = competitorMeta?.[c.slug] || {};
+      const isOos = c.price === null || String(c.stock).toLowerCase().includes('out of stock') || String(c.stock) === '0';
+
+      return (
+        <div key={c.slug} className={`flex items-center gap-2 ${isOos ? 'opacity-60 grayscale' : ''}`}>
+          {isOos ? (
+            <>
+              <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
               <span className="font-bold text-slate-400 dark:text-slate-500 text-[10px] uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">Out of Stock</span>
-             ) : (
-              <>
-                <span className="font-bold text-slate-800 dark:text-white text-[13px]">
-                  ₹{c.price.toLocaleString("en-IN")}
-                </span>
-                <button
-                  onClick={() => navigate(buildProductHistoryUrl(product.product_ean_id, 30))}
-                  className="group flex items-center justify-center h-6 w-6 rounded-full border border-sky-200 bg-sky-50 text-sky-600 hover:bg-sky-500 hover:text-white hover:border-sky-500 hover:shadow-sm transition-all shrink-0"
-                  title="View price history"
-                >
-                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
-                    <rect x="3"  y="14" width="3.5" height="7" rx="1" fill="currentColor" />
-                    <rect x="8"  y="10" width="3.5" height="11" rx="1" fill="currentColor" />
-                    <rect x="13" y="6"  width="3.5" height="15" rx="1" fill="currentColor" />
-                    <rect x="18" y="3"  width="3.5" height="18" rx="1" fill="currentColor" />
-                  </svg>
-                </button>
-              </>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
+            </>
+          ) : c.url ? (
+            <a
+              href={c.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`Open on ${c.name}`}
+              className="flex items-center gap-2 hover:opacity-75 transition-opacity"
+            >
+              <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
+              <span className="font-bold text-slate-800 dark:text-white text-[13px]">
+                ₹{c.price.toLocaleString("en-IN")}
+              </span>
+            </a>
+          ) : (
+            <>
+              <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
+              <span className="font-bold text-slate-800 dark:text-white text-[13px]">₹{c.price.toLocaleString("en-IN")}</span>
+            </>
+          )}
+
+          {!isOos && (
+            <button
+              onClick={() => navigate(buildProductHistoryUrl(product.product_ean_id, 30))}
+              className="group flex items-center justify-center h-6 w-6 rounded-full border border-sky-200 bg-sky-50 text-sky-600 hover:bg-sky-500 hover:text-white hover:border-sky-500 hover:shadow-sm transition-all shrink-0"
+              title="View price history"
+            >
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
+                <rect x="3"  y="14" width="3.5" height="7" rx="1" fill="currentColor" />
+                <rect x="8"  y="10" width="3.5" height="11" rx="1" fill="currentColor" />
+                <rect x="13" y="6"  width="3.5" height="15" rx="1" fill="currentColor" />
+                <rect x="18" y="3"  width="3.5" height="18" rx="1" fill="currentColor" />
+              </svg>
+            </button>
+          )}
+        </div>
+      );
+    })}
+  </div>
+);
 }
 
 // ── Searchable filter dropdown ─────────────────────────────────────────────────
@@ -563,10 +580,23 @@ function ErrorState({ message, onRetry }) {
 }
 
 function ProductCell({ product }) {
+  const linkUrl = product.product_url;
   return (
     <div className="flex items-center gap-4">
+      {linkUrl ? (
+        <a
+          href={linkUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open product page"
+          className="shrink-0 hover:opacity-80 transition-opacity"
+        >
+          <ProductImage src={resolveProductImage(product)} alt={product.product_name} />
+        </a>
+      ) : (
+        <ProductImage src={resolveProductImage(product)} alt={product.product_name} />
+      )}
       {/* <ProductImage src={product.product_image} alt={product.product_name} /> */}
-       <ProductImage src={resolveProductImage(product)} alt={product.product_name} />
       <div>
          {product.product_url ? (
           <a
