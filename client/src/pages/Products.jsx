@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { buildProductHistoryUrl } from "../utilis/urls";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useStore } from "../store";
 import { fetchProducts, fetchProductsMeta, configureProduct, removeProductConfiguration,exportProductsCSV } from "../services/productsService";
@@ -83,16 +84,10 @@ function ProductImage({ src, alt }) {
 function resolveProductImage(product) {
   const isValidImage = (v) => v && v !== "No Result";
 
-  console.log("──────────────────────────────");
-  console.log("EAN:", product.product_ean_id);
-  console.log("Step 1 - own product_image:", product.product_image);
-
   // 1. Our own scraped image, if valid
   if (isValidImage(product.product_image)) {
-    console.log("✅ Using own product_image:", product.product_image);
     return product.product_image;
   }
-  console.log("❌ Own product_image invalid/missing, checking competitors...");
 
   const competitors = product.competitor_prices || [];
   console.log("Step 2 - competitor list:", competitors.map(c => ({
@@ -226,10 +221,11 @@ function PriceGapBadge({ value, ean }) {
       )}
 
       {/* History shortcut links — Always show if EAN exists */}
+       {/* History shortcut links — Always show if EAN exists */}
       {ean && (
         <div className="flex items-center mt-0.5 bg-white dark:bg-[#151a2a] rounded-full border border-slate-200 dark:border-slate-700/60 shadow-sm overflow-hidden w-fit transition-all hover:shadow-md hover:border-slate-300">
           <button
-            onClick={() => navigate(`/product-history?ean=${ean}&range=7`)}
+            onClick={() => navigate(buildProductHistoryUrl(ean, 7))}
             className="group flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-extrabold tracking-wider text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all border-r border-slate-200 dark:border-slate-700/60"
           >
             <svg viewBox="0 0 24 24" className="w-3 h-3 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" strokeWidth="3">
@@ -238,7 +234,7 @@ function PriceGapBadge({ value, ean }) {
             7 DAYS
           </button>
           <button
-            onClick={() => navigate(`/product-history?ean=${ean}&range=30`)}
+            onClick={() => navigate(buildProductHistoryUrl(ean, 30))}
             className="group flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-extrabold tracking-wider text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all"
           >
             <svg viewBox="0 0 24 24" className="w-3 h-3 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" strokeWidth="3">
@@ -328,6 +324,7 @@ function MarketGapCell({ product, competitorMeta }) {
 }
 
 function CompetitorPrices({ product, competitorMeta }) {
+  const navigate = useNavigate();
   // Get all competitors that actually have this product listed (even if out of stock)
   const listed = (product.competitor_prices || []).filter(c => c.is_listed);
 
@@ -358,10 +355,23 @@ function CompetitorPrices({ product, competitorMeta }) {
             <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
             {isOos ? (
               <span className="font-bold text-slate-400 dark:text-slate-500 text-[10px] uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">Out of Stock</span>
-            ) : (
+             ) : (
               <>
-                <span className="font-bold text-slate-800 dark:text-white text-[13px]">₹{c.price.toLocaleString("en-IN")}</span>
-                <Sparkline data={trendFor(product, c.slug)} color="#0ea5e9" />
+                <span className="font-bold text-slate-800 dark:text-white text-[13px]">
+                  ₹{c.price.toLocaleString("en-IN")}
+                </span>
+                <button
+                  onClick={() => navigate(buildProductHistoryUrl(product.product_ean_id, 30))}
+                  className="group flex items-center justify-center h-6 w-6 rounded-full border border-sky-200 bg-sky-50 text-sky-600 hover:bg-sky-500 hover:text-white hover:border-sky-500 hover:shadow-sm transition-all shrink-0"
+                  title="View price history"
+                >
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
+                    <rect x="3"  y="14" width="3.5" height="7" rx="1" fill="currentColor" />
+                    <rect x="8"  y="10" width="3.5" height="11" rx="1" fill="currentColor" />
+                    <rect x="13" y="6"  width="3.5" height="15" rx="1" fill="currentColor" />
+                    <rect x="18" y="3"  width="3.5" height="18" rx="1" fill="currentColor" />
+                  </svg>
+                </button>
               </>
             )}
           </div>

@@ -228,7 +228,7 @@ exports.seedSuperAdmin = async (req, res) => {
 
 exports.getAllStores = async (req, res) => {
   try {
-    const cmpDbsSetup = require('../configs/cmpDbsSetup');
+    // const cmpDbsSetup = require('../configs/cmpDbsSetup');
 
     // Stores from the main DB (Node.js registered stores)
     const merchants = await Merchant.find({ archived: 0 });
@@ -248,19 +248,19 @@ exports.getAllStores = async (req, res) => {
     );
 
     // Supplement with cmpDbsSetup entries not already in the DB list
-    const dbCmpIds    = new Set(dbStores.map((s) => s.companyId));
-    const configStores = Object.keys(cmpDbsSetup)
-      .filter((cmpId) => !dbCmpIds.has(cmpId))
-      .map((cmpId) => ({
-        _id:         cmpId,
-        companyId:   cmpId,
-        companyName: cmpId.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
-        website:     '',
-        user_id:     '',
-        archived:    0,
-      }));
+    // const dbCmpIds    = new Set(dbStores.map((s) => s.companyId));
+    // const configStores = Object.keys(cmpDbsSetup)
+    //   .filter((cmpId) => !dbCmpIds.has(cmpId))
+    //   .map((cmpId) => ({
+    //     _id:         cmpId,
+    //     companyId:   cmpId,
+    //     companyName: cmpId.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    //     website:     '',
+    //     user_id:     '',
+    //     archived:    0,
+    //   }));
 
-    res.json([...dbStores, ...configStores]);
+    res.json([...dbStores]);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

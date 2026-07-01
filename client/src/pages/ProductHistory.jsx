@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams,useParams } from "react-router-dom";
 import { useStore } from "../store";
 import { fetchProducts } from "../services/productsService";
 import { fetchCompetitors } from "../services/competitorsService";
@@ -333,7 +333,8 @@ export default function ProductHistory() {
   const [visibleSlugs,  setVisibleSlugs]  = useState(new Set());
   const [imgErrors,     setImgErrors]     = useState({});
   const [searchParams] = useSearchParams();
-const eanFromUrl = searchParams.get("ean") || "";
+// const eanFromUrl = searchParams.get("ean") || "";
+const { ean: eanFromUrl } = useParams();
 const rangeFromUrl = searchParams.get("range") || "30";
 
 const [daysRange,     setDaysRange]     = useState(Number(rangeFromUrl));

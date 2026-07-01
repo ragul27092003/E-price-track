@@ -18,6 +18,32 @@ function parsePrice(raw) {
   return isNaN(n) ? null : n;
 }
 
+function resolveProductImage(product) {
+  const isValidImage = (v) => v && v !== "No Result";
+
+  // 1. Our own scraped image, if valid
+  if (isValidImage(product.product_image)) {
+    return product.product_image;
+  }
+
+  const competitors = product.competitor_prices || [];
+
+  // 2. Prefer an in-stock competitor that has a valid image
+  const inStockWithImage = competitors.find(
+    (c) =>
+      isValidImage(c.image) &&
+      !String(c.stock).toLowerCase().includes("out of stock") &&
+      String(c.stock) !== "0"
+  );
+  if (inStockWithImage) return inStockWithImage.image;
+
+  // 3. Fallback: any competitor with a valid image, even out of stock
+  const anyWithImage = competitors.find((c) => isValidImage(c.image));
+  if (anyWithImage) return anyWithImage.image;
+
+  return null;
+}
+
 function marketStats(product) {
   const prices = (product.price_history_30days || [])
     .map((h) => (typeof h.product_price === "number" ? h.product_price : parseFloat(h.product_price)))
@@ -88,7 +114,23 @@ function ProductImage({ src, alt }) {
   const [err, setErr] = useState(false);
   if (!src || err) {
     return (
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#151a2a] text-lg shadow-sm">📦</div>
+      <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-[#151a2a] shadow-sm">
+        <svg
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-slate-300 dark:text-slate-600"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="9" cy="9" r="1.5" fill="currentColor" stroke="none" />
+          <path d="M21 15l-5-5a2 2 0 0 0-2.8 0L3 19" />
+        </svg>
+      </div>
     );
   }
   return <img src={src} alt={alt} onError={() => setErr(true)} className="h-10 w-10 shrink-0 rounded-lg border border-slate-100 dark:border-slate-700/50 object-contain shadow-sm bg-slate-50 dark:bg-[#151a2a]" />;
@@ -225,6 +267,7 @@ function MarketGapCell({ product, competitorMeta }) {
 }
 
 function CompetitorPrices({ product, competitorMeta }) {
+  const navigate = useNavigate();
   const listed = (product.competitor_prices || []).filter(c => c.is_listed);
   if (listed.length === 0) {
     const { low, avg, high } = marketStats(product);
@@ -246,11 +289,41 @@ function CompetitorPrices({ product, competitorMeta }) {
         const isOos = c.price === null || String(c.stock).toLowerCase().includes('out of stock') || String(c.stock) === '0';
         return (
           <div key={c.slug} className={`flex items-center gap-2 ${isOos ? 'opacity-60 grayscale' : ''}`}>
-            <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
             {isOos ? (
-              <span className="font-bold text-slate-400 text-[10px] uppercase bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">Out of Stock</span>
+              <>
+                <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
+                <span className="font-bold text-slate-400 text-[10px] uppercase bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">Out of Stock</span>
+              </>
+            ) : c.url ? (
+              <a
+                href={c.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`Open on ${c.name}`}
+                className="flex items-center gap-2 hover:opacity-75 transition-opacity"
+              >
+                <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
+                <span className="font-bold text-slate-800 dark:text-white text-[13px]">₹{c.price.toLocaleString("en-IN")}</span>
+              </a>
             ) : (
-              <><span className="font-bold text-slate-800 dark:text-white text-[13px]">₹{c.price.toLocaleString("en-IN")}</span><TableSparkline data={trendFor(product, c.slug)} color="#0ea5e9" /></>
+              <>
+                <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
+                <span className="font-bold text-slate-800 dark:text-white text-[13px]">₹{c.price.toLocaleString("en-IN")}</span>
+              </>
+            )}
+
+            {!isOos && (
+              <button
+                onClick={() => navigate(`/product-history?ean=${product.product_ean_id}&range=30`)}
+                className="group flex items-center justify-center text-sky-500 hover:text-sky-700 transition-colors shrink-0"
+                title="View price history"
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none">
+                  <rect x="3"  y="13" width="3.2" height="8"  rx="0.8" fill="currentColor" />
+                  <rect x="9"  y="9"  width="3.2" height="12" rx="0.8" fill="currentColor" />
+                  <rect x="15" y="4"  width="3.2" height="17" rx="0.8" fill="currentColor" />
+                </svg>
+              </button>
             )}
           </div>
         );
@@ -260,15 +333,46 @@ function CompetitorPrices({ product, competitorMeta }) {
 }
 
 function ProductCell({ product }) {
+   const linkUrl = product.product_url;
   return (
     <div className="flex items-center gap-4">
-      <ProductImage src={product.product_image} alt={product.product_name} />
+      {linkUrl ? (
+        <a
+          href={linkUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open product page"
+          className="shrink-0 hover:opacity-80 transition-opacity"
+        >
+          <ProductImage src={resolveProductImage(product)} alt={product.product_name} />
+        </a>
+      ) : (
+        <ProductImage src={resolveProductImage(product)} alt={product.product_name} />
+      )}
+      {/* <ProductImage src={product.product_image} alt={product.product_name} /> */}
       <div>
-        <p className="font-bold text-slate-800 dark:text-white text-[13px]">{product.product_name || "Unnamed Product"}</p>
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-          {product.product_brand && <span>{product.product_brand} · </span>}
-          {product.product_ean_id || product.product_code || product._id}
-        </p>
+          {linkUrl ? (
+            <a
+              href={linkUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open product page"
+              className="inline-flex items-center gap-1 font-bold text-slate-800 dark:text-white text-[13px] hover:text-black dark:hover:text-black"
+            >
+              {product.product_name || "Unnamed Product"}
+              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" className="shrink-0 opacity-60">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <path d="M15 3h6v6" />
+                <path d="M10 14 21 3" />
+              </svg>
+            </a>
+          ) : (
+            <p className="font-bold text-slate-800 dark:text-white text-[13px]">{product.product_name || "Unnamed Product"}</p>
+          )}
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+            {product.product_brand && <span>{product.product_brand} · </span>}
+            {product.product_ean_id || product.product_code || product._id}
+          </p>
       </div>
     </div>
   );
@@ -453,7 +557,7 @@ const CompetitorRow = ({ data, onClick }) => {
     <div className="group relative">
       <div onClick={() => !isOffline && onClick(data)} className={`flex flex-col sm:flex-row sm:items-center p-4 border rounded-lg mb-3 transition-all duration-150 shadow-sm gap-3 sm:gap-0 ${isOffline ? 'bg-gray-100 border-gray-200 dark:border-slate-700 cursor-not-allowed opacity-60' : 'bg-white dark:bg-slate-800 border-blue-200 cursor-pointer hover:shadow-md hover:bg-blue-50 dark:hover:bg-slate-700'}`}>
         <div className="flex items-center gap-4 w-full sm:w-[45%]">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded border border-gray-200 dark:border-slate-700 flex items-center justify-center overflow-hidden shrink-0 shadow-sm" style={{ backgroundColor: data.color || '#475e77' }}>
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded border border-gray-200 dark:border-slate-700 flex items-center justify-center overflow-hidden shrink-0 shadow-sm" >
             {logoUrl ? <img src={logoUrl} alt={data.name} className="w-full h-full object-contain" onError={(e) => { e.target.style.display = 'none'; }} /> : <span className="text-[12px] font-bold text-white uppercase">{data.name.substring(0, 2).toUpperCase()}</span>}
           </div>
           <div className="flex flex-col min-w-0">

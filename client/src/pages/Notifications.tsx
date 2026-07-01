@@ -363,14 +363,44 @@ export default function Notifications() {
                   </div>
 
                   {/* Our price */}
-                  {price !== null && (
+                  {/* {price !== null && (
                     <div className="mb-4">
                       <span className="inline-block rounded-md bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800/50 px-3 py-1.5 text-[13px] font-bold text-emerald-600 dark:text-emerald-400">
                         ₹{price.toLocaleString("en-IN")}
                       </span>
                     </div>
-                  )}
+                  )} */}
+                  {/* Our prices: Web / SAP / MRP + Quantity */}
+                  <div className="mb-3 grid grid-cols-3 gap-2 bg-white dark:bg-slate-800/60 rounded-lg border border-slate-100 dark:border-slate-700/50 px-3 py-2.5">
+                    <div className="text-center">
+                      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5">Web</p>
+                      <p className="text-[12px] font-bold text-emerald-600 dark:text-emerald-400">
+                        {price !== null ? `₹${price.toLocaleString("en-IN")}` : "—"}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5">SAP</p>
+                      <p className="text-[12px] font-bold text-slate-700 dark:text-slate-300">
+                        {parsePrice(p.product_sap_price) !== null ? `₹${parsePrice(p.product_sap_price).toLocaleString("en-IN")}` : "—"}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5">MRP</p>
+                      <p className="text-[12px] font-bold text-blue-600 dark:text-blue-400">
+                        {parsePrice(p.product_store_price) !== null ? `₹${parsePrice(p.product_store_price).toLocaleString("en-IN")}` : "—"}
+                      </p>
+                    </div>
+                  </div>
 
+                  {/* Quantity — separate row */}
+                  <div className="mb-4 flex items-center justify-between text-[13px] bg-white dark:bg-slate-800/60 rounded-lg border border-slate-100 dark:border-slate-700/50 px-3 py-2.5">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Quantity</span>
+                    <span className={`text-[12px] font-bold px-2 py-0.5 rounded-full ${
+                      p.product_stock > 0 ? "text-emerald-600 bg-emerald-50" : "text-rose-600 bg-rose-50"
+                    }`}>
+                      {p.product_stock !== null && p.product_stock !== undefined ? `${p.product_stock} units` : "—"}
+                    </span>
+                  </div>
                   {/* Status rows */}
                   <div className="space-y-3 mb-5">
                     <div className="flex items-center justify-between text-[13px]">
