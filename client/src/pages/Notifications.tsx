@@ -94,7 +94,7 @@ function ProductImage({ src, alt }: { src: string | null; alt: string }) {
 function resolveLogoUrl(logo: string): string | null {
   if (!logo) return null;
   if (logo.startsWith("blob:") || logo.startsWith("http://") || logo.startsWith("https://")) return logo;
-  return `${API}${logo}`;
+  return `${API.defaults.baseURL.replace(/\/api\/?$/, '')}${logo}`;
 }
 
 function CompetitorLogo({ name = "", slug = "", logo = "" }) {
@@ -267,6 +267,7 @@ export default function Notifications() {
   competitors.forEach((c: any) => {
     competitorMeta[c.slug] = { logo: c.logo || "", name: c.name };
   });
+  
 
   const [search,      setSearch]      = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -421,6 +422,7 @@ export default function Notifications() {
                   </div>
 
                   {/* Quantity — separate row */}
+                  {p.product_stock !== null && p.product_stock !== undefined && p.product_stock !== "" && (
                   <div className="mb-4 flex items-center justify-between text-[13px] bg-white dark:bg-slate-800/60 rounded-lg border border-slate-100 dark:border-slate-700/50 px-3 py-2.5">
                     <span className="text-slate-500 dark:text-slate-400 font-medium">Quantity</span>
                     <span className={`text-[12px] font-bold px-2 py-0.5 rounded-full ${
@@ -429,6 +431,7 @@ export default function Notifications() {
                       {p.product_stock !== null && p.product_stock !== undefined ? `${p.product_stock} units` : "—"}
                     </span>
                   </div>
+                  )}
                   {/* Status rows */}
                   <div className="space-y-3 mb-5">
                     <div className="flex items-center justify-between text-[13px]">
