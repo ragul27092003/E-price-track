@@ -721,28 +721,17 @@ function exportToCSV(products, exportType = "A", competitorMeta = {}) {
     return;
   }
 
-  // ── Default (Type A) — now also splits competitors into separate columns ──
-  const slugMap = {};
-  products.forEach((p) => {
-    (p.competitor_prices || []).forEach((c) => {
-      if (!slugMap[c.slug]) slugMap[c.slug] = competitorMeta?.[c.slug]?.name || c.name || c.slug;
-    });
-  });
-  const slugs = Object.keys(slugMap);
-
-  const headers = ["Product Name", "Item Code", "Ranking Position", "Competing With", "Price", "SAP Price", "Store Price", "Item Groups", ...slugs.map((s) => slugMap[s])];
+  const headers = ["Product Name", "Item Code", "Ranking Position", "Competing With", "Price", "SAP Price", "Store Price", "Item Groups", "Competitor Detail"];
   const rows = products.map((p) => {
-    const compMap = {};
-    (p.competitor_prices || []).forEach((c) => {
+    const compDetail = (p.competitor_prices || []).map((c) => {
       const outOfStock = c.price === null || c.price === undefined || c.stock === 0;
-      compMap[c.slug] = outOfStock ? "Out Of Stock" : c.price;
-    });
+      return outOfStock ? `${c.name} : Out Of Stock` : `${c.name} : ${c.price}`;
+    }).join(" | ");
     return [
       p.product_name || "", p.product_code || p.product_ean_id || "",
       p.user_notification_data?.rank_pos || p.rank_by || "", p.user_notification_data?.Competing_with ?? "",
       p.product_price ?? "", p.product_sap_price ?? "", p.product_store_price ?? "",
-      p.product_item_group || p.product_category || "",
-      ...slugs.map((s) => compMap[s] ?? "Out Of Stock"),
+      p.product_item_group || p.product_category || "", compDetail,
     ].map(escape).join(",");
   });
   triggerDownload([headers.map(escape).join(","), ...rows].join("\r\n"));

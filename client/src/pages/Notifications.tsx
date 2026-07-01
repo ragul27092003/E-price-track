@@ -349,12 +349,40 @@ export default function Notifications() {
 
                   {/* Product header */}
                   <div className="flex items-center gap-4 mb-5">
-                    {/* <ProductImage src={p.product_image} alt={p.product_name} /> */}
-                    <ProductImage src={resolveProductImage(p)} alt={p.product_name} />
+                    {p.product_url ? (
+                      <a
+                        href={p.product_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Open product page"
+                        className="shrink-0 hover:opacity-80 transition-opacity"
+                      >
+                        <ProductImage src={resolveProductImage(p)} alt={p.product_name} />
+                      </a>
+                    ) : (
+                      <ProductImage src={resolveProductImage(p)} alt={p.product_name} />
+                    )}
                     <div className="min-w-0">
-                      <h3 className="font-bold text-slate-800 dark:text-white text-[14px] leading-snug line-clamp-2">
-                        {p.product_name || "Unnamed Product"}
-                      </h3>
+                      {p.product_url ? (
+                        <a
+                          href={p.product_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open product page"
+                          className="inline-flex items-start gap-1 font-bold text-slate-800 dark:text-white text-[14px] leading-snug line-clamp-2 hover:text-black dark:hover:text-black"
+                        >
+                          {p.product_name || "Unnamed Product"}
+                          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" className="shrink-0 opacity-60 mt-0.5">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <path d="M15 3h6v6" />
+                            <path d="M10 14 21 3" />
+                          </svg>
+                        </a>
+                      ) : (
+                        <h3 className="font-bold text-slate-800 dark:text-white text-[14px] leading-snug line-clamp-2">
+                          {p.product_name || "Unnamed Product"}
+                        </h3>
+                      )}
                       <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
                         {p.product_brand && <span>{p.product_brand} · </span>}
                         {p.product_ean_id || p.product_code || p._id}
@@ -450,12 +478,27 @@ export default function Notifications() {
                           const meta = competitorMeta[c.slug] || { logo: "", name: "" };
                           return (
                             <div key={c.slug} className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
-                                <span className="font-bold text-slate-700 dark:text-slate-300 text-[13px]">
-                                  ₹{c.price.toLocaleString("en-IN")}
-                                </span>
-                              </div>
+                              {c.url ? (
+                                <a
+                                  href={c.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title={`Open on ${c.name}`}
+                                  className="flex items-center gap-2 hover:opacity-75 transition-opacity"
+                                >
+                                  <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
+                                  <span className="font-bold text-slate-700 dark:text-slate-300 text-[13px]">
+                                    ₹{c.price.toLocaleString("en-IN")}
+                                  </span>
+                                </a>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
+                                  <span className="font-bold text-slate-700 dark:text-slate-300 text-[13px]">
+                                    ₹{c.price.toLocaleString("en-IN")}
+                                  </span>
+                                </div>
+                              )}
                               <Sparkline data={trendFor(p, c.slug)} color="#0ea5e9" />
                             </div>
                           );
