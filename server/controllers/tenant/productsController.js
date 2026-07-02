@@ -159,7 +159,15 @@ exports.getMeta = async (req, res) => {
       d.product_category ? d.product_category.split('>')[0].trim() : ''
     ).filter(Boolean))].sort();
 
-    res.json({ brands, categories, ranks, itemGroups });
+    // 🆕 resolve effective alert user id (super_admin → tenant's store_admin id)
+    let alertUserId = req.user.user_id;
+    if (req.user.user_type === 'super_admin') {
+      const tenantCmpid = req.headers['x-tenant-id'] || req.user.cmpid;
+      const storeAdmin = await User.findOne({ cmpid: tenantCmpid, user_type: 'store_admin' }).select('user_id').lean();
+      if (storeAdmin) alertUserId = storeAdmin.user_id;
+    }
+
+    res.json({ brands, categories, ranks, itemGroups, alertUserId }); // 🆕 alertUserId added
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -342,6 +350,9 @@ exports.getAlertProducts = async (req, res) => {
         console.log(`store_admin for cmpid ${tenantCmpid}:`, storeAdmin?.user_id);
         if (!storeAdmin) return res.json({ data: [], total: 0, page: 1, totalPages: 0 });
         query = { ...baseFilter, user_alert_id: storeAdmin.user_id };
+        // const idsToMatch = [user_id];
+        // if (storeAdmin) idsToMatch.push(storeAdmin.user_id);
+        // query = { ...baseFilter, user_alert_id: { $in: idsToMatch } };
       } else {
         // store_admin: show all products with alerts from any user in this tenant
         const tenantUsers   = await User.find({ cmpid: tenantCmpid }).select('user_id').lean();
@@ -395,12 +406,39 @@ exports.remove = async (req, res) => {
 };
 
 // Update group_name and user_alert_id for a specific product
+// exports.configureProduct = async (req, res) => {
+//   try {
+//     const { group_name, user_alert_id } = req.body;
+//     await req.tenantDb.collection('ept_product_details_new').updateOne(
+//       { _id: new ObjectId(req.params.id) },
+//       { $set: { group_name, user_alert_id: user_alert_id || [], updatedAt: new Date() } }
+//     );
+//     res.json({ message: 'Product configured' });
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
+// };
+
 exports.configureProduct = async (req, res) => {
   try {
-    const { group_name, user_alert_id } = req.body;
+    const { group_name } = req.body;
+    const { user_type, user_id } = req.user;
+
+    let alertUserId = user_id;
+
+    // Super admin subscribe பண்ணா, store_admin-ன ID-ஐயே use பண்ணுங்க
+    if (user_type === 'super_admin') {
+      const tenantCmpid = req.headers['x-tenant-id'] || req.user.cmpid;
+      const storeAdmin = await User
+        .findOne({ cmpid: tenantCmpid, user_type: 'store_admin' })
+        .select('user_id')
+        .lean();
+      if (storeAdmin) alertUserId = storeAdmin.user_id;
+    }
+
     await req.tenantDb.collection('ept_product_details_new').updateOne(
       { _id: new ObjectId(req.params.id) },
-      { $set: { group_name, user_alert_id: user_alert_id || [], updatedAt: new Date() } }
+      { $set: { group_name, user_alert_id: [alertUserId], updatedAt: new Date() } }
     );
     res.json({ message: 'Product configured' });
   } catch (error) {

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../store";
 import { fetchAlertProducts } from "../services/notificationsService.js";
+import { removeProductConfiguration } from "../services/productsService"; 
 import API from "../hooks/useApi";
 // ── Helpers (mirrored from Products page) ─────────────────────────────────────
 
@@ -261,6 +262,10 @@ export default function Notifications() {
   const setAlertProductsTotalPages = useStore((s) => s.setAlertProductsTotalPages);
   const competitors  = useStore((s) => s.competitors);
   const activeStoreId = useStore((s) => s.activeStoreId);
+  const [removingId, setRemovingId] = useState(null); // 🆕 tracks which card is removing
+  const [confirmTarget, setConfirmTarget] = useState(null);
+  const products    = useStore((s) => s.products);       // 🆕
+  const setProducts = useStore((s) => s.setProducts); 
 
   // Build competitor meta map for logos (same pattern as Products page)
   const competitorMeta: Record<string, { logo: string; name: string }> = {};
@@ -301,6 +306,26 @@ export default function Notifications() {
       p.product_brand?.toLowerCase().includes(q) ||
       String(p.product_ean_id || "").includes(q);
   });
+
+  const handleRemove = async () => {
+    if (!confirmTarget) return;
+    const productId = confirmTarget._id;
+    setRemovingId(productId);
+    try {
+      await removeProductConfiguration(productId);
+      setAlertProducts(alertProducts.filter((p) => p._id !== productId));
+      setProducts(
+        products.map((p) =>
+          p._id === productId ? { ...p, group_name: "", user_alert_id: [] } : p
+        )
+      );
+      setConfirmTarget(null);
+    } catch (err) {
+      console.error("Remove failed:", err);
+    } finally {
+      setRemovingId(null);
+    }
+  };
 
   // totalPages and paginated come from the server — no client-side slicing needed
   const totalPages = alertProductsTotalPages;
@@ -518,6 +543,12 @@ export default function Notifications() {
                     >
                       View Details
                     </button>
+                    <button
+                      onClick={() => setConfirmTarget(p)}
+                      className="flex-1 rounded-xl border border-rose-200 dark:border-rose-800/50 bg-rose-50 dark:bg-rose-900/20 py-2.5 text-xs font-bold text-rose-600 dark:text-rose-400 transition-colors hover:bg-rose-100 dark:hover:bg-rose-900/40"
+                    >
+                      Remove
+                    </button>
                     {/* <button className="flex-1 rounded-xl bg-[#2B86C5] py-2.5 text-xs font-bold text-white transition-colors hover:bg-[#226fa3]">
                       Quick Sync
                     </button> */}
@@ -534,6 +565,49 @@ export default function Notifications() {
           onPageChange={setCurrentPage}
         />
       </div>
+
+      {/* 🆕 Remove confirm modal — inline, no separate component */}
+      {confirmTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-[#151a2a] shadow-2xl border border-slate-200 dark:border-slate-700/60 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#0b101e]">
+              <h2 className="font-bold text-slate-800 dark:text-white text-sm line-clamp-1">Remove Notification</h2>
+              <button
+                onClick={() => setConfirmTarget(null)}
+                disabled={removingId === confirmTarget._id}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors disabled:opacity-50"
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Are you sure you want to remove <strong className="text-slate-800 dark:text-white">{confirmTarget.product_name}</strong> from notifications?
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#151a2a]">
+              <button
+                onClick={() => setConfirmTarget(null)}
+                disabled={removingId === confirmTarget._id}
+                className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRemove}
+                disabled={removingId === confirmTarget._id}
+                className="flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              >
+                {removingId === confirmTarget._id && (
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white inline-block" />
+                )}
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

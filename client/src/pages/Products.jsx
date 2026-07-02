@@ -1001,7 +1001,9 @@ export default function Products() {
     ),
   }));
 
-  const isConfigured  = (p) => !!(p.group_name || (p.user_alert_id && p.user_alert_id.length > 0));
+  const alertUserId = productsMeta?.alertUserId || null;
+  const isConfigured = (p) =>
+    !!(alertUserId && Array.isArray(p.user_alert_id) && p.user_alert_id.includes(alertUserId));
   const allConfigured = filtered.length > 0 && filtered.every(isConfigured);
   const someConfigured = filtered.some(isConfigured);
 
@@ -1057,6 +1059,7 @@ export default function Products() {
 
   const handleBulkSave = async () => {
     setBulkSaving(true);
+    const effectiveUserId = alertUserId || currentUserId;
     try {
       const filteredIds = new Set(filtered.map((p) => p._id));
       await Promise.all(
@@ -1383,7 +1386,7 @@ export default function Products() {
 
       {configProduct && (
         <ConfigureModal
-          product={configProduct} currentUserId={currentUserId}
+          product={configProduct} currentUserId={alertUserId || currentUserId}
           onClose={() => setConfigProduct(null)} onSaved={handleConfigSaved}
         />
       )}
