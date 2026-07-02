@@ -2,7 +2,7 @@ import API from '../hooks/useApi';
 
 // Paginated product fetch — all filter params are optional
 export const fetchProducts = ({
-  page = 1, limit = 5,
+  page = 1, limit = 15,
   competitorSlug = null,
   search, brand, category, rank, itemGroup,
 } = {}) => {

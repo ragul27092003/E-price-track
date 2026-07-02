@@ -356,6 +356,141 @@ exports.toggleSync = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+// ─── GET /api/competitors/available ───────────────────────────────────────────
+// Returns competitors from the global admin pool (plm_admin_competitor) that
+// THIS store hasn't added yet. The same competitor (e.g. Amazon) can be added
+// by many different stores — `selected_company` is an array of tenant IDs
+// that have already added it. The array itself is excluded from the response.
+exports.getAvailable = async (req, res) => {
+  try {
+    const mainDb   = mongoose.connection.db;
+    const tenantId = req.tenantId;
+
+    const admins = await mainDb.collection('plm_admin_competitor').find(
+      { selected_company: { $nin: [tenantId] } },
+      { projection: { selected_company: 0 } }
+    ).toArray();
+
+    const data = admins.map((a) => ({
+      slug:         a.competitor_slug,
+      name:         a.competitors || a.competitor_name || a.competitor_slug || 'Unknown',
+      logo:         a.competitor_logo      || '',
+      fullLogo:     a.competitor_full_logo || '',
+      website:      a.competitor_site        || '',
+      searchUrl:    a.competitor_search_url  || '',
+      color:        a.color || '#475e77',
+      mappingType:  ((a.mapping_type || 'ean').toLowerCase() === 'ean') ? 'EAN' : 'NON_EAN',
+    }));
+
+    res.json(data);
+  } catch (err) {
+    console.error('competitorsController.getAvailable error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ─── POST /api/competitors/assign/:slug ───────────────────────────────────────
+// Assigns a competitor from the global admin pool to the current store:
+//   1. Adds tenantId into `selected_company` (an array) on the admin doc, so
+//      this store won't see it in "available" again — but OTHER stores can
+//      still independently add the same competitor (e.g. Amazon).
+//   2. Copies its details into this tenant's ept_competitor_info collection
+//      so it immediately shows up in this store's Competitors list.
+exports.assignCompetitor = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const tenantId = req.tenantId;
+    const mainDb   = mongoose.connection.db;
+
+    const adminComp = await mainDb.collection('plm_admin_competitor').findOne({ competitor_slug: slug });
+    if (!adminComp) {
+      return res.status(404).json({ message: 'Competitor not found in admin pool.' });
+    }
+
+    // Add this store to the list of stores that have selected this competitor.
+    // $addToSet is used instead of $push so a duplicate click never adds the
+    // same tenantId twice, and instead of $set so other stores' entries stay intact.
+    await mainDb.collection('plm_admin_competitor').updateOne(
+      { competitor_slug: slug },
+      { $addToSet: { selected_company: tenantId } }
+    );
+
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const doc = {
+      competitors:           adminComp.competitors || adminComp.competitor_name || slug,
+      competitor_name:       (adminComp.competitor_name || adminComp.competitors || slug).toLowerCase().trim(),
+      competitor_slug:       slug,
+      competitor_logo:       adminComp.competitor_logo      || '',
+      competitor_full_logo:  adminComp.competitor_full_logo || '',
+      competitor_site:       adminComp.competitor_site        || '',
+      competitor_search_url: adminComp.competitor_search_url  || '',
+      color:                 adminComp.color || '#475e77',
+      mapping_type:          (adminComp.mapping_type || 'ean').toLowerCase(),
+      competitor_status:     'enable',
+      status:                'active',
+      cmpid:                 tenantId,
+      created_date:          now,
+      modified_date:         now,
+    };
+
+    const result = await req.tenantDb.collection('ept_competitor_info').insertOne(doc);
+
+    res.status(201).json({
+      id:              result.insertedId,
+      name:            doc.competitors,
+      logo:            doc.competitor_logo,
+      fullLogo:        doc.competitor_full_logo,
+      website:         doc.competitor_site,
+      searchUrl:       doc.competitor_search_url,
+      color:           doc.color,
+      mappingType:     doc.mapping_type === 'ean' ? 'EAN' : 'NON_EAN',
+      isActive:        true,
+      avgPriceDelta:   '+0.0%',
+      productsTracked: 0,
+      lastSync:        now,
+      slug,
+    });
+  } catch (err) {
+    console.error('competitorsController.assignCompetitor error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ─── DELETE /api/competitors/:id  (super_admin only) ─────────────────────────
+// Removes a competitor from this store's list, and also pulls this tenant's
+// id out of the admin pool's `selected_company` array so the competitor
+// becomes available again in "Add Competitor" for this store (in case it
+// was added by mistake and they want to re-add it correctly later).
+exports.remove = async (req, res) => {
+  try {
+    const { ObjectId } = require('mongodb');
+    const tenantId = req.tenantId;
+    const { id } = req.params;
+
+    const existing = await req.tenantDb.collection('ept_competitor_info').findOne({ _id: new ObjectId(id) });
+    if (!existing) {
+      return res.status(404).json({ message: 'Competitor not found.' });
+    }
+
+    await req.tenantDb.collection('ept_competitor_info').deleteOne({ _id: new ObjectId(id) });
+
+    // Pull this tenant out of the admin pool's selected_company array so it
+    // shows up again in "Add Competitor" for this store.
+    if (existing.competitor_slug) {
+      const mainDb = mongoose.connection.db;
+      await mainDb.collection('plm_admin_competitor').updateOne(
+        { competitor_slug: existing.competitor_slug },
+        { $pull: { selected_company: tenantId } }
+      );
+    }
+
+    res.json({ id, deleted: true });
+  } catch (err) {
+    console.error('competitorsController.remove error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // ─── GET /api/competitors/debug-mapping  (temporary — remove after fixing) ───
 // Hit this endpoint to see EXACTLY what mapping_type each DB has per slug.
 // curl http://localhost:5100/api/competitors/debug-mapping

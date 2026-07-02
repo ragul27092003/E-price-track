@@ -5,33 +5,59 @@ import { fetchProducts } from "../services/productsService";
 import { fetchCompetitors } from "../services/competitorsService";
 import API from "../hooks/useApi";
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
+ 
 function parsePrice(raw) {
   if (raw === null || raw === undefined || raw === "No Result" || raw === "") return null;
   const n = typeof raw === "number" ? raw : parseFloat(String(raw).replace(/[₹,\s]/g, ""));
   return isNaN(n) ? null : n;
 }
-
+ 
 function fmt(v) {
   if (v === null || v === undefined) return "—";
   return `₹${Number(v).toLocaleString("en-IN")}`;
 }
+ 
+// ── Pick the default product to show: prefer one with 4-7 competitors ─────────
+function getCompetitorCount(product) {
+  return Array.isArray(product?.arrrank_name_by) ? product.arrrank_name_by.length : 0;
+}
+ 
+function pickDefaultProduct(products) {
+  console.log("🔍 pickDefaultProduct called with", products?.length, "products");
+  console.log("🔍 counts:", products?.map(p => ({ name: p.product_name, count: getCompetitorCount(p) })));
 
+  if (!products || !products.length) return null;
+
+ 
+  // First product (in original order) whose competitor count is between 4 and 7 (inclusive)
+  const inRange = products.find((p) => {
+    const count = getCompetitorCount(p);
+    return count >= 4 && count <= 7;
+  });
+  if (inRange) return inRange;
+ 
+  // Otherwise fall back to the product with the highest competitor count overall
+  return products.reduce(
+    (best, p) => (getCompetitorCount(p) > getCompetitorCount(best) ? p : best),
+    products[0]
+  );
+}
+ 
 // ── Resolve logo URL safely (mirrors MarketCompetitor) ────────────────────────
 function resolveLogoUrl(logo) {
   if (!logo) return null;
   if (logo.startsWith("blob:") || logo.startsWith("http://") || logo.startsWith("https://")) return logo;
   return `${API.defaults.baseURL.replace(/\/api\/?$/, '')}${logo}`;
 }
-
-
+ 
+ 
 // ── Competitor Logo Component ─────────────────────────────────────────────────
 function CompetitorLogo({ competitor, size = 28, showName = false }) {
   const [imgErr, setImgErr] = useState(false);
   const bg       = competitor.color || "#475e77";
   const initials = (competitor.name || competitor.slug || "").substring(0, 2).toUpperCase();
   const imgSrc   = resolveLogoUrl(competitor.logo);
-
+ 
   return (
     <div className="flex items-center gap-2">
       <div
@@ -59,13 +85,13 @@ function CompetitorLogo({ competitor, size = 28, showName = false }) {
     </div>
   );
 }
-
+ 
 // ── Interactive Business Analytics Graph ──────────────────────────────────────
-
+ 
 function PriceChart({ history, competitors, visibleSlugs }) {
   const [hoverIdx, setHoverIdx] = useState(null);
   const chartRef = useRef(null);
-
+ 
   if (!history || !history.length) {
     return (
       <div className="flex h-[280px] items-center justify-center text-sm font-medium text-gray-400">
@@ -73,12 +99,12 @@ function PriceChart({ history, competitors, visibleSlugs }) {
       </div>
     );
   }
-
+ 
   const svgW = 750, svgH = 290;
   const pad  = { top: 25, right: 20, bottom: 80, left: 65 }; 
   const plotW = svgW - pad.left - pad.right;
   const plotH = svgH - pad.top - pad.bottom;
-
+ 
   const allPrices = [];
   history.forEach((h) => {
     const p = parsePrice(h.product_price);
@@ -89,7 +115,7 @@ function PriceChart({ history, competitors, visibleSlugs }) {
       if (cp !== null) allPrices.push(cp);
     });
   });
-
+ 
   if (!allPrices.length) {
     return (
       <div className="flex h-[280px] items-center justify-center text-sm font-medium text-gray-400">
@@ -97,22 +123,22 @@ function PriceChart({ history, competitors, visibleSlugs }) {
       </div>
     );
   }
-
+ 
   let dataMin = Math.min(...allPrices);
   let dataMax = Math.max(...allPrices);
   if (dataMin === dataMax) {
     dataMin = dataMin * 0.95;
     dataMax = dataMax * 1.05;
   }
-
+ 
   const range    = dataMax - dataMin;
   const chartMin = Math.max(0, dataMin - range * 0.1); 
   const chartMax = dataMax + range * 0.1;
   const span     = chartMax - chartMin;
-
+ 
   const getX = (i) => pad.left + (plotW / Math.max(history.length - 1, 1)) * i;
   const getY = (v) => pad.top + ((chartMax - v) / span) * plotH;
-
+ 
   const yTickCount = 4;
   const rawTicks = Array.from({ length: yTickCount }, (_, i) => chartMin + (span / (yTickCount - 1)) * i);
   const yTicks = [...new Set(rawTicks.map(t => Math.round(t)))];
@@ -135,7 +161,7 @@ function PriceChart({ history, competitors, visibleSlugs }) {
         isMain: false,
       })),
   ];
-
+ 
   const buildPath = (values) => {
     let d = "";
     values.forEach((v, i) => {
@@ -145,7 +171,7 @@ function PriceChart({ history, competitors, visibleSlugs }) {
     });
     return d.trim();
   };
-
+ 
   const buildAreaPath = (values) => {
     let d = "";
     let firstX = null, lastX = null;
@@ -163,7 +189,7 @@ function PriceChart({ history, competitors, visibleSlugs }) {
     }
     return d.trim();
   };
-
+ 
   const handleMouseMove = (e) => {
     if (!chartRef.current) return;
     const rect = chartRef.current.getBoundingClientRect();
@@ -177,7 +203,7 @@ function PriceChart({ history, competitors, visibleSlugs }) {
     
     setHoverIdx(index);
   };
-
+ 
   return (
     <div className="relative w-full select-none" onMouseLeave={() => setHoverIdx(null)}>
       <svg 
@@ -195,7 +221,7 @@ function PriceChart({ history, competitors, visibleSlugs }) {
             <stop offset="100%" stopColor="#2563eb" stopOpacity="0" />
           </linearGradient>
         </defs>
-
+ 
         {yTicks.map((tick) => (
           <g key={tick}>
             <line
@@ -208,7 +234,7 @@ function PriceChart({ history, competitors, visibleSlugs }) {
             </text>
           </g>
         ))}
-
+ 
         {history.map((h, i) => {
           if (!h.display_date) return null;
           const step = history.length > 31 ? Math.ceil(history.length / 15) : 1;
@@ -224,12 +250,12 @@ function PriceChart({ history, competitors, visibleSlugs }) {
             </text>
           );
         })}
-
+ 
         {series.map((s) => {
           const dLine = buildPath(s.values);
           const dArea = s.isMain ? buildAreaPath(s.values) : "";
           if (!dLine) return null;
-
+ 
           return (
             <g key={s.slug}>
               {s.isMain && dArea && (
@@ -257,7 +283,7 @@ function PriceChart({ history, competitors, visibleSlugs }) {
             </g>
           );
         })}
-
+ 
         {hoverIdx !== null && (
           <line
             x1={getX(hoverIdx)} y1={pad.top}
@@ -271,7 +297,7 @@ function PriceChart({ history, competitors, visibleSlugs }) {
         )}
         <rect x={pad.left} y={pad.top} width={plotW} height={plotH} fill="transparent" />
       </svg>
-
+ 
       {hoverIdx !== null && (
         <div 
           className="pointer-events-none absolute z-10 rounded-lg border border-gray-200 bg-white/95 p-2 md:p-3 shadow-xl backdrop-blur-md dark:border-gray-700 dark:bg-[#151a2a]/95"
@@ -313,9 +339,9 @@ function PriceChart({ history, competitors, visibleSlugs }) {
     </div>
   );
 }
-
+ 
 // ── Main Component ─────────────────────────────────────────────────────────────
-
+ 
 export default function ProductHistory() {
   const storeProducts      = useStore((s) => s.products);
   const storeCompetitors   = useStore((s) => s.competitors);
@@ -325,7 +351,7 @@ export default function ProductHistory() {
   const activeStoreId      = useStore((s) => s.activeStoreId);
   const lastViewedEan      = useStore((s) => s.lastViewedEan);
   const setLastViewedEan   = useStore((s) => s.setLastViewedEan);
-
+ 
   const [loading,       setLoading]       = useState(false);
   const [searchQuery,   setSearchQuery]   = useState("");
   const [userSearched,  setUserSearched]  = useState(false);
@@ -336,22 +362,20 @@ export default function ProductHistory() {
 // const eanFromUrl = searchParams.get("ean") || "";
 const { ean: eanFromUrl } = useParams();
 const rangeFromUrl = searchParams.get("range") || "30";
-
+ 
 const [daysRange,     setDaysRange]     = useState(Number(rangeFromUrl));
-
+ 
   useEffect(() => {
     const load = async () => {
       setLoading(true);
       try {
         const [, comps] = await Promise.all([
-          storeProducts.length
-            ? Promise.resolve(storeProducts)
-            : fetchProducts().then((d) => {
-                     const arr = Array.isArray(d) ? d : (d?.products ?? d?.data ?? d?.items ?? []);
-                     setProducts(arr);
-                     setProductsLoading(false);
-                     return arr;
-               }),
+          fetchProducts().then((d) => {
+            const arr = Array.isArray(d) ? d : (d?.products ?? d?.data ?? d?.items ?? []);
+            setProducts(arr);
+            setProductsLoading(false);
+            return arr;
+          }),
           storeCompetitors.length
             ? Promise.resolve(storeCompetitors)
             : fetchCompetitors().then((d) => { setCompetitors(d); return d; }),
@@ -365,7 +389,7 @@ const [daysRange,     setDaysRange]     = useState(Number(rangeFromUrl));
     };
     load();
   }, [activeStoreId]);
-
+ 
   const filteredProducts = useMemo(() => {
     if (!searchQuery.trim()) return storeProducts;
     const q = searchQuery.toLowerCase();
@@ -376,25 +400,27 @@ const [daysRange,     setDaysRange]     = useState(Number(rangeFromUrl));
         String(p.product_ean_id || "").includes(q)
     );
   }, [storeProducts, searchQuery]);
-
+ 
   const selectedProduct = useMemo(() => {
     if (userSearched) {
       return filteredProducts[selectedIndex] ?? filteredProducts[0] ?? null;
     }
-    const ean = eanFromUrl || lastViewedEan;
-    if (ean) {
-      const found = storeProducts.find((p) => String(p.product_ean_id) === String(ean));
+    // Only an explicit EAN in the URL (e.g. navigated here from another page/link)
+    // should override the smart default. A stale lastViewedEan from a previous
+    // visit should NOT stop us from computing the 4-7-competitor default.
+    if (eanFromUrl) {
+      const found = storeProducts.find((p) => String(p.product_ean_id) === String(eanFromUrl));
       if (found) return found;
     }
-    return storeProducts[0] ?? null;
-  }, [userSearched, filteredProducts, selectedIndex, eanFromUrl, lastViewedEan, storeProducts]);
-
+    return pickDefaultProduct(storeProducts);
+  }, [userSearched, filteredProducts, selectedIndex, eanFromUrl, storeProducts]);
+ 
   useEffect(() => {
     if (selectedProduct?.product_ean_id) {
       setLastViewedEan(String(selectedProduct.product_ean_id));
     }
   }, [selectedProduct?.product_ean_id]);
-
+ 
   useEffect(() => {
     setSelectedIndex(0);
   }, [searchQuery]);
@@ -406,12 +432,18 @@ useEffect(() => {
   }
 }, [searchParams]);
   const onlineCompetitors = storeCompetitors.filter((c) => c.isActive !== false);
-
+ 
   const activeHistory = useMemo(() => {
     const full = selectedProduct?.price_history_30days || [];
     return full.slice(0, daysRange); 
   }, [selectedProduct, daysRange]);
-
+ 
+   const chartCompetitors = useMemo(() => {
+    return onlineCompetitors.filter((c) =>
+      activeHistory.some((h) => parsePrice(h.competitors?.[c.slug]) !== null)
+    );
+  }, [onlineCompetitors, activeHistory]);
+ 
   const stats = useMemo(() => {
     if (!selectedProduct || activeHistory.length === 0) return { min: null, max: null, avgDev: null };
     const compPrices = [];
@@ -428,7 +460,7 @@ useEffect(() => {
     const avgDev   = avg !== null && ourPrice !== null ? Math.abs(Math.round(ourPrice - avg)) : null;
     return { min, max, avgDev };
   }, [selectedProduct, activeHistory, onlineCompetitors]);
-
+ 
   const toggleSlug = (slug) => {
     setVisibleSlugs((prev) => {
       const next = new Set(prev);
@@ -436,23 +468,23 @@ useEffect(() => {
       return next;
     });
   };
-
+ 
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
     setUserSearched(true);
   };
-
+ 
   const handleSearchSubmit = () => {
     setUserSearched(true);
     setSelectedIndex(0);
   };
-
+ 
   const handleClearSearch = () => {
     setSearchQuery("");
     setUserSearched(false);
     setSelectedIndex(0);
   };
-
+ 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white dark:bg-[#0b101e]">
@@ -460,7 +492,7 @@ useEffect(() => {
       </div>
     );
   }
-
+ 
   return (
     <div className="min-h-screen bg-white font-sans text-gray-900 transition-colors duration-200 dark:bg-[#0b101e] dark:text-gray-100 pb-12">
       
@@ -470,9 +502,9 @@ useEffect(() => {
           <h1 className="text-lg md:text-xl font-bold text-gray-800 dark:text-white">Manage Product History</h1>
         </div>
       </div>
-
+ 
       <div className="mx-auto flex max-w-[1280px] flex-col gap-6 px-4 pt-6">
-
+ 
         {/* Search & Filter Top Bar */}
         <div className="flex flex-col md:flex-row md:items-end gap-4 rounded-lg border border-gray-200 bg-white p-4 md:p-5 shadow-sm dark:border-[#262c3d] dark:bg-[#151a2a]">
           <div className="flex flex-col gap-2 w-full md:w-auto">
@@ -486,7 +518,7 @@ useEffect(() => {
               <option value={30}>Last 30 Days</option>
             </select>
           </div>
-
+ 
           <div className="flex flex-col gap-2 flex-1 w-full">
             <label className="whitespace-nowrap text-sm font-medium text-gray-600 dark:text-gray-400">
               Search Product
@@ -513,7 +545,7 @@ useEffect(() => {
               )}
             </div>
           </div>
-
+ 
           <button
             onClick={handleSearchSubmit}
             className="w-full md:w-auto md:mt-0 inline-flex h-10 items-center justify-center gap-2 rounded bg-teal-500 px-6 text-sm font-medium text-white shadow-sm transition-colors hover:bg-teal-600"
@@ -524,7 +556,7 @@ useEffect(() => {
             Search
           </button>
         </div>
-
+ 
         {/* Search Results Feedback */}
         {userSearched && searchQuery && filteredProducts.length > 1 && (
           <p className="-mt-2 text-[11px] md:text-xs text-gray-500 dark:text-gray-400">
@@ -537,7 +569,7 @@ useEffect(() => {
             <button onClick={handleClearSearch} className="underline hover:no-underline">Clear search</button>
           </p>
         )}
-
+ 
         {!selectedProduct ? (
           <div className="flex h-64 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 dark:border-[#262c3d] dark:bg-[#151a2a]">
             No products found
@@ -566,16 +598,16 @@ useEffect(() => {
                 </div>
               ))}
             </div>
-
+ 
             {/* Chart + Insights Layout */}
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-
+ 
               {/* Chart Section */}
               <div className="flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-[#262c3d] dark:bg-[#151a2a]">
                 <div className="border-b border-[#1e3a5f] bg-[#2a4365] py-2 text-center">
                   <span className="text-sm font-semibold text-white">Price History (Last {daysRange} Days)</span>
                 </div>
-
+ 
                 <div className="flex flex-1 flex-col p-4">
                   <div className="flex flex-col md:flex-row gap-6">
                     {/* Left Product Info Panel */}
@@ -592,9 +624,26 @@ useEffect(() => {
                           <span className="text-3xl md:text-4xl">📦</span>
                         )}
                       </div>
-                      <p className="text-center text-xs font-semibold leading-tight text-gray-800 dark:text-gray-200 max-w-[180px]">
-                        {selectedProduct.product_name}
-                      </p>
+                      {selectedProduct.product_url ? (
+                      <a
+                      href={selectedProduct.product_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Open product page"
+                      className="inline-flex items-center gap-1 text-center text-xs font-semibold leading-tight text-gray-800 dark:text-gray-200 max-w-[180px]"
+                      >
+                      {selectedProduct.product_name}
+                      <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="2.5" className="shrink-0 opacity-60">
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                        <path d="M15 3h6v6" />
+                        <path d="M10 14 21 3" />
+                      </svg>
+                       </a>
+                       ) : (
+                         <p className="text-center text-xs font-semibold leading-tight text-gray-800 dark:text-gray-200 max-w-[180px]">
+                           {selectedProduct.product_name}
+                         </p>)
+}
                       {selectedProduct.product_brand && (
                         <p className="mt-0.5 text-center text-[10px] text-gray-500 dark:text-gray-400">
                           ({selectedProduct.product_brand})
@@ -607,7 +656,7 @@ useEffect(() => {
                         <p className="mt-1 text-center text-[10px] text-gray-400">EAN: {selectedProduct.product_ean_id}</p>
                       )}
                     </div>
-
+ 
                     {/* Right Chart Area */}
                     <div className="flex flex-1 flex-col w-full overflow-hidden">
                       {/* Legend Top Bar */}
@@ -616,7 +665,7 @@ useEffect(() => {
                           <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: "#2563eb" }} />
                           <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-400">Our Price</span>
                         </div>
-                        {onlineCompetitors.map((c) => (
+                        {chartCompetitors.map((c) => (
                           <button
                             key={c.slug}
                             onClick={() => toggleSlug(c.slug)}
@@ -634,11 +683,11 @@ useEffect(() => {
                           </button>
                         ))}
                       </div>
-
+ 
                       <div className="w-full flex-1">
                         <PriceChart
                           history={activeHistory}
-                          competitors={onlineCompetitors}
+                          competitors={chartCompetitors}
                           visibleSlugs={visibleSlugs}
                         />
                       </div>
@@ -646,13 +695,13 @@ useEffect(() => {
                   </div>
                 </div>
               </div>
-
+ 
               {/* Insights Sidebar */}
               <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-[#262c3d] dark:bg-[#151a2a]">
                 <h3 className="mb-5 border-b border-gray-100 pb-2 text-base font-bold text-gray-900 dark:border-[#262c3d] dark:text-white">
                   Insights
                 </h3>
-
+ 
                 {/* Lowest Price Alert */}
                 {(() => {
                   const competitorPrices = (selectedProduct.competitor_prices || [])
@@ -660,7 +709,7 @@ useEffect(() => {
                     .sort((a, b) => a.price - b.price);
                   const lowest     = competitorPrices[0];
                   const lowestComp = storeCompetitors.find((c) => c.slug === lowest?.slug);
-
+ 
                   return (
                     <div className="mb-4 rounded border border-gray-200 p-3 shadow-sm dark:border-[#262c3d]">
                       <p className="mb-2 text-[11px] font-semibold text-gray-600 dark:text-gray-400">Lowest Price Alert</p>
@@ -685,7 +734,7 @@ useEffect(() => {
                     </div>
                   );
                 })()}
-
+ 
                 {/* Current Competitor Prices List */}
                 <div className="rounded border border-gray-200 p-3 shadow-sm dark:border-[#262c3d]">
                   <p className="mb-3 text-[11px] font-semibold text-gray-600 dark:text-gray-400">Current Competitor Prices</p>
@@ -720,7 +769,7 @@ useEffect(() => {
                     )}
                   </div>
                 </div>
-
+ 
                 {/* Price Stability */}
                 <div className="mt-4 rounded border border-gray-200 p-3 shadow-sm dark:border-[#262c3d]">
                   <p className="mb-3 text-[11px] font-semibold text-gray-600 dark:text-gray-400">Price Stability ({daysRange} Days)</p>
@@ -746,7 +795,7 @@ useEffect(() => {
                 </div>
               </div>
             </div>
-
+ 
             {/* Price History Data Table - Wrapped in Scroll Container */}
             <div className="mt-2 overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm dark:border-[#262c3d] dark:bg-[#151a2a]">
               <table className="w-full min-w-[700px] border-collapse">

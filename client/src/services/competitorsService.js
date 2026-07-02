@@ -3,6 +3,29 @@ import API from '../hooks/useApi';
 export const fetchCompetitors = () =>
   API.get('/competitors').then((r) => r.data);
 
+/**
+ * Fetch competitors from the global admin pool (plm_admin_competitor)
+ * that have NOT yet been assigned to the current store.
+ */
+export const fetchAvailableCompetitors = () =>
+  API.get('/competitors/available').then((r) => r.data);
+
+/**
+ * Assign a competitor from the global admin pool to the current store.
+ * Marks it as selected (server-side) and adds it to this store's list.
+ *
+ * @param {string} slug - competitor slug, e.g. "amazon"
+ */
+export const assignCompetitor = (slug) =>
+  API.post(`/competitors/assign/${slug}`).then((r) => r.data);
+
+/**
+ * Remove a competitor from the current store (super_admin only —
+ * the server enforces this via roleCheck).
+ */
+export const deleteCompetitor = (id) =>
+  API.delete(`/competitors/${id}`).then((r) => r.data);
+
 export const createCompetitor = (data) =>
   API.post('/competitors', data).then((r) => r.data);
 
