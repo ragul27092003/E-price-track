@@ -29,13 +29,6 @@ export function AppSidebar() {
 
   return (
     <aside className="flex flex-col border-r border-sidebar-border bg-sidebar shrink-0 w-[70px] h-screen">
-      {/* Logo */}
-      <div className="flex items-center justify-center h-16 border-b border-sidebar-border px-2">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary">
-          <Rss className="h-5 w-5 text-primary-foreground" />
-        </div>
-      </div>
-
       {/* Main Nav - Scroll removed */}
       <nav className="flex-1 py-4 px-2 space-y-2">
         {navItems.map((item) => {

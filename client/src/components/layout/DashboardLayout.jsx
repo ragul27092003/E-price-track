@@ -4,14 +4,14 @@ import { AppHeader } from "./AppHeader";
 
 export function DashboardLayout() {
   return (
-    <div className="flex max-h-screen w-full bg-background">
-      <AppSidebar />
-      <div className="flex flex-1 flex-col min-w-0">
-        <AppHeader />
-        <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto">
+    <div className="h-screen flex flex-col bg-background">
+      <AppHeader />
+      <div className="flex flex-1 overflow-hidden">
+        <AppSidebar />
+        <main className="flex-1 overflow-y-auto p-6 bg-[#f7f8fa]">
           <Outlet />
         </main>
       </div>
-    </div>
+    </div> 
   );
 }

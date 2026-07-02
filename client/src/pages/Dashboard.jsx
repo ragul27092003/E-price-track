@@ -162,6 +162,8 @@ export default function Dashboard() {
   const currentStoreId = useStore(selectCurrentStoreId);
   const showLsp        = useStore((s) => s.showLsp);
   const activeShopName = useStore((s) => s.activeShopName) || "Store";
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(true);
 
   const {
     sapUpdateStatus, sapUpdateStatusLoading,
@@ -211,11 +213,11 @@ export default function Dashboard() {
     }
   }, [brandAnalyticsBrands]);
 
-  useEffect(() => {
-    if (brandAnalyticsCategories.length > 0 && !selectedCategory) {
-      setSelectedCategory(brandAnalyticsCategories[0]);
-    }
-  }, [brandAnalyticsCategories]);
+  // useEffect(() => {
+  //   if (brandAnalyticsCategories.length > 0 && !selectedCategory) {
+  //     setSelectedCategory(brandAnalyticsCategories[0]);
+  //   }
+  // }, [brandAnalyticsCategories]);
 
   const handleBrandChange = (brand) => {
     setSelectedBrand(brand);
@@ -270,6 +272,39 @@ export default function Dashboard() {
     color: comp.color || CHART_COLORS[i % CHART_COLORS.length],
     displayPercent: totalCompetitorProducts ? ((comp.count / totalCompetitorProducts) * 100).toFixed(1) : 0
   }));
+
+  useEffect(() => {
+  fetchSapUpdateStatus();
+  fetchOverallStatistics();
+  fetchRankAnalysis();
+  fetchBrandAnalyticsBrands();
+
+    const fetchCompetitorCounts = async () => {
+      try {
+        const data = await fetchCompetitorCountsData();
+        setCompCounts(data);
+      } catch (err) {
+        console.error("Failed to fetch competitor counts", err);
+      } finally {
+        setCompCountsLoading(false);
+      }
+    };
+    fetchCompetitorCounts();
+
+    // ── Competitor Activity Log ──
+    const loadActivityLog = async () => {
+      setLogsLoading(true);
+      try {
+        const res = await API.get('/feeds/competitor-activity-log');
+        setActivityLogs(res.data?.logs || []);
+      } catch (err) {
+        setActivityLogs([]);
+      } finally {
+        setLogsLoading(false);
+      }
+    };
+    loadActivityLog();
+  }, []);
 
   return (
     <motion.div
@@ -393,15 +428,12 @@ export default function Dashboard() {
                 onChange={(e) => handleCategoryChange(e.target.value)}
                 disabled={brandAnalyticsLoading || !brandAnalyticsCategories.length}
               >
-                {brandAnalyticsCategories.length === 0 ? (
-                  <option value="">All Category</option>
-                ) : (
-                  brandAnalyticsCategories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {fmtCategory(cat)}
-                    </option>
-                  ))
-                )}
+                <option value="">All Category</option>
+                {brandAnalyticsCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {fmtCategory(cat)}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -614,6 +646,64 @@ export default function Dashboard() {
         </div>
 
       </motion.div>
+
+      {/* ── Activity Log ── */}
+      <motion.div variants={itemVariants} className="bg-card rounded-xl p-6 card-shadow border border-border">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h3 className="font-semibold text-lg text-foreground">Activity Log</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">Competitor scrape activity</p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto border-t border-border">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="text-muted-foreground text-xs uppercase font-semibold">
+                <th className="py-3 border-b border-border">Date & Time</th>
+                <th className="py-3 border-b border-border">Competitor</th>
+                <th className="py-3 border-b border-border">Status</th>
+                <th className="py-3 border-b border-border">Message</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm">
+              {logsLoading ? (
+                <tr>
+                  <td colSpan="4" className="py-10 text-center">
+                    <span className="text-sm text-muted-foreground animate-pulse">Loading…</span>
+                  </td>
+                </tr>
+              ) : activityLogs.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="py-8 text-center text-muted-foreground italic">
+                    No activity logs found
+                  </td>
+                </tr>
+              ) : (
+                activityLogs.map((log, idx) => (
+                  <tr key={idx} className="hover:bg-secondary/50 transition-colors">
+                    <td className="py-3 border-b border-border whitespace-nowrap text-foreground">{log.date}</td>
+                    <td className="py-3 border-b border-border">
+                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-indigo-500/10 text-indigo-600 capitalize">
+                        {log.competitor || '—'}
+                      </span>
+                    </td>
+                    <td className="py-3 border-b border-border">
+                      <span className="text-xs font-semibold px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600">
+                        {log.status}
+                      </span>
+                    </td>
+                    <td className="py-3 border-b border-border text-muted-foreground">{log.message}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </motion.div>
+
     </motion.div>
+
+    
   );
 }

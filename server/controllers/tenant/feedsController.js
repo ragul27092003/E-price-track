@@ -166,3 +166,34 @@ exports.getActivityLog = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// ── GET /api/feeds/competitor-activity-log ─────────────────────────────────
+exports.getCompetitorActivityLog = async (req, res) => {
+  try {
+    const tenantDb = req.tenantDb;
+
+    const cronDocs = await tenantDb
+      .collection('ept_cron_time_management')
+      .find({})
+      .sort({ start_time: -1 })
+      .limit(100)
+      .toArray();
+
+    const cronLogs = cronDocs
+    .map((doc) => ({
+      date:       formatDate(doc.start_time),
+      status:     'Success',
+      message:    `Scraped ${doc.cron_competitor_name || 'competitor'}: ${doc.update_count || 0} of ${doc.total_count || 0} products updated. Ended: ${formatDate(doc.end_time)}`,
+      source:     'cron_scrape',
+      competitor: doc.cron_competitor_name || '',
+    }))
+    .filter((l) => l.date && l.date !== '—')
+    .filter((l) => l.competitor.trim() !== '')   // 👈 add this — drop entries with no competitor name
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+
+    res.json({ logs: cronLogs });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
