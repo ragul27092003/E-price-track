@@ -277,11 +277,11 @@ export default function Notifications() {
   const [search,      setSearch]      = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const load = async (page: number) => {
+  const load = async (page: number, searchQuery: string = "") => {
     setAlertProductsLoading(true);
     setAlertProductsError(null);
     try {
-      const res = await fetchAlertProducts(page, ITEMS_PER_PAGE);
+      const res = await fetchAlertProducts(page, ITEMS_PER_PAGE, searchQuery);
       // Normalise: guard against old flat-array response shape
       const rows       = Array.isArray(res) ? res : (res?.data       || []);
       const totalPages = Array.isArray(res) ? 1   : (res?.totalPages || 1);
@@ -294,18 +294,29 @@ export default function Notifications() {
     }
   };
 
-  useEffect(() => { load(currentPage); }, [currentPage, activeStoreId]);
+  // ── FIX: this effect only reacts to page/store changes — NOT search.
+  // Previously `search` was in this dependency array too, which caused
+  // this effect AND the debounced search effect below to both fire
+  // load() calls on every keystroke, racing each other and stomping
+  // results (that's why the search field appeared "not working").
+  useEffect(() => { load(currentPage, search); }, [currentPage, activeStoreId]);
+
   // Reset to page 1 when store switches (avoids stale page number)
   useEffect(() => { setCurrentPage(1); }, [activeStoreId]);
 
-  // Search filters the current page's data only
-  const filtered = alertProducts.filter((p: any) => {
-    const q = search.toLowerCase();
-    return !q ||
-      p.product_name?.toLowerCase().includes(q) ||
-      p.product_brand?.toLowerCase().includes(q) ||
-      String(p.product_ean_id || "").includes(q);
-  });
+  // ── Search: debounced, resets to page 1, and is the ONLY effect that
+  // reacts to `search` changing.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (currentPage !== 1) {
+        setCurrentPage(1); // triggers the effect above → load(1, search)
+      } else {
+        load(1, search);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
 
   const handleRemove = async () => {
     if (!confirmTarget) return;
@@ -313,13 +324,23 @@ export default function Notifications() {
     setRemovingId(productId);
     try {
       await removeProductConfiguration(productId);
-      setAlertProducts(alertProducts.filter((p) => p._id !== productId));
       setProducts(
         products.map((p) =>
           p._id === productId ? { ...p, group_name: "", user_alert_id: [] } : p
         )
       );
       setConfirmTarget(null);
+      setAlertProductsLoading(true);
+      setSearch("");
+      setCurrentPage(1);
+
+    
+      const isLastItemOnPage = alertProducts.length === 1 && currentPage > 1;
+      if (isLastItemOnPage) {
+        setCurrentPage(currentPage - 1); 
+      } else {
+        await load(currentPage, search); 
+      }
     } catch (err) {
       console.error("Remove failed:", err);
     } finally {
@@ -327,9 +348,8 @@ export default function Notifications() {
     }
   };
 
-  // totalPages and paginated come from the server — no client-side slicing needed
+  // totalPages comes from the server — no client-side slicing needed
   const totalPages = alertProductsTotalPages;
-  const paginated  = filtered;
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0b101e] p-4 md:p-8 font-sans">
@@ -360,11 +380,11 @@ export default function Notifications() {
           {alertProductsLoading ? (
             <LoadingState />
           ) : alertProductsError ? (
-            <ErrorState message={alertProductsError} onRetry={() => load(currentPage)} />
-          ) : filtered.length === 0 ? (
+            <ErrorState message={alertProductsError} onRetry={() => load(currentPage, search)} />
+          ) : alertProducts.length === 0 ? (
             <EmptyState />
           ) : (
-            paginated.map((p: any) => {
+            alertProducts.map((p: any) => {
               const { low, avg, high } = marketStats(p);
               const gap   = priceGapPct(p);
               const price = parsePrice(p.product_price);
@@ -416,14 +436,6 @@ export default function Notifications() {
                     </div>
                   </div>
 
-                  {/* Our price */}
-                  {/* {price !== null && (
-                    <div className="mb-4">
-                      <span className="inline-block rounded-md bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-100 dark:border-emerald-800/50 px-3 py-1.5 text-[13px] font-bold text-emerald-600 dark:text-emerald-400">
-                        ₹{price.toLocaleString("en-IN")}
-                      </span>
-                    </div>
-                  )} */}
                   {/* Our prices: Web / SAP / MRP + Quantity */}
                   <div className="mb-3 grid grid-cols-3 gap-2 bg-white dark:bg-slate-800/60 rounded-lg border border-slate-100 dark:border-slate-700/50 px-3 py-2.5">
                     <div className="text-center">

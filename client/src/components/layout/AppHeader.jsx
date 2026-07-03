@@ -134,7 +134,7 @@ export function AppHeader() {
 
   return (
     <header className="flex items-center h-16 pl-1 pr-9 border-b border-border bg-card shrink-0">
-      <img src={logo} alt="Logo" className="h-16 w-auto object-contain" />
+      <img src={logo} alt="Logo" className="h-20 w-auto object-contain" />
 
       <div className="ml-auto flex items-center gap-2">
 
@@ -155,9 +155,9 @@ export function AppHeader() {
         )}
 
         {/* Dark mode toggle */}
-        <Button variant="ghost" size="icon" onClick={toggleDarkMode} className="text-muted-foreground hover:text-foreground">
+        {/* <Button variant="ghost" size="icon" onClick={toggleDarkMode} className="text-muted-foreground hover:text-foreground">
           {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-        </Button>
+        </Button> */}
 
         {/* Avatar + dropdown */}
         <div className="ml-2 relative">

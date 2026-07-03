@@ -42,10 +42,7 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center">
-            <Rss className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-2xl font-bold text-slate-900 dark:text-white">E-Price Track</span>
+          <img src="/src/services/assets/main-logo.png" alt="Logo" class="h-24 w-auto object-contain"></img>
         </div>
 
         <Card>
