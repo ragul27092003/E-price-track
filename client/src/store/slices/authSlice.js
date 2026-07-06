@@ -52,6 +52,7 @@ export const createAuthSlice = (set, get) => ({
         companyName:   data.companyName   || '',
         website:       data.website       || '',
         email_address: data.email_address || '',
+        export_option: data.export_option ?? 'yes',
       },
     });
   },

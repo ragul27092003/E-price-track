@@ -13,6 +13,7 @@ import API from '../hooks/useApi';
 
 const ManageFeedSetup = () => {
   const activeStoreId = useStore((s) => s.activeStoreId);
+  const isRestrictedUser = useStore((s) => s.user?.user_type === 'user');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [logsLoading, setLogsLoading] = useState(true);
@@ -76,11 +77,13 @@ const ManageFeedSetup = () => {
   const handleChange = (e) =>
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
-  const handleCardSelect = (type) =>
+  const handleCardSelect = (type) => {
+    if (isRestrictedUser) return;
     setFormData((prev) => ({
       ...prev,
       cms_upload_type: prev.cms_upload_type === type ? 'none' : type,
     }));
+  };
 
   const isShopify = formData.cms_upload_type === 'shopify';
   const isWordPress = formData.cms_upload_type === 'wordpress';
@@ -171,7 +174,7 @@ const ManageFeedSetup = () => {
           {/* URL Feed Card */}
           <div
             onClick={() => handleCardSelect('none')}
-            className={`relative p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
+            className={`relative p-4 border rounded-lg transition-all duration-200 ${isRestrictedUser ? 'cursor-not-allowed' : 'cursor-pointer'} ${
               (!isShopify && !isWordPress)
                 ? 'border-teal-600 ring-2 ring-teal-600 ring-opacity-20 bg-teal-600/10'
                 : 'border-gray-200 dark:border-slate-700 bg-transparent'
@@ -188,10 +191,13 @@ const ManageFeedSetup = () => {
               )}
             </div>
             <button
+              disabled={isRestrictedUser}
               className={`w-full py-1.5 rounded text-sm font-medium transition-colors ${
-                (!isShopify && !isWordPress)
-                  ? 'bg-teal-600 text-white hover:bg-teal-700'
-                  : 'bg-transparent border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-[#151a2a]'
+                isRestrictedUser
+                  ? 'bg-gray-200 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-gray-400 dark:text-slate-500 cursor-not-allowed'
+                  : (!isShopify && !isWordPress)
+                    ? 'bg-teal-600 text-white hover:bg-teal-700'
+                    : 'bg-transparent border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-[#151a2a]'
               }`}
             >
               {(!isShopify && !isWordPress) ? 'Selected' : 'Import'}
@@ -201,7 +207,7 @@ const ManageFeedSetup = () => {
           {/* Shopify Card */}
           <div
             onClick={() => handleCardSelect('shopify')}
-            className={`relative p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
+            className={`relative p-4 border rounded-lg transition-all duration-200 ${isRestrictedUser ? 'cursor-not-allowed' : 'cursor-pointer'} ${
               isShopify ? 'border-teal-600 ring-2 ring-teal-600 ring-opacity-20' : 'border-gray-200 dark:border-slate-700'
             }`}
           >
@@ -216,8 +222,13 @@ const ManageFeedSetup = () => {
               )}
             </div>
             <button
+              disabled={isRestrictedUser}
               className={`w-full py-1.5 rounded text-sm font-medium transition-colors ${
-                isShopify ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-transparent border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-[#151a2a]'
+                isRestrictedUser
+                  ? 'bg-gray-200 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-gray-400 dark:text-slate-500 cursor-not-allowed'
+                  : isShopify
+                    ? 'bg-teal-600 text-white hover:bg-teal-700'
+                    : 'bg-transparent border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-[#151a2a]'
               }`}
             >
               {isShopify ? 'Connected' : 'Connect'}
@@ -227,7 +238,7 @@ const ManageFeedSetup = () => {
           {/* WordPress Card */}
           <div
             onClick={() => handleCardSelect('wordpress')}
-            className={`relative p-4 border rounded-lg cursor-pointer transition-all duration-200 ${
+            className={`relative p-4 border rounded-lg transition-all duration-200 ${isRestrictedUser ? 'cursor-not-allowed' : 'cursor-pointer'} ${
               isWordPress ? 'border-teal-600 ring-2 ring-teal-600 ring-opacity-20' : 'border-gray-200 dark:border-slate-700'
             }`}
           >
@@ -242,8 +253,13 @@ const ManageFeedSetup = () => {
               )}
             </div>
             <button
+              disabled={isRestrictedUser}
               className={`w-full py-1.5 rounded text-sm font-medium transition-colors ${
-                isWordPress ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-transparent border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-[#151a2a]'
+                isRestrictedUser
+                  ? 'bg-gray-200 dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-gray-400 dark:text-slate-500 cursor-not-allowed'
+                  : isWordPress
+                    ? 'bg-teal-600 text-white hover:bg-teal-700'
+                    : 'bg-transparent border border-gray-300 dark:border-slate-700 text-gray-600 dark:text-slate-400 hover:bg-slate-50 dark:bg-[#151a2a]'
               }`}
             >
               {isWordPress ? 'Connected' : 'Connect'}
@@ -319,6 +335,10 @@ const ManageFeedSetup = () => {
                   name="feed_url"
                   value={formData.feed_url}
                   onChange={handleChange}
+                  onCopy={(e) => { if (isRestrictedUser) e.preventDefault(); }}
+                  onCut={(e) => { if (isRestrictedUser) e.preventDefault(); }}
+                  onContextMenu={(e) => { if (isRestrictedUser) e.preventDefault(); }}
+                  style={isRestrictedUser ? { userSelect: 'none', WebkitUserSelect: 'none' } : undefined}
                   className="bg-white dark:bg-[#1e2535] text-gray-800 dark:text-slate-200 placeholder:text-gray-400 dark:placeholder:text-slate-500 w-full border border-gray-300 dark:border-slate-700 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600"
                 />
               </div>
@@ -363,17 +383,19 @@ const ManageFeedSetup = () => {
           </div>
         </div>
 
-        <div className="mt-6 pt-4 border-t border-gray-100 dark:border-slate-700/60">
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 text-white px-6 py-2 rounded text-sm font-medium transition-colors"
-          >
-            {isSaving ? (
-              <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></span>
-            ) : '→'} Save Configuration
-          </button>
-        </div>
+        {!isRestrictedUser && (
+          <div className="mt-6 pt-4 border-t border-gray-100 dark:border-slate-700/60">
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 text-white px-6 py-2 rounded text-sm font-medium transition-colors"
+            >
+              {isSaving ? (
+                <span className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></span>
+              ) : '→'} Save Configuration
+            </button>
+          </div>
+        )}
       </SectionCard>
 
       {/* CARD 4 — Activity Log */}

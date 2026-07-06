@@ -913,7 +913,7 @@ export default function Products() {
   const activeStoreId  = useStore((s) => s.activeStoreId);
   const currentUserId  = useStore((s) => s.user?.user_id);
   const exportType     = useStore((s) => s.exportType) || "A";
-  const exportOption   = useStore((s) => s.exportOption);
+  const canExport      = useStore((s) => (s.user?.export_option ?? "yes") !== "no");
 
   const competitorMeta = {};
   competitors.forEach((c) => {
@@ -1002,9 +1002,7 @@ export default function Products() {
     ),
   }));
 
-  const alertUserId = productsMeta?.alertUserId || null;
-  const isConfigured = (p) =>
-    !!(alertUserId && Array.isArray(p.user_alert_id) && p.user_alert_id.includes(alertUserId));
+  const isConfigured  = (p) => !!(p.group_name || (p.user_alert_id && p.user_alert_id.length > 0));
   const allConfigured = filtered.length > 0 && filtered.every(isConfigured);
   const someConfigured = filtered.some(isConfigured);
 
@@ -1060,7 +1058,6 @@ export default function Products() {
 
   const handleBulkSave = async () => {
     setBulkSaving(true);
-    const effectiveUserId = alertUserId || currentUserId;
     try {
       const filteredIds = new Set(filtered.map((p) => p._id));
       await Promise.all(
@@ -1127,7 +1124,18 @@ export default function Products() {
               />
             </div>
             <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-              {exportOption !== "no" && (
+              {/* <button
+                onClick={() => exportToCSV(filtered, exportType, competitorMeta)}
+                className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors"
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Export
+              </button> */}
+              {canExport && (
                 <button
                   onClick={async () => {
                     setExporting(true);
@@ -1378,7 +1386,7 @@ export default function Products() {
 
       {configProduct && (
         <ConfigureModal
-          product={configProduct} currentUserId={alertUserId || currentUserId}
+          product={configProduct} currentUserId={currentUserId}
           onClose={() => setConfigProduct(null)} onSaved={handleConfigSaved}
         />
       )}

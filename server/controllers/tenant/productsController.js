@@ -1,6 +1,7 @@
 const { ObjectId } = require('mongodb');
 const mongoose     = require('mongoose');
 const User         = require('../../models/User');
+const { buildAlertQuery } = require('../../utils/alertQuery');
 
 function toPrice(raw) {
   if (raw === null || raw === undefined || raw === 'No Result' || raw === '') return null;
@@ -159,15 +160,7 @@ exports.getMeta = async (req, res) => {
       d.product_category ? d.product_category.split('>')[0].trim() : ''
     ).filter(Boolean))].sort();
 
-    // 🆕 resolve effective alert user id (super_admin → tenant's store_admin id)
-    let alertUserId = req.user.user_id;
-    if (req.user.user_type === 'super_admin') {
-      const tenantCmpid = req.headers['x-tenant-id'] || req.user.cmpid;
-      const storeAdmin = await User.findOne({ cmpid: tenantCmpid, user_type: 'store_admin' }).select('user_id').lean();
-      if (storeAdmin) alertUserId = storeAdmin.user_id;
-    }
-
-    res.json({ brands, categories, ranks, itemGroups, alertUserId }); // 🆕 alertUserId added
+    res.json({ brands, categories, ranks, itemGroups });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -261,6 +254,11 @@ exports.getAll = async (req, res) => {
 
 exports.exportAll = async (req, res) => {
   try {
+    const requestingUser = await User.findOne({ user_id: req.user.user_id });
+    if (requestingUser && requestingUser.export_option === 'no') {
+      return res.status(403).json({ message: 'Export is disabled for this account' });
+    }
+
     const db = req.tenantDb;
     const { competitor: filterSlug, search, brand, category, rank, itemGroup } = req.query;
 
@@ -322,61 +320,13 @@ exports.exportAll = async (req, res) => {
 // - store_admin / super_admin → all products that have at least one user_alert_id set
 exports.getAlertProducts = async (req, res) => {
   try {
-    const db                    = req.tenantDb;
-    const { user_id, user_type } = req.user;
+    const db    = req.tenantDb;
     const page  = Math.max(1, parseInt(req.query.page  || '1', 10));
     const limit = Math.max(1, parseInt(req.query.limit || '9', 10));
     const skip  = (page - 1) * limit;
-    const search = (req.query.search || '').trim();
-   
 
-    const baseFilter = {
-      status: 'active',
-      ean_product_data_details_scrap_status: 'completed',
-    };
-
-    let query = {};
-    if (user_type === 'user') {
-      // MongoDB element match: find docs where user_alert_id array contains this user_id
-      query = { ...baseFilter, user_alert_id: user_id };
-    } else {
-      const tenantCmpid = req.headers['x-tenant-id'] || req.user.cmpid;
-
-      if (user_type === 'super_admin') {
-        // super_admin viewing a tenant: find that tenant's store_admin and use their user_id
-        const storeAdmin = await User
-          .findOne({ cmpid: tenantCmpid, user_type: 'store_admin' })
-          .select('user_id')
-          .lean();
-      
-        if (!storeAdmin) return res.json({ data: [], total: 0, page: 1, totalPages: 0 });
-        query = { ...baseFilter, user_alert_id: storeAdmin.user_id };
-        // const idsToMatch = [user_id];
-        // if (storeAdmin) idsToMatch.push(storeAdmin.user_id);
-        // query = { ...baseFilter, user_alert_id: { $in: idsToMatch } };
-      } else {
-        // store_admin: show all products with alerts from any user in this tenant
-        const tenantUsers   = await User.find({ cmpid: tenantCmpid }).select('user_id').lean();
-        const tenantUserIds = tenantUsers.map((u) => u.user_id);
-        console.log(`Tenant users for cmpid ${tenantCmpid}:`, tenantUserIds);
-        if (tenantUserIds.length === 0) return res.json({ data: [], total: 0, page: 1, totalPages: 0 });
-        query = { ...baseFilter, user_alert_id: { $in: tenantUserIds } };
-      }
-    }
-
-    if (search) {
-      const re = { $regex: search, $options: 'i' };
-      const searchOr = {
-        $or: [
-          { product_name:   re },
-          { product_brand:  re },
-          { product_ean_id: re },
-          { product_code:   re },
-        ]
-      };
-      query = { $and: [query, searchOr] };
-    }
-    
+    const query = await buildAlertQuery(req);
+    if (!query) return res.json({ data: [], total: 0, page: 1, totalPages: 0 });
 
     const col      = db.collection('ept_product_details_new');
     const total    = await col.countDocuments(query);
@@ -421,96 +371,26 @@ exports.remove = async (req, res) => {
 };
 
 // Update group_name and user_alert_id for a specific product
-// exports.configureProduct = async (req, res) => {
-//   try {
-//     const { group_name, user_alert_id } = req.body;
-//     await req.tenantDb.collection('ept_product_details_new').updateOne(
-//       { _id: new ObjectId(req.params.id) },
-//       { $set: { group_name, user_alert_id: user_alert_id || [], updatedAt: new Date() } }
-//     );
-//     res.json({ message: 'Product configured' });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
 exports.configureProduct = async (req, res) => {
   try {
-    const { group_name } = req.body;
-    const { user_type, user_id } = req.user;
-
-    let alertUserId = user_id;
-
-    // Super admin subscribe பண்ணா, store_admin-ன ID-ஐயே use பண்ணுங்க
-    if (user_type === 'super_admin') {
-      const tenantCmpid = req.headers['x-tenant-id'] || req.user.cmpid;
-      const storeAdmin = await User
-        .findOne({ cmpid: tenantCmpid, user_type: 'store_admin' })
-        .select('user_id')
-        .lean();
-      if (storeAdmin) alertUserId = storeAdmin.user_id;
-    }
-
-
+    const { group_name, user_alert_id } = req.body;
     await req.tenantDb.collection('ept_product_details_new').updateOne(
       { _id: new ObjectId(req.params.id) },
-      {
-        $set: { group_name, updatedAt: new Date() },
-        $addToSet: { user_alert_id: alertUserId },  
-      }
+      { $set: { group_name, user_alert_id: user_alert_id || [], updatedAt: new Date() } }
     );
-    const updated = await req.tenantDb.collection('ept_product_details_new')
-      .findOne({ _id: new ObjectId(req.params.id) }, { projection: { user_alert_id: 1, group_name: 1 } });
-
-    res.json({ message: 'Product configured', user_alert_id: updated.user_alert_id, group_name: updated.group_name });
+    res.json({ message: 'Product configured' });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
 // Clear group_name and user_alert_id for a specific product
-// exports.removeConfiguration = async (req, res) => {
-//   try {
-//     await req.tenantDb.collection('ept_product_details_new').updateOne(
-//       { _id: new ObjectId(req.params.id) },
-//       { $set: { group_name: '', user_alert_id: [], updatedAt: new Date() } }
-//     );
-//     res.json({ message: 'Product configuration removed' });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
 exports.removeConfiguration = async (req, res) => {
   try {
-    const { user_type, user_id } = req.user;
-
-    let alertUserId = user_id;
-
-    if (user_type === 'super_admin') {
-      const tenantCmpid = req.headers['x-tenant-id'] || req.user.cmpid;
-      const storeAdmin = await User
-        .findOne({ cmpid: tenantCmpid, user_type: 'store_admin' })
-        .select('user_id')
-        .lean();
-      if (storeAdmin) alertUserId = storeAdmin.user_id;
-    }
-
     await req.tenantDb.collection('ept_product_details_new').updateOne(
       { _id: new ObjectId(req.params.id) },
-      { $pull: { user_alert_id: alertUserId } }   // 👈 andha oru id matum remove pannum
+      { $set: { group_name: '', user_alert_id: [], updatedAt: new Date() } }
     );
-
-    // Optional: group_name-ah last person remove pannitanaa clear pannanumnu na
-    const updated = await req.tenantDb.collection('ept_product_details_new')
-      .findOne({ _id: new ObjectId(req.params.id) }, { projection: { user_alert_id: 1 } });
-
-    if (updated && (!updated.user_alert_id || updated.user_alert_id.length === 0)) {
-      await req.tenantDb.collection('ept_product_details_new').updateOne(
-        { _id: new ObjectId(req.params.id) },
-        { $set: { group_name: '', updatedAt: new Date() } }
-      );
-    }
-
     res.json({ message: 'Product configuration removed' });
   } catch (error) {
     res.status(500).json({ message: error.message });

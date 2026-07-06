@@ -1,7 +1,13 @@
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const { getAdminDb } = require('../../config/db');
 const User    = require('../../models/User');
 const Company = require('../../models/Company');
+const Access  = require('../../models/Access');
+
+// Same hashing scheme as models/User.js pre('save') hook — must match,
+// since addUser writes directly to the collection and bypasses Mongoose hooks.
+const sha1 = (str) => crypto.createHash('sha1').update('salt' + str).digest('hex');
 
 // ─── GET /api/settings/profile ────────────────────────────────────────────────
 exports.getProfile = async (req, res) => {
@@ -176,7 +182,7 @@ exports.addUser = async (req, res) => {
     if (!['super_admin', 'store_admin'].includes(req.user.user_type))
       return res.status(403).json({ message: 'Access denied' });
 
-    const { email_address, password, user_name } = req.body;
+    const { email_address, password, user_name, email_notify, export_option } = req.body;
     if (!email_address || !password)
       return res.status(400).json({ message: 'Email and password are required' });
 
@@ -194,21 +200,37 @@ exports.addUser = async (req, res) => {
     const adminUser = await adminDb.collection('plm_admin_users').findOne({ user_id: req.user.user_id });
 
     const user_id = require('crypto').randomBytes(16).toString('hex');
+    const password_code = require('crypto').randomBytes(8).toString('hex');
     const now     = new Date();
 
     await adminDb.collection('plm_admin_users').insertOne({
       user_id,
       cmpid:         targetCmpid,
+      website:       adminUser?.website || '',
       user_name:     user_name || '',
       email_address,
-      password,
+      password:      sha1(password),
       password_new:  password,
+      password_code,
       mobile_number: adminUser?.mobile_number || '',
       user_type:     'user',
+      email_notify:  email_notify === 'yes' ? 'yes' : 'no',
+      export_option: export_option === 'yes' ? 'yes' : 'no',
+      page_option:   null,
+      login_cookie:  '',
+      last_login:    '',
       addedby:       req.user.user_id,
       addedon:       now,
       archived:      0,
-      status:        'active',
+     
+    });
+
+    await Access.create({
+      cmpid:     targetCmpid,
+      user_id,
+      user_type: 'user',
+      user_name: user_name || email_address,
+      addedby:   req.user.user_id,
     });
 
     res.status(201).json({ message: 'User added successfully', user_id });

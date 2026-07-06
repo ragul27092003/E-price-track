@@ -385,6 +385,8 @@ function AddUserModal({ onClose, onSuccess, companyName }) {
   const [email_address, setEmailAddress] = useState("");
   const [user_name, setUserName] = useState("");
   const [password, setPassword] = useState("");
+  const [email_notify, setEmailNotify] = useState("");
+  const [export_option, setExportOption] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -392,7 +394,7 @@ function AddUserModal({ onClose, onSuccess, companyName }) {
     if (!email_address || !password) { toast.error("Email and password are required"); return; }
     setSaving(true);
     try {
-      await addUser({ email_address, user_name, password });
+      await addUser({ email_address, user_name, password, email_notify, export_option });
       toast.success("User added successfully");
       onSuccess();
       onClose();
@@ -402,6 +404,9 @@ function AddUserModal({ onClose, onSuccess, companyName }) {
       setSaving(false);
     }
   };
+
+  const selectClass =
+    "w-full h-9 rounded-md border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-gray-900 dark:text-white px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none";
 
   return (
     <>
@@ -413,6 +418,9 @@ function AddUserModal({ onClose, onSuccess, companyName }) {
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
       >
         <div className="bg-white dark:bg-[#151a2a] border border-gray-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-md p-6">
+          {/* Decoy fields — absorb Chrome's autofill so it doesn't land on Name/Password below */}
+          <input type="text" name="username" autoComplete="username" style={{ display: 'none' }} />
+          <input type="password" name="password" autoComplete="current-password" style={{ display: 'none' }} />
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-base font-bold text-gray-900 dark:text-white">Add User</h3>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-300">
@@ -438,6 +446,8 @@ function AddUserModal({ onClose, onSuccess, companyName }) {
                 placeholder="Full name"
                 value={user_name}
                 onChange={(e) => setUserName(e.target.value)}
+                autoComplete="off"
+                name="new_user_display_name"
                 className="border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800"
               />
             </div>
@@ -449,6 +459,8 @@ function AddUserModal({ onClose, onSuccess, companyName }) {
                   placeholder="Min 8 chars, 1 uppercase, 1 number"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
+                  name="new_user_password"
                   className="border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 pr-10"
                 />
                 <button
@@ -458,6 +470,38 @@ function AddUserModal({ onClose, onSuccess, companyName }) {
                 >
                   {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-800 dark:text-white block">Email Notification</label>
+                <div className="relative">
+                  <select
+                    value={email_notify}
+                    onChange={(e) => setEmailNotify(e.target.value)}
+                    className={selectClass}
+                  >
+                    <option value="">-- Select --</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 dark:text-slate-500 pointer-events-none" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-800 dark:text-white block">Export Option</label>
+                <div className="relative">
+                  <select
+                    value={export_option}
+                    onChange={(e) => setExportOption(e.target.value)}
+                    className={selectClass}
+                  >
+                    <option value="">-- Select --</option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 dark:text-slate-500 pointer-events-none" />
+                </div>
               </div>
             </div>
           </div>

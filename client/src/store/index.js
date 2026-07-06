@@ -55,6 +55,8 @@ export const useStore = create(
 
 export const selectIsSuperAdmin  = (s) => s.user?.user_type === 'super_admin';
 export const selectIsStoreAdmin  = (s) => s.user?.user_type === 'store_admin';
+export const selectIsUser        = (s) => s.user?.user_type === 'user';
+export const selectCanExport     = (s) => (s.user?.export_option ?? 'yes') !== 'no';
 export const selectCanEdit       = (s) => s.user?.user_type === 'super_admin';
 export const selectCurrentStoreId = (s) =>
   s.user?.user_type === 'super_admin' ? s.activeStoreId : s.user?.cmpid;

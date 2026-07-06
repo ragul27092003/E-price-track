@@ -1,3 +1,5 @@
+const { buildAlertQuery } = require('../../utils/alertQuery');
+
 // ─── GET /api/dashboard/rank-analysis ────────────────────────────────────────
 exports.getRankAnalysis = async (req, res) => {
   try {
@@ -91,7 +93,22 @@ exports.getOverallStatistics = async (req, res) => {
       .toArray();
 
     if (!docs.length) return res.json(null);
-    res.json(docs[0]);
+
+    // varNotificationCounts in the precomputed doc is a stale/tenant-wide
+    // figure. Replace it with a live count scoped to the logged-in user's
+    // own alert subscriptions (user_alert_id) + their store (cmpid), same
+    // rule used by GET /api/products/alert.
+    let varNotificationCounts = docs[0].varNotificationCounts ?? 0;
+    try {
+      const alertQuery = await buildAlertQuery(req);
+      varNotificationCounts = alertQuery
+        ? await req.tenantDb.collection('ept_product_details_new').countDocuments(alertQuery)
+        : 0;
+    } catch (countErr) {
+      console.error('dashboardController.getOverallStatistics notification count error:', countErr);
+    }
+
+    res.json({ ...docs[0], varNotificationCounts });
   } catch (err) {
     console.error('dashboardController.getOverallStatistics error:', err);
     res.status(500).json({ message: err.message });

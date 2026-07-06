@@ -857,6 +857,7 @@ export default function SmartReports() {
   const location = useLocation();
   const { competitors, setCompetitors, overallStatistics, fetchOverallStatistics, activeStoreId } = useStore();
   const exportType = useStore((s) => s.exportType) || "A";
+  const canExport  = useStore((s) => (s.user?.export_option ?? "yes") !== "no");
 
   const [activeTab, setActiveTab] = useState(location.state?.tab || "Easy Gain");
   const [selectedEan, setSelectedEan] = useState(null);
@@ -1080,7 +1081,7 @@ if (activeTab === "Neutral Trend") {
                 )}
               </div>
 
-              {filteredProducts.length > 0 && (
+              {canExport && filteredProducts.length > 0 && (
                 <button
                   onClick={() => exportSmartReportCSV(filteredProducts, activeTab, competitorMeta, exportType)}
                   className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors whitespace-nowrap"

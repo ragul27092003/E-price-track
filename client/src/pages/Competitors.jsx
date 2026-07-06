@@ -213,7 +213,7 @@ const CompetitorAddCard = ({ competitor, isAssigning, onAdd }) => {
 };
 
 // ─── CompetitorRow ─────────────────────────────────────────────────────────────
-const CompetitorRow = ({ data, onToggleSync, isSuperAdmin, onLogoUploaded, onRequestRemove, removingId }) => {
+const CompetitorRow = ({ data, onToggleSync, isSuperAdmin, isRestrictedUser, onLogoUploaded, onRequestRemove, removingId }) => {
   const [isActive, setIsActive] = useState(data?.isActive || false);
   const [isSyncing, setIsSyncing] = useState(false);
   const isRemoving = removingId === data.id;
@@ -223,6 +223,7 @@ const CompetitorRow = ({ data, onToggleSync, isSuperAdmin, onLogoUploaded, onReq
   }, [data?.isActive]);
 
   const handleToggle = async () => {
+    if (isRestrictedUser) return;
     const newValue = !isActive;
     setIsActive(newValue);
     setIsSyncing(true);
@@ -290,8 +291,9 @@ const CompetitorRow = ({ data, onToggleSync, isSuperAdmin, onLogoUploaded, onReq
         <span className="md:hidden text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase">Activation</span>
         <button
           onClick={handleToggle}
-          disabled={isSyncing}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isActive ? 'bg-green-500' : 'bg-gray-300'} ${isSyncing ? 'opacity-50' : 'cursor-pointer'}`}
+          disabled={isSyncing || isRestrictedUser}
+          title={isRestrictedUser ? 'You do not have permission to change this' : undefined}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isActive ? 'bg-green-500' : 'bg-gray-300'} ${(isSyncing || isRestrictedUser) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
         >
           <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-slate-800 transition-transform ${isActive ? 'translate-x-6' : 'translate-x-1'}`} />
         </button>
@@ -323,7 +325,7 @@ const CompetitorRow = ({ data, onToggleSync, isSuperAdmin, onLogoUploaded, onReq
 };
 
 // ─── CompetitorSection ─────────────────────────────────────────────────────────
-const CompetitorSection = ({ title, items = [], onToggleSync, isSuperAdmin, onLogoUploaded, onRequestRemove, removingId }) => (
+const CompetitorSection = ({ title, items = [], onToggleSync, isSuperAdmin, isRestrictedUser, onLogoUploaded, onRequestRemove, removingId }) => (
   <div className="border border-gray-200 dark:border-slate-700 rounded-lg overflow-hidden mb-8 shadow-sm">
     <div className="bg-[#475e77] text-white px-5 py-3">
       <h3 className="text-sm font-bold">{title}</h3>
@@ -349,6 +351,7 @@ const CompetitorSection = ({ title, items = [], onToggleSync, isSuperAdmin, onLo
             data={item}
             onToggleSync={onToggleSync}
             isSuperAdmin={isSuperAdmin}
+            isRestrictedUser={isRestrictedUser}
             onLogoUploaded={onLogoUploaded}
             onRequestRemove={onRequestRemove}
             removingId={removingId}
@@ -372,6 +375,7 @@ const Competitors = () => {
   const user                  = useStore((s) => s.user);
 
   const isSuperAdmin = user?.user_type === 'super_admin';
+  const isRestrictedUser = user?.user_type === 'user';
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -532,6 +536,7 @@ const Competitors = () => {
           items={eanList}
           onToggleSync={handleToggleSync}
           isSuperAdmin={isSuperAdmin}
+          isRestrictedUser={isRestrictedUser}
           onLogoUploaded={handleLogoUploaded}
           onRequestRemove={handleRequestRemove}
           removingId={removingId}
@@ -543,6 +548,7 @@ const Competitors = () => {
           items={nonEanList}
           onToggleSync={handleToggleSync}
           isSuperAdmin={isSuperAdmin}
+          isRestrictedUser={isRestrictedUser}
           onLogoUploaded={handleLogoUploaded}
           onRequestRemove={handleRequestRemove}
           removingId={removingId}
