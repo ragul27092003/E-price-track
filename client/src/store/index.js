@@ -35,6 +35,7 @@ export const useStore = create(
         activeStoreId:   state.activeStoreId,
         activeShopName:  state.activeShopName,
         exportType:      state.exportType,
+        exportOption:    state.exportOption,
         // Last viewed product — persisted so ProductHistory remembers across navigation
         lastViewedEan:   state.lastViewedEan,
         // UI — persisted so layout preference survives refresh

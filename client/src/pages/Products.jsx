@@ -913,6 +913,7 @@ export default function Products() {
   const activeStoreId  = useStore((s) => s.activeStoreId);
   const currentUserId  = useStore((s) => s.user?.user_id);
   const exportType     = useStore((s) => s.exportType) || "A";
+  const exportOption   = useStore((s) => s.exportOption);
 
   const competitorMeta = {};
   competitors.forEach((c) => {
@@ -1126,47 +1127,38 @@ export default function Products() {
               />
             </div>
             <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-              {/* <button
-                onClick={() => exportToCSV(filtered, exportType, competitorMeta)}
-                className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors"
-              >
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                Export
-              </button> */}
-              <button
-                onClick={async () => {
-                  setExporting(true);
-                  try {
-                    const result = await exportProductsCSV({
-                      competitorSlug: competitorSlug || null,
-                      search, brand: brandFilter, category: catFilter,
-                      rank: rankFilter, itemGroup: itemGroupFilter,
-                    });
-                    exportToCSV(result.data || [], exportType, competitorMeta);
-                  } catch (err) {
-                    console.error("Export failed:", err);
-                  } finally {
-                    setExporting(false);
-                  }
-                }}
-                disabled={exporting}
-                className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors disabled:opacity-60"
-              >
-                {exporting ? (
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white inline-block" />
-                ) : (
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                )}
-                {exporting ? "Exporting…" : "Export"}
-              </button>
+              {exportOption !== "no" && (
+                <button
+                  onClick={async () => {
+                    setExporting(true);
+                    try {
+                      const result = await exportProductsCSV({
+                        competitorSlug: competitorSlug || null,
+                        search, brand: brandFilter, category: catFilter,
+                        rank: rankFilter, itemGroup: itemGroupFilter,
+                      });
+                      exportToCSV(result.data || [], exportType, competitorMeta);
+                    } catch (err) {
+                      console.error("Export failed:", err);
+                    } finally {
+                      setExporting(false);
+                    }
+                  }}
+                  disabled={exporting}
+                  className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors disabled:opacity-60"
+                >
+                  {exporting ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white inline-block" />
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                  )}
+                  {exporting ? "Exporting…" : "Export"}
+                </button>
+              )}
             </div>
           </div>
 

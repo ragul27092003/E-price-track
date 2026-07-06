@@ -14,6 +14,7 @@ export const createAuthSlice = (set, get) => ({
   activeShopName:  null,
   exportType:      localStorage.getItem('exportType') || '',
   showLsp:         localStorage.getItem('showLsp') === 'true',
+  exportOption:    'yes',
 
   // ── Actions ────────────────────────────────────────────────────────
   login: (data) => {
@@ -31,8 +32,9 @@ export const createAuthSlice = (set, get) => ({
       localStorage.setItem('activeStoreId', activeStoreId);
     }
 
-    const exportType = data.export_type ?? 'A';
-    const showLsp    = data.show_lsp    ?? false;
+    const exportType   = data.export_type   ?? 'A';
+    const showLsp      = data.show_lsp      ?? false;
+    const exportOption = data.export_option ?? 'yes';
     localStorage.setItem('exportType', exportType);
     localStorage.setItem('showLsp',    String(showLsp));
 
@@ -42,6 +44,7 @@ export const createAuthSlice = (set, get) => ({
       activeShopName,
       exportType,
       showLsp,
+      exportOption,
       user: {
         user_id:       decoded?.user_id,
         user_type:     decoded?.user_type,
@@ -61,7 +64,7 @@ export const createAuthSlice = (set, get) => ({
     localStorage.removeItem('activeShopName');
     localStorage.removeItem('exportType');
     localStorage.removeItem('showLsp');
-    set({ token: null, user: null, activeStoreId: null, activeShopName: null, exportType: '', showLsp: false });
+    set({ token: null, user: null, activeStoreId: null, activeShopName: null, exportType: '', showLsp: false, exportOption: 'yes' });
   },
 
   setExportType: (type) => set({ exportType: type }),
