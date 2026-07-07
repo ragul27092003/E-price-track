@@ -1,6 +1,6 @@
-const { buildAlertQuery } = require('../../utils/alertQuery');
+const { buildAlertQuery } = require('../../utils/alertquery');
 
-// ─── GET /api/dashboard/rank-analysis ────────────────────────────────────────
+
 exports.getRankAnalysis = async (req, res) => {
   try {
     // status is nested: competitor_rank1_count.status
@@ -100,9 +100,9 @@ exports.getOverallStatistics = async (req, res) => {
     // rule used by GET /api/products/alert.
     let varNotificationCounts = docs[0].varNotificationCounts ?? 0;
     try {
-      const alertQuery = await buildAlertQuery(req);
-      varNotificationCounts = alertQuery
-        ? await req.tenantDb.collection('ept_product_details_new').countDocuments(alertQuery)
+      const alertquery = await buildAlertQuery(req);
+      varNotificationCounts = alertquery
+        ? await req.tenantDb.collection('ept_product_details_new').countDocuments(alertquery)
         : 0;
     } catch (countErr) {
       console.error('dashboardController.getOverallStatistics notification count error:', countErr);

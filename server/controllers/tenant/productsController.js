@@ -1,7 +1,7 @@
 const { ObjectId } = require('mongodb');
 const mongoose     = require('mongoose');
 const User         = require('../../models/User');
-const { buildAlertQuery } = require('../../utils/alertQuery');
+const { buildAlertQuery } = require('../../utils/alertquery');
 
 function toPrice(raw) {
   if (raw === null || raw === undefined || raw === 'No Result' || raw === '') return null;
