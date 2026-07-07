@@ -86,6 +86,7 @@ exports.login = async (req, res) => {
       shopName:      merchant?.feed_info?.store_name || '',
       export_type:   merchant?.export_type ?? 'A',
       show_lsp:      merchant?.show_lsp    ?? false,
+      //add new
       export_option: user.export_option    ?? 'yes',
     });
 
