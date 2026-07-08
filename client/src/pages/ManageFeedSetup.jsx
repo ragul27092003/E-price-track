@@ -19,6 +19,7 @@ const ManageFeedSetup = () => {
   const [logsLoading, setLogsLoading] = useState(true);
   const [activityLogs, setActivityLogs] = useState([]);
   const [snack, setSnack] = useState({ open: false, msg: '', severity: 'success' });
+  const isSuperAdmin = useStore((s) => s.user?.user_type === 'super_admin');
 
   const [formData, setFormData] = useState({
     store_name: '',
@@ -399,6 +400,7 @@ const ManageFeedSetup = () => {
       </SectionCard>
 
       {/* CARD 4 — Activity Log */}
+      {isSuperAdmin && (
       <SectionCard>
         <div className="flex justify-between items-center mb-4">
           <div>
@@ -414,9 +416,9 @@ const ManageFeedSetup = () => {
           </button>
         </div>
 
-        <div className="overflow-x-auto border-t border-gray-100 dark:border-slate-700/60">
+        <div className="overflow-x-auto overflow-y-auto max-h-[200px] border-t border-gray-100 dark:border-slate-700/60 scrollbar-hide">
           <table className="w-full text-left border-collapse">
-            <thead>
+            <thead className="sticky top-0 bg-white dark:bg-[#0f1420] z-10">
               <tr className="text-gray-500 dark:text-slate-400 text-xs uppercase font-bold">
                 <th className="py-3 border-b border-gray-100 dark:border-slate-700/60">Date & Time</th>
                 <th className="py-3 border-b border-gray-100 dark:border-slate-700/60">Status</th>
@@ -458,6 +460,7 @@ const ManageFeedSetup = () => {
           </table>
         </div>
       </SectionCard>
+      )}
 
       {/* Snackbar / Alert */}
       {snack.open && (

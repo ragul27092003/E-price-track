@@ -27,6 +27,14 @@ function formatDate(raw) {
   });
 }
 
+function parseCustomDate(str) {
+  if (!str) return null;
+  if (str instanceof Date) return isNaN(str) ? null : str;
+  const fixed = str.replace(/(AM|PM)$/i, ' $1'); // add space before AM/PM so Date() can parse it
+  const d = new Date(fixed);
+  return isNaN(d) ? null : d;
+}
+
 // ── GET /api/feeds ────────────────────────────────────────────────────────────
 exports.getFeed = async (req, res) => {
   try {
@@ -172,25 +180,54 @@ exports.getCompetitorActivityLog = async (req, res) => {
   try {
     const tenantDb = req.tenantDb;
 
+    // Fetch logos once, build a lookup map: competitor_name (lowercase) -> logo
+    const statsDocs = await tenantDb
+      .collection('ept_dashbaord_statics')
+      .find({ status: 'active' })
+      .toArray();
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`; // adjust if using a fixed BASE_URL env var
+    const logoMap = {};
+    statsDocs.forEach((d) => {
+      const key = (d.competitor_name || d.competitors || '').toLowerCase().trim();
+      if (key && d.competitor_logo) {
+        logoMap[key] = d.competitor_logo.startsWith('http')
+          ? d.competitor_logo
+          : `${baseUrl}${d.competitor_logo}`;
+      }
+    });
+
     const cronDocs = await tenantDb
       .collection('ept_cron_time_management')
       .find({})
       .sort({ start_time: -1 })
-      .limit(100)
+      .limit(200)
       .toArray();
 
-    const cronLogs = cronDocs
-    .map((doc) => ({
-      date:       formatDate(doc.start_time),
-      status:     'Success',
-      message:    `Scraped ${doc.cron_competitor_name || 'competitor'}: ${doc.update_count || 0} of ${doc.total_count || 0} products updated. Ended: ${formatDate(doc.end_time)}`,
-      source:     'cron_scrape',
-      competitor: doc.cron_competitor_name || '',
-    }))
-    .filter((l) => l.date && l.date !== '—')
-    .filter((l) => l.competitor.trim() !== '')   // 👈 add this — drop entries with no competitor name
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
+    const cronLogs = cronDocs
+      .map((doc) => {
+        const competitorKey = (doc.cron_competitor_name || '').toLowerCase().trim();
+        return {
+          date:       formatDate(doc.start_time),
+          status:     'Success',
+          message:    `Scraped ${doc.cron_competitor_name || 'competitor'}: ${doc.update_count || 0} of ${doc.total_count || 0} products updated. Ended: ${formatDate(doc.end_time)}`,
+          source:     'cron_scrape',
+          competitor: doc.cron_competitor_name || '',
+          logo:       logoMap[competitorKey] || null,   // 👈 attach logo here
+          _rawDate:   doc.start_time,
+        };
+      })
+      .filter((l) => l.date && l.date !== '—')
+      .filter((l) => l.competitor.trim() !== '')
+      .filter((l) => {
+        const d = parseCustomDate(l._rawDate);
+        return d && d >= sevenDaysAgo;
+      })
+      .sort((a, b) => parseCustomDate(b._rawDate) - parseCustomDate(a._rawDate))
+      .map(({ _rawDate, ...rest }) => rest);
 
     res.json({ logs: cronLogs });
   } catch (error) {

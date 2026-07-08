@@ -164,6 +164,7 @@ export default function Dashboard() {
   const activeShopName = useStore((s) => s.activeShopName) || "Store";
   const [activityLogs, setActivityLogs] = useState([]);
   const [logsLoading, setLogsLoading] = useState(true);
+  const isSuperAdmin = useStore((s) => s.user?.user_type === 'super_admin');
 
   const {
     sapUpdateStatus, sapUpdateStatusLoading,
@@ -178,25 +179,40 @@ export default function Dashboard() {
     fetchBrandAnalytics,
   } = useStore();
 
-  useEffect(() => {
-    fetchSapUpdateStatus();
-    fetchOverallStatistics();
-    fetchRankAnalysis();
-    fetchBrandAnalyticsBrands();
+   useEffect(() => {
+      fetchSapUpdateStatus();
+      fetchOverallStatistics();
+      fetchRankAnalysis();
+      fetchBrandAnalyticsBrands();
 
-   // Fetch the competitor counts for the list and pie chart
-    const fetchCompetitorCounts = async () => {
-      try {
-        const data = await fetchCompetitorCountsData();
-        setCompCounts(data);
-      } catch (err) {
-        console.error("Failed to fetch competitor counts", err);
-      } finally {
-        setCompCountsLoading(false);
-      }
-    };
-    fetchCompetitorCounts();
-  }, []);
+      // Fetch the competitor counts for the list and pie chart
+      const fetchCompetitorCounts = async () => {
+        setCompCountsLoading(true);
+        try {
+          const data = await fetchCompetitorCountsData();
+          setCompCounts(data);
+        } catch (err) {
+          console.error("Failed to fetch competitor counts", err);
+        } finally {
+          setCompCountsLoading(false);
+        }
+      };
+      fetchCompetitorCounts();
+
+      // ── Competitor Activity Log ──
+      const loadActivityLog = async () => {
+        setLogsLoading(true);
+        try {
+          const res = await API.get('/feeds/competitor-activity-log');
+          setActivityLogs(res.data?.logs || []);
+        } catch (err) {
+          setActivityLogs([]);
+        } finally {
+          setLogsLoading(false);
+        }
+      };
+      loadActivityLog();
+    }, [currentStoreId]);
 
   const isFirstRender = useRef(true);
   useEffect(() => {
@@ -256,13 +272,13 @@ export default function Dashboard() {
 
   const total = stats?.varCompletedProductCount ?? '--';
   const trendCards = [
-    { key: 'easyGain',  title: 'Easy Gain',      count: stats?.varEasyGainCount,        percent: stats?.varEasyGainPercent,        total, progressColor: 'bg-emerald-500', btnClass: 'bg-emerald-500 hover:bg-emerald-600', titleColor: 'text-amber-600',        onView: () => goToReport('Easy Gain')       },
-    { key: 'clever',    title: 'Clever Move',     count: stats?.varCleverMoveCount,       percent: stats?.varCleverMovePercent,       total, progressColor: 'bg-amber-500',  btnClass: 'bg-amber-500 hover:bg-amber-600',   titleColor: 'text-amber-500',        onView: () => goToReport('Clever Move')     },
-    { key: 'nonComp',   title: 'Non Competitors', count: stats?.varNonCompetitorCount,    percent: stats?.varNonCompetitorPercent,    total, progressColor: 'bg-rose-600',   btnClass: 'bg-rose-700 hover:bg-rose-800',    titleColor: 'text-muted-foreground', onView: () => goToReport('Non Competitors') },
-    { key: 'posTrend',  title: 'Positive Trend',  count: stats?.varPostiveTrendingCount,  percent: stats?.varPostiveTrendingPercent,  total, progressColor: 'bg-emerald-500', btnClass: 'bg-emerald-500 hover:bg-emerald-600', titleColor: 'text-emerald-600',      onView: () => goToReport('Positive Trend')  },
-    { key: 'neutTrend', title: 'Neutral Trend',   count: stats?.varEqualTrendingCount,    percent: stats?.varEqualTrendingPercent,    total, progressColor: 'bg-amber-500',  btnClass: 'bg-amber-500 hover:bg-amber-600',   titleColor: 'text-amber-500',        onView: () => goToReport('Neutral Trend')   },
-    { key: 'negTrend',  title: 'Negative Trend',  count: stats?.varNegativeTrendingCount, percent: stats?.varNegativeTrendingPercent, total, progressColor: 'bg-red-500',    btnClass: 'bg-red-500 hover:bg-red-600',      titleColor: 'text-red-500',          onView: () => goToReport('Negative Trend')  },
-  ];
+  { id: 'easyGain',  title: 'Easy Gain',      count: stats?.varEasyGainCount,        percent: stats?.varEasyGainPercent,        total, progressColor: 'bg-emerald-500', btnClass: 'bg-emerald-500 hover:bg-emerald-600', titleColor: 'text-amber-600',        onView: () => goToReport('Easy Gain')       },
+  { id: 'clever',    title: 'Clever Move',     count: stats?.varCleverMoveCount,       percent: stats?.varCleverMovePercent,       total, progressColor: 'bg-amber-500',  btnClass: 'bg-amber-500 hover:bg-amber-600',   titleColor: 'text-amber-500',        onView: () => goToReport('Clever Move')     },
+  { id: 'nonComp',   title: 'Non Competitors', count: stats?.varNonCompetitorCount,    percent: stats?.varNonCompetitorPercent,    total, progressColor: 'bg-rose-600',   btnClass: 'bg-rose-700 hover:bg-rose-800',    titleColor: 'text-muted-foreground', onView: () => goToReport('Non Competitors') },
+  { id: 'posTrend',  title: 'Positive Trend',  count: stats?.varPostiveTrendingCount,  percent: stats?.varPostiveTrendingPercent,  total, progressColor: 'bg-emerald-500', btnClass: 'bg-emerald-500 hover:bg-emerald-600', titleColor: 'text-emerald-600',      onView: () => goToReport('Positive Trend')  },
+  { id: 'neutTrend', title: 'Neutral Trend',   count: stats?.varEqualTrendingCount,    percent: stats?.varEqualTrendingPercent,    total, progressColor: 'bg-amber-500',  btnClass: 'bg-amber-500 hover:bg-amber-600',   titleColor: 'text-amber-500',        onView: () => goToReport('Neutral Trend')   },
+  { id: 'negTrend',  title: 'Negative Trend',  count: stats?.varNegativeTrendingCount, percent: stats?.varNegativeTrendingPercent, total, progressColor: 'bg-red-500',    btnClass: 'bg-red-500 hover:bg-red-600',      titleColor: 'text-red-500',          onView: () => goToReport('Negative Trend')  },
+];
 
   // Map API data into Pie Chart structure
   const totalCompetitorProducts = compCounts.reduce((acc, curr) => acc + curr.count, 0);
@@ -640,15 +656,16 @@ export default function Dashboard() {
 
         {/* Trend Cards — independent 2×3 grid */}
         <div className="flex-1 grid grid-cols-2 lg:grid-cols-3 gap-4">
-          {trendCards.map((card) => (
-            <TrendCard key={card.key} {...card} loading={statsLoading} />
+         {trendCards.map((card) => (
+            <TrendCard key={card.id} {...card} loading={statsLoading} />
           ))}
         </div>
 
       </motion.div>
 
       {/* ── Activity Log ── */}
-      <motion.div variants={itemVariants} className="bg-card rounded-xl p-6 card-shadow border border-border">
+       {isSuperAdmin && (
+      <motion.div variants={itemVariants} className="bg-card rounded-xl p-6 card-shadow border border-border ">
         <div className="flex justify-between items-center mb-4">
           <div>
             <h3 className="font-semibold text-lg text-foreground">Activity Log</h3>
@@ -656,7 +673,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="overflow-x-auto border-t border-border">
+        <div className="overflow-x-auto overflow-y-auto max-h-[200px] border-t border-gray-100 dark:border-slate-700/60 scrollbar-hide">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="text-muted-foreground text-xs uppercase font-semibold">
@@ -684,7 +701,15 @@ export default function Dashboard() {
                   <tr key={idx} className="hover:bg-secondary/50 transition-colors">
                     <td className="py-3 border-b border-border whitespace-nowrap text-foreground">{log.date}</td>
                     <td className="py-3 border-b border-border">
-                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-indigo-500/10 text-indigo-600 capitalize">
+                      <span className="flex items-center gap-2 text-xs font-medium px-2 py-1 rounded-full bg-indigo-500/10 text-indigo-600 capitalize w-fit">
+                        {log.logo ? (
+                          <img
+                            src={log.logo}
+                            alt={log.competitor}
+                            className="w-4 h-4 rounded-full object-contain bg-white shrink-0"
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                          />
+                        ) : null}
                         {log.competitor || '—'}
                       </span>
                     </td>
@@ -701,6 +726,7 @@ export default function Dashboard() {
           </table>
         </div>
       </motion.div>
+       )}
 
     </motion.div>
 

@@ -53,8 +53,14 @@ exports.getBrandAnalytics = async (req, res) => {
       .find({ brand_name: brand })
       .toArray();
 
-    const categories = [...new Set(docs.map((d) => d.category_name).filter(Boolean))].sort();
-    const selectedCategory = category || categories[0];
+    // Exclude "all_category" from the dropdown — it's not a real category,
+    // it's the pre-aggregated "All Category" summary document
+    const categories = [...new Set(
+      docs.map((d) => d.category_name).filter((c) => c && c !== 'all_category')
+    )].sort();
+
+    // "All Category" selected in UI → category comes as '' from frontend
+    const selectedCategory = category || 'all_category';
     const record = docs.find((d) => d.category_name === selectedCategory);
 
     res.json({ categories, data: record?.price_analysis_data || null });
@@ -111,7 +117,7 @@ exports.getOverallStatistics = async (req, res) => {
     res.json({ ...docs[0], varNotificationCounts });
   } catch (err) {
     console.error('dashboardController.getOverallStatistics error:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).jsongetCompetitorActivityLog({ message: err.message });
   }
 };
 // ─── GET /api/dashboard/competitor-counts ───────────────────────────────────
@@ -121,13 +127,17 @@ exports.getCompetitorCounts = async (req, res) => {
       .collection('ept_dashbaord_statics')
       .find({ status: 'active' })
       .toArray();
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
 
     const formatted = docs.map((d) => {
       const rawCount = d.competitor_count?.$numberLong || d.competitor_count?.toString() || 0;
+      const logo = d.competitor_logo
+        ? (d.competitor_logo.startsWith('http') ? d.competitor_logo : `${baseUrl}${d.competitor_logo}`)
+        : null;
       return {
         id: d._id,
         name: d.competitors || d.competitor_name,
-        logo: d.competitor_logo,
+        logo,
         count: parseInt(rawCount, 10) || 0,
         color: d.competitor_color
       };
