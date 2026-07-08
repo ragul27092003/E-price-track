@@ -10,6 +10,7 @@ const {
   addUser,
   removeUser,
   getUsersLog,
+  getLogFilterUsers,
   uploadStoreLogo: uploadStoreLogoHandler,
 } = require('../../controllers/tenant/settingsController');
 const tenantResolver = require('../../middleware/tenantResolver');
@@ -24,6 +25,7 @@ router.get('/users',                auth, tenantResolver, getUsers);
 router.post('/add-user',            auth, tenantResolver, addUser);
 router.delete('/users/:user_id',    auth, tenantResolver, removeUser);
 router.get('/users-log',            auth, getUsersLog);
+router.get('/log-users',            auth, getLogFilterUsers);
 router.post('/logo-upload', auth, uploadStoreLogo.single('logo'), uploadStoreLogoHandler);
 
 

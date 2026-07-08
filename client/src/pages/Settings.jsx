@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
-import {User, Mail, Lock, Eye, EyeOff, Trash2, UserPlus,X, Check, AlertCircle, Users, FileText, ChevronDown, Camera,} from "lucide-react";
+import { format, startOfToday, endOfToday, subDays, startOfMonth, endOfMonth } from "date-fns";
+import {User, Mail, Lock, Eye, EyeOff, Trash2, UserPlus,X, Check, AlertCircle, Users, FileText, ChevronDown, Camera, Calendar as CalendarIcon,} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useStore } from "@/store";
 import { toast } from "sonner";
 import {
@@ -15,6 +19,7 @@ import {
   addUser,
   removeUser,
   fetchUsersLog,
+  fetchLogFilterUsers,
 } from "@/services/settingsService";
 
 const TABS = [
@@ -669,16 +674,64 @@ function ManageUsersTab() {
 }
 
 // ── UsersLogTab ─────────────────────────────────────────────────────────────
+const DATE_PRESETS = [
+  { id: "today",     label: "Today" },
+  { id: "last7",     label: "Last 7 Days" },
+  { id: "last10",    label: "Last 10 Days" },
+  { id: "thisMonth", label: "This Month" },
+  { id: "custom",    label: "Date Range" },
+];
+
+const PAGE_SIZE = 20;
+
+function presetToRange(presetId) {
+  const today = new Date();
+  switch (presetId) {
+    case "today":     return { from: startOfToday(), to: endOfToday() };
+    case "last7":     return { from: subDays(startOfToday(), 6), to: endOfToday() };
+    case "last10":    return { from: subDays(startOfToday(), 9), to: endOfToday() };
+    case "thisMonth": return { from: startOfMonth(today), to: endOfMonth(today) };
+    default:          return undefined;
+  }
+}
+
 function UsersLogTab() {
   const usersLog = useStore((s) => s.usersLog);
   const setUsersLog = useStore((s) => s.setUsersLog);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+
+  const [filterUsers, setFilterUsers] = useState([]);
+  const [selectedUserId, setSelectedUserId] = useState("all");
+  const [preset, setPreset] = useState("");           // "" = no date filter
+  const [customRange, setCustomRange] = useState();   // { from, to } for the "Date Range" popover
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+
+  // Applied filters — only these trigger a fetch, so changing the dropdown
+  // or picking dates doesn't reload until "Submit" is pressed.
+  const [appliedUserId, setAppliedUserId] = useState("all");
+  const [appliedRange, setAppliedRange] = useState(undefined);
+
+  useEffect(() => {
+    fetchLogFilterUsers()
+      .then(setFilterUsers)
+      .catch(() => setFilterUsers([]));
+  }, []);
 
   useEffect(() => {
     const load = async () => {
+      setLoading(true);
       try {
-        const data = await fetchUsersLog();
-        setUsersLog(data);
+        const { total, logs } = await fetchUsersLog({
+          userId: appliedUserId,
+          start: appliedRange?.from ? format(appliedRange.from, "yyyy-MM-dd") : undefined,
+          end: appliedRange?.to ? format(appliedRange.to, "yyyy-MM-dd") : undefined,
+          page,
+          limit: PAGE_SIZE,
+        });
+        setUsersLog(logs);
+        setTotal(total);
       } catch {
         toast.error("Failed to load logs");
       } finally {
@@ -686,18 +739,123 @@ function UsersLogTab() {
       }
     };
     load();
-  }, []);
+  }, [appliedUserId, appliedRange, page]);
+
+  const handlePresetChange = (id) => {
+    setPreset(id);
+    if (id === "custom") {
+      setDatePopoverOpen(true);
+    } else {
+      setCustomRange(undefined);
+    }
+  };
+
+  const handleSubmit = () => {
+    setAppliedUserId(selectedUserId);
+    setAppliedRange(preset === "custom" ? customRange : presetToRange(preset));
+    setPage(1); // reset to first page on any new filter
+  };
+
+  const dateLabel = preset === "custom"
+    ? customRange?.from
+      ? customRange.to
+        ? `${format(customRange.from, "dd/MM/yyyy")} - ${format(customRange.to, "dd/MM/yyyy")}`
+        : format(customRange.from, "dd/MM/yyyy")
+      : "Pick a range"
+    : DATE_PRESETS.find((p) => p.id === preset)?.label || "All Dates";
+
+  const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(page * PAGE_SIZE, total);
+
+  const pageNumbers = React.useMemo(() => {
+    const nums = [];
+    const windowSize = 2;
+    for (let p = 1; p <= totalPages; p++) {
+      if (p === 1 || p === totalPages || (p >= page - windowSize && p <= page + windowSize)) {
+        nums.push(p);
+      } else if (nums[nums.length - 1] !== "…") {
+        nums.push("…");
+      }
+    }
+    return nums;
+  }, [page, totalPages]);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="pt-2">
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="pt-2 space-y-4">
+      {/* Filter bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+          <SelectTrigger className="w-full sm:w-[220px] bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-700">
+            <SelectValue placeholder="All Users" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Users</SelectItem>
+            {filterUsers.map((u) => (
+              <SelectItem key={u.user_id} value={u.user_id}>
+                {u.user_name || u.email_address}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={preset} onValueChange={handlePresetChange}>
+          <SelectTrigger className="w-full sm:w-[180px] bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-700">
+            <SelectValue placeholder="All Dates" />
+          </SelectTrigger>
+          <SelectContent>
+            {DATE_PRESETS.map((p) => (
+              <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {preset === "custom" && (
+          <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full sm:w-[260px] justify-start text-left font-normal bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-700"
+              >
+                <CalendarIcon className="mr-2 h-4 w-4 text-gray-400" />
+                <span className="text-sm text-gray-700 dark:text-slate-300">{dateLabel}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="range"
+                selected={customRange}
+                onSelect={setCustomRange}
+                numberOfMonths={2}
+                initialFocus
+              />
+              {customRange?.from && (
+                <div className="flex justify-end gap-2 p-3 border-t border-gray-200 dark:border-slate-700">
+                  <Button size="sm" variant="ghost" onClick={() => setCustomRange(undefined)}>Clear</Button>
+                  <Button size="sm" onClick={() => setDatePopoverOpen(false)}>Done</Button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+        )}
+
+        <Button onClick={handleSubmit} className="bg-[#1864ab] hover:bg-[#14538a] text-white">
+          Submit
+        </Button>
+      </div>
+
+      <p className="text-xs text-gray-500 dark:text-slate-400">
+        {loading ? "Loading…" : `Showing ${rangeStart}-${rangeEnd} of ${total} items`}
+      </p>
+
       <div className="bg-slate-50 dark:bg-[#151a2a] border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <div className="min-w-[800px] md:min-w-full">
             <div className="grid grid-cols-12 gap-4 px-5 py-3 bg-slate-50 dark:bg-[#151a2a] border-b border-gray-200 dark:border-slate-700 text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">
-              <div className="col-span-4">Email</div>
-              <div className="col-span-2">Role</div>
-              <div className="col-span-2">Company</div>
-              <div className="col-span-4">Date</div>
+              <div className="col-span-3">User Name</div>
+              <div className="col-span-3">Email Address</div>
+              <div className="col-span-3">Action</div>
+              <div className="col-span-3">Log At</div>
             </div>
 
             {loading ? (
@@ -710,23 +868,82 @@ function UsersLogTab() {
                 <p className="text-sm text-gray-500 dark:text-slate-400">No logs yet</p>
               </div>
             ) : (
-              // ✅ FIX 3: Use _id for log keys too (falling back to index only if _id missing)
-              usersLog.map((log, i) => (
-                <div
-                  key={log._id || i}
-                  className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-gray-200 dark:border-slate-700 last:border-0 text-sm hover:bg-gray-100 dark:hover:bg-slate-700/60 items-center"
-                >
-                  <div className="col-span-4 text-gray-900 dark:text-white font-medium truncate">{log.email_address}</div>
-                  <div className="col-span-2 text-gray-600 dark:text-slate-400 capitalize">{log.user_type}</div>
-                  <div className="col-span-2 text-gray-600 dark:text-slate-400 truncate">{log.cmpid}</div>
-                  <div className="col-span-4 text-gray-500 dark:text-slate-400 text-xs">
-                    {new Date(log.loginAt).toLocaleString()}
+              usersLog.map((log, i) => {
+                const isFailedLogin = (log.action || '').includes('invalid');
+                const isLogout = log.action === 'logout';
+                return (
+                  <div
+                    key={log._id || i}
+                    className="grid grid-cols-12 gap-4 px-5 py-4 border-b border-gray-200 dark:border-slate-700 last:border-0 text-sm hover:bg-gray-100 dark:hover:bg-slate-700/60 items-center"
+                  >
+                    <div className="col-span-3 text-gray-900 dark:text-white font-medium truncate">
+                      {log.user_name || '-'}
+                    </div>
+                    <div className="col-span-3 text-gray-600 dark:text-slate-400 truncate">
+                      {log.email_address || log.email_addr || '-'}
+                    </div>
+                    <div className="col-span-3">
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-tight ${
+                        isFailedLogin ? "bg-red-100 text-red-700"
+                        : isLogout ? "bg-gray-100 text-gray-600"
+                        : "bg-green-100 text-green-700"
+                      }`}>
+                        {log.action || (isLogout ? "logout" : "manual login")}
+                      </span>
+                    </div>
+                    <div className="col-span-3 text-gray-500 dark:text-slate-400 text-xs">
+                      {log.log_at || (log.loginAt && new Date(log.loginAt).toLocaleString()) || '-'}
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
+
+        {/* Pagination */}
+        {!loading && total > 0 && (
+          <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-gray-200 dark:border-slate-700 flex-wrap">
+            <span className="text-xs text-gray-500 dark:text-slate-400">
+              Page {page} of {totalPages}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={page === 1}
+                onClick={() => setPage((p) => Math.max(p - 1, 1))}
+                className="h-8 px-3"
+              >
+                Prev
+              </Button>
+              {pageNumbers.map((p, idx) =>
+                p === "…" ? (
+                  <span key={`ellipsis-${idx}`} className="px-2 text-xs text-gray-400">…</span>
+                ) : (
+                  <Button
+                    key={p}
+                    size="sm"
+                    variant={p === page ? "default" : "outline"}
+                    onClick={() => setPage(p)}
+                    className={`h-8 w-8 p-0 ${p === page ? "bg-[#1864ab] hover:bg-[#14538a] text-white" : ""}`}
+                  >
+                    {p}
+                  </Button>
+                )
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={page === totalPages}
+                onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
+                className="h-8 px-3"
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </motion.div>
   );

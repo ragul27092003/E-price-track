@@ -38,5 +38,13 @@ export const addUser = (data) =>
 export const removeUser = (user_id) =>
   API.delete(`/settings/users/${user_id}`).then((r) => r.data);
 
-export const fetchUsersLog = () =>
-  API.get('/settings/users-log').then((r) => r.data);
+export const fetchUsersLog = ({ userId, start, end, page = 1, limit = 20 } = {}) => {
+  const params = { page, limit };
+  if (userId && userId !== 'all') params.user_id = userId;
+  if (start) params.start = start;
+  if (end) params.end = end;
+  return API.get('/settings/users-log', { params }).then((r) => r.data);
+};
+
+export const fetchLogFilterUsers = () =>
+  API.get('/settings/log-users').then((r) => r.data);

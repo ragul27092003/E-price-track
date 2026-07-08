@@ -271,27 +271,100 @@ exports.removeUser = async (req, res) => {
 // ─── GET /api/settings/users-log ─────────────────────────────────────────────
 // FIX: was querying the old 'eprice_main_admin_db' which no longer exists.
 // Now reads from plm_admin_manage_info via mongoose.connection.db (MONGO_URI).
-exports.getUsersLog = async (req, res) => {
+// ─── GET /api/settings/log-users ─────────────────────────────────────────────
+// Returns the tenant's users (store_admin + user) for the "Manage Log History"
+// filter dropdown — id/name/email only.
+exports.getLogFilterUsers = async (req, res) => {
   try {
-    const adminDb = mongoose.connection.db; // plm_admin_manage_info
-    let query = {};
+    const adminDb = mongoose.connection.db;
 
+    let userFilter = {};
     if (req.user.user_type === 'super_admin') {
       const tenantId = req.headers['x-tenant-id'];
       if (!tenantId) return res.status(400).json({ message: 'No store selected' });
-      query = { cmpid: tenantId, user_type: { $in: ['store_admin', 'user'] } };
+      userFilter = { cmpid: tenantId, user_type: { $in: ['store_admin', 'user'] } };
     } else {
-      query = { cmpid: req.user.cmpid, user_type: 'user' };
+      userFilter = { cmpid: req.user.cmpid, user_type: { $in: ['store_admin', 'user'] } };
+    }
+
+    const users = await adminDb
+      .collection('plm_admin_users')
+      .find(userFilter)
+      .project({ user_id: 1, user_name: 1, email_address: 1, user_type: 1 })
+      .toArray();
+
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ─── GET /api/settings/users-log ─────────────────────────────────────────────
+// Query params (all optional):
+//   user_id  - filter to a single user (defaults to all users of the tenant)
+//   start    - 'YYYY-MM-DD', inclusive
+//   end      - 'YYYY-MM-DD', inclusive
+// plm_user_history_logs does NOT store cmpid — it only has
+// user_id/user_name/user_type/email_address/log_at/system_log/data_log.
+// So we resolve which user_ids belong to this tenant from plm_admin_users
+// first, then filter the logs by those user_ids.
+exports.getUsersLog = async (req, res) => {
+  try {
+    const adminDb = mongoose.connection.db; // plm_admin_manage_info
+    const { user_id, start, end } = req.query;
+    const page  = Math.max(parseInt(req.query.page, 10)  || 1, 1);
+    const limit = Math.max(parseInt(req.query.limit, 10) || 20, 1);
+
+    let userFilter = {};
+    if (req.user.user_type === 'super_admin') {
+      const tenantId = req.headers['x-tenant-id'];
+      if (!tenantId) return res.status(400).json({ message: 'No store selected' });
+      userFilter = { cmpid: tenantId, user_type: { $in: ['store_admin', 'user'] } };
+    } else {
+      userFilter = { cmpid: req.user.cmpid, user_type: 'user' };
+    }
+
+    const tenantUsers = await adminDb
+      .collection('plm_admin_users')
+      .find(userFilter)
+      .project({ user_id: 1 })
+      .toArray();
+
+    let userIds = tenantUsers.map((u) => u.user_id);
+    if (userIds.length === 0) return res.json({ total: 0, page, limit, logs: [] });
+
+    // Narrow to a single user if requested (must still belong to the tenant).
+    if (user_id && user_id !== 'all') {
+      if (!userIds.includes(user_id)) return res.json({ total: 0, page, limit, logs: [] });
+      userIds = [user_id];
     }
 
     const logs = await adminDb
       .collection('plm_user_history_logs')
-      .find(query)
+      .find({ user_id: { $in: userIds } })
       .sort({ _id: -1 })
-      .limit(50)
+      .limit(2000)
       .toArray();
 
-    res.json(logs);
+    // log_at is a formatted string like "2026-07-07 01:31:40pm" (not a real
+    // Date on most docs), but it's zero-padded ISO at the front, so a plain
+    // string prefix compare against 'YYYY-MM-DD' works for range filtering.
+    let filtered = logs;
+    if (start || end) {
+      filtered = logs.filter((l) => {
+        const datePart = (l.log_at || '').slice(0, 10);
+        if (!datePart) return false;
+        if (start && datePart < start) return false;
+        if (end && datePart > end) return false;
+        return true;
+      });
+    }
+
+    const total = filtered.length;
+    const startIdx = (page - 1) * limit;
+    const pageLogs = filtered.slice(startIdx, startIdx + limit);
+
+    res.json({ total, page, limit, logs: pageLogs });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
