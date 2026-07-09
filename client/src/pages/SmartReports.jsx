@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useStore } from "../store";
-import { fetchProducts } from "../services/productsService";
+import { fetchSmartReportProducts, fetchSmartReportProductDetail, exportSmartReportProducts } from "../services/smartReportsService";
 import { fetchCompetitors } from "../services/competitorsService";
 import API from "../hooks/useApi";
 
@@ -902,6 +902,7 @@ function exportSmartReportCSV(products, tab, competitorMeta, exportType = "A") {
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 const TABS = ["Easy Gain", "Clever Move", "Non Competitors", "Positive Trend", "Neutral Trend", "Negative Trend"];
+const PAGE_SIZE = 50;
 const HISTORY_FILTERS = [
   { label: "Last 5 Days", value: 5 }, { label: "Last 7 Days", value: 7 },
   { label: "Last 10 Days", value: 10 }, { label: "Last 20 Days", value: 20 },
@@ -916,180 +917,159 @@ export default function SmartReports() {
 
   const [activeTab, setActiveTab] = useState(location.state?.tab || "Easy Gain");
   const [selectedEan, setSelectedEan] = useState(null);
+  const [selectedProductDetail, setSelectedProductDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [historyDays, setHistoryDays] = useState(30);
 
-  // ── PROGRESSIVE BATCH DRIVEN STATES ──
-  const [allProducts, setAllProducts] = useState([]);
+  const [listProducts, setListProducts] = useState([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState(""); 
-  const [displayLimit, setDisplayLimit] = useState(40);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
 
   const sidebarRef = useRef(null);
+  const fetchIdRef = useRef(0);
 
-  // 1. Progressive loader: Streams products page by page dynamically
   useEffect(() => {
-    let isMounted = true;
-    setAllProducts([]);
-    setLoading(true);
+    const timer = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
-    const loadBatch = async (pageNo) => {
-      try {
-        const res = await fetchProducts({ page: pageNo, limit: 200 });
-        if (!isMounted) return;
-
-        const arr = Array.isArray(res) ? res : (res?.data || res?.products || []);
-        
-        if (arr.length === 0) {
-          setLoading(false);
-          return;
-        }
-
-        setAllProducts((prev) => [...prev, ...arr]);
-        
-        if (pageNo === 1) {
-          setLoading(false); 
-        }
-
-        if (arr.length === 200) {
-          loadBatch(pageNo + 1); 
-        }
-      } catch (err) {
-        console.error("Error loading smart report batch:", err);
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    loadBatch(1);
-
+  useEffect(() => {
     if (!competitors.length) {
       fetchCompetitors().then((data) => setCompetitors(data)).catch(() => {});
     }
     if (!overallStatistics) {
       fetchOverallStatistics();
     }
-
-    return () => { isMounted = false; };
   }, [activeStoreId]);
 
-  // 2. Exact requested criteria computations + front-end search filtering
-  const filteredProducts = useMemo(() => {
-    let result = allProducts.filter((p) => {
-      const activeComps = (p.competitor_prices || []).filter((c) => {
-        const hasPrice = parsePrice(c.price) !== null;
-        const isOos = !c.stock || String(c.stock).toLowerCase().includes("out of stock") || String(c.stock) === "0";
-        return c.is_listed && hasPrice && !isOos;
-      });
+  useEffect(() => {
+    let isMounted = true;
+    const fetchId = ++fetchIdRef.current;
 
-      const ourPrice = parsePrice(p.product_price);
+    const loadPage = async () => {
+      setLoading(true);
+      setListProducts([]);
+      setPage(1);
+      setHasMore(false);
+      setTotal(0);
+      setSelectedEan(null);
+      setSelectedProductDetail(null);
 
-      // CRITERIA 1: Non Competitors
-      if (activeTab === "Non Competitors") {
-        return activeComps.length === 0;
-      }
-
-      if (ourPrice === null) return false;
-      const compPrices = activeComps.map((c) => parsePrice(c.price)).filter((v) => v !== null);
-      const rank = compPrices.filter((price) => price < ourPrice).length + 1;
-
-      // CRITERIA 2: Positive Trend (Must be active, scrap completed, and Rank 1)
-      if (activeTab === "Positive Trend") {
-        const isActive = p.status === "active";
-        const isScrapCompleted = p.ean_product_data_details_scrap_status === "completed";
-        if (!isActive || !isScrapCompleted) return false;
-        return rank === 1;
-      }
-
-      // CRITERIA 3: Negative Trend (Must be active, scrap completed, and trailing with higher prices)
-      if (activeTab === "Negative Trend") {
-        const isActive = p.status === "active";
-        const isScrapCompleted = p.ean_product_data_details_scrap_status === "completed";
-        if (!isActive || !isScrapCompleted) return false;
-        return activeComps.length > 0 && rank >= 2;
-      }
-
-      // CRITERIA 4: Easy Gain (Must be active, scrap completed, Rank 1, and have active competitors)
-      if (activeTab === "Easy Gain") {
-        const isActive = p.status === "active";
-        const isScrapCompleted = p.ean_product_data_details_scrap_status === "completed";
-        if (!isActive || !isScrapCompleted) return false;
-        return rank === 1 && activeComps.length > 0;
-      }
-      
-// CRITERIA 4: Clever Move (Strategic Match with 1 Rupee Undercut Tolerance)
-      if (activeTab === "Clever Move") {
-        const isActive = p.status === "active";
-        const isScrapCompleted = p.ean_product_data_details_scrap_status === "completed";
-        if (!isActive || !isScrapCompleted) return false;
-
-        if (compPrices.length === 0 || ourPrice === null) return false;
-
-        const lowestCompPrice = Math.min(...compPrices);
-
-        // Rule 1: We must never be Rank 1 (must be higher than the absolute lowest price)
-        if (ourPrice <= lowestCompPrice) return false;
-
-        // Rule 2: Check if our price matches a competitor tier exactly OR undercuts it by up to 1 rupee
-        const matchesCompetitorTier = compPrices.some((price) => {
-          const priceDiff = price - ourPrice;
-          // Returns true if same price (0) or if we are 1 rupee cheaper (1)
-          return priceDiff >= 0 && priceDiff <= 1;
+      try {
+        const res = await fetchSmartReportProducts({
+          tab: activeTab,
+          page: 1,
+          limit: PAGE_SIZE,
+          search,
         });
+        if (!isMounted || fetchId !== fetchIdRef.current) return;
 
-        return matchesCompetitorTier;
+        const data = res?.data || [];
+        setListProducts(data);
+        setTotal(res?.total ?? data.length);
+        setHasMore(!!res?.hasMore);
+        setPage(1);
+        if (data.length) {
+          setSelectedEan(data[0].product_ean_id);
+        }
+      } catch (err) {
+        console.error("Error loading smart report products:", err);
+        if (isMounted && fetchId === fetchIdRef.current) {
+          setListProducts([]);
+        }
+      } finally {
+        if (isMounted && fetchId === fetchIdRef.current) {
+          setLoading(false);
+        }
       }
-      // CRITERIA 5: Neutral Trend (Tied exactly with the lowest competitor price)
-if (activeTab === "Neutral Trend") {
-  if (compPrices.length === 0) return false;
-  
-  // This automatically finds the Rank 1 competitor price
-  const lowestCompPrice = Math.min(...compPrices);
-  
-  // Checks if our price matches them exactly (whether we're tied at Rank 2, 3, or 4)
-  return ourPrice === lowestCompPrice;
-}
+    };
 
-      return true;
-    });
+    loadPage();
+    if (sidebarRef.current) sidebarRef.current.scrollTop = 0;
 
-    // Apply Live Search Box Filter string check logic
-    if (search.trim() !== "") {
-      const query = search.toLowerCase().trim();
-      result = result.filter((p) => 
-        (p.product_name || "").toLowerCase().includes(query) ||
-        (p.product_brand || "").toLowerCase().includes(query) ||
-        (p.product_ean_id || "").toLowerCase().includes(query) ||
-        (p.product_code || "").toLowerCase().includes(query)
-      );
+    return () => { isMounted = false; };
+  }, [activeTab, activeStoreId, search]);
+
+  useEffect(() => {
+    if (!selectedEan) {
+      setSelectedProductDetail(null);
+      return;
     }
 
-    return result;
-  }, [allProducts, activeTab, search]);
+    let cancelled = false;
+    setDetailLoading(true);
 
-  // Reset states on tab switch alterations 
+    fetchSmartReportProductDetail(selectedEan)
+      .then((data) => {
+        if (!cancelled) setSelectedProductDetail(data);
+      })
+      .catch((err) => {
+        console.error("Error loading product detail:", err);
+        if (!cancelled) {
+          const fallback = listProducts.find((p) => p.product_ean_id === selectedEan) || null;
+          setSelectedProductDetail(fallback);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [selectedEan]);
+
+  const loadMoreProducts = async () => {
+    if (loadingMore || !hasMore || loading) return;
+
+    setLoadingMore(true);
+    const nextPage = page + 1;
+
+    try {
+      const res = await fetchSmartReportProducts({
+        tab: activeTab,
+        page: nextPage,
+        limit: PAGE_SIZE,
+        search,
+      });
+      const data = res?.data || [];
+      setListProducts((prev) => [...prev, ...data]);
+      setPage(nextPage);
+      setHasMore(!!res?.hasMore);
+      if (search.trim()) {
+        setTotal(res?.total ?? 0);
+      }
+    } catch (err) {
+      console.error("Error loading more smart report products:", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   useEffect(() => {
-    setDisplayLimit(40);
-    setSelectedEan(null);
-    setSearch(""); // Automatically clear search text whenever users switch tabs
+    setSearchInput("");
+    setSearch("");
     if (sidebarRef.current) sidebarRef.current.scrollTop = 0;
   }, [activeTab]);
 
   const handleSidebarScroll = (e) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    if (scrollHeight - scrollTop <= clientHeight + 50 && displayLimit < filteredProducts.length) {
-      setDisplayLimit((prev) => prev + 40);
+    if (scrollHeight - scrollTop <= clientHeight + 50) {
+      loadMoreProducts();
     }
   };
 
   const competitorMeta = useMemo(() => Object.fromEntries((competitors || []).map((c) => [c.slug, c])), [competitors]);
-  
-  const paginatedProducts = useMemo(() => {
-    return filteredProducts.slice(0, displayLimit);
-  }, [filteredProducts, displayLimit]);
 
   const selectedProduct = useMemo(() => {
-    if (!paginatedProducts.length) return null;
-    return paginatedProducts.find((p) => p.product_ean_id === selectedEan) || paginatedProducts[0];
-  }, [paginatedProducts, selectedEan]);
+    if (selectedProductDetail) return selectedProductDetail;
+    if (!listProducts.length) return null;
+    return listProducts.find((p) => p.product_ean_id === selectedEan) || listProducts[0];
+  }, [selectedProductDetail, listProducts, selectedEan]);
 
   // Maps the backend statistics directly into tab counts instantly on load
   const tabCounts = useMemo(() => {
@@ -1106,6 +1086,18 @@ if (activeTab === "Neutral Trend") {
     }
     return Object.fromEntries(TABS.map((tab) => [tab, 0]));
   }, [overallStatistics]);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const result = await exportSmartReportProducts({ tab: activeTab, search });
+      exportSmartReportCSV(result.data || [], activeTab, competitorMeta, exportType);
+    } catch (err) {
+      console.error("Smart report export failed:", err);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0b101e] text-slate-800 dark:text-white p-3 md:p-6 lg:p-8">
@@ -1125,28 +1117,33 @@ if (activeTab === "Neutral Trend") {
                 <input
                   type="text" 
                   placeholder="Search product name, brand or code…" 
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   className="w-full border-0 bg-transparent text-sm text-slate-800 dark:text-white outline-none placeholder:text-slate-400 bg-transparent"
                 />
-                {search && (
-                  <button onClick={() => setSearch("")} className="text-slate-400 hover:text-slate-600 shrink-0">
+                {searchInput && (
+                  <button onClick={() => setSearchInput("")} className="text-slate-400 hover:text-slate-600 shrink-0">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12" /></svg>
                   </button>
                 )}
               </div>
 
-              {canExport && filteredProducts.length > 0 && (
+              {canExport && (search.trim() !== "" ? listProducts.length > 0 : tabCounts[activeTab] > 0) && (
                 <button
-                  onClick={() => exportSmartReportCSV(filteredProducts, activeTab, competitorMeta, exportType)}
-                  className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors whitespace-nowrap"
+                  onClick={handleExport}
+                  disabled={exporting}
+                  className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors whitespace-nowrap disabled:opacity-60"
                 >
-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  Export {activeTab}
+                  {exporting ? (
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white inline-block" />
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                  )}
+                  {exporting ? "Exporting…" : `Export ${activeTab}`}
                 </button>
               )}
             </div>
@@ -1171,7 +1168,7 @@ if (activeTab === "Neutral Trend") {
             ))}
           </div>
 
-          {allProducts.length === 0 && loading ? (
+          {loading && listProducts.length === 0 ? (
             <div className="flex items-center justify-center py-24 text-slate-400">
               <svg className="animate-spin h-6 w-6 mr-3 text-[#2B86C5]" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -1179,7 +1176,7 @@ if (activeTab === "Neutral Trend") {
               </svg>
               Loading products…
             </div>
-          ) : filteredProducts.length === 0 ? (
+          ) : listProducts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-slate-400">
               <p className="font-medium">No matching products found</p>
             </div>
@@ -1192,13 +1189,13 @@ if (activeTab === "Neutral Trend") {
                 className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 shadow-sm h-[680px] overflow-y-auto flex flex-col gap-1"
               >
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">
-                  {search.trim() !== "" 
-                    ? `${filteredProducts.length} Match${filteredProducts.length !== 1 ? "es" : ""}`
-                    : `${tabCounts[activeTab]} Product${tabCounts[activeTab] !== 1 ? "s" : ""}`
+                  {search.trim() !== ""
+                    ? `${total} Match${total !== 1 ? "es" : ""}`
+                    : `${total} Product${total !== 1 ? "s" : ""}`
                   }
                 </p>
-                
-                {paginatedProducts.map((p) => (
+
+                {listProducts.map((p) => (
                   <SidebarProduct
                     key={p.product_ean_id || p.product_code || p._id}
                     product={p}
@@ -1206,11 +1203,30 @@ if (activeTab === "Neutral Trend") {
                     onClick={() => setSelectedEan(p.product_ean_id)}
                   />
                 ))}
+
+                {loadingMore && (
+                  <div className="flex items-center justify-center py-4 text-slate-400">
+                    <svg className="animate-spin h-5 w-5 mr-2 text-[#2B86C5]" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    Loading more…
+                  </div>
+                )}
               </div>
 
               {/* Right Side Metrics & Visualization Panel */}
               {selectedProduct && (
                 <div className="space-y-5">
+                  {detailLoading && (
+                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <svg className="animate-spin h-4 w-4 text-[#2B86C5]" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      Loading product details…
+                    </div>
+                  )}
                   <div className="flex items-center gap-4">
                     <ProductImage src={selectedProduct.product_image} alt={selectedProduct.product_name} />
                     <div>
