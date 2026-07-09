@@ -382,6 +382,11 @@ exports.getAvailable = async (req, res) => {
       mappingType:  ((a.mapping_type || 'ean').toLowerCase() === 'ean') ? 'EAN' : 'NON_EAN',
     }));
 
+    data.sort((a, b) =>
+      (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+    );
+
+
     res.json(data);
   } catch (err) {
     console.error('competitorsController.getAvailable error:', err);
