@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { fetchCompetitors } from '../services/competitorsService';
-import { fetchProducts, fetchProductsMeta } from '../services/productsService';
+import { fetchProducts, fetchProductsMeta, exportProductsCSV } from '../services/productsService';
 import API from '../hooks/useApi';
 
 // ─── Shared Helpers ───────────────────────────────────────────────────────────
@@ -56,13 +56,6 @@ function marketStats(product) {
   return { low, avg, high };
 }
 
-function trendFor(product, slug) {
-  return (product.price_history_30days || [])
-    .map((h) => h.competitors?.[slug])
-    .filter((v) => v !== null && v !== undefined)
-    .slice(-7);
-}
-
 function priceGap(product) {
   const ourPrice = parsePrice(product.product_price);
   const { avg } = marketStats(product);
@@ -78,6 +71,9 @@ function slugColor(slug = "") {
 }
 
 // ─── Export Function ──────────────────────────────────────────────────────────
+// Supports both export types, same as Products.jsx:
+//   "A" -> single "Competitor Detail" column combining all competitor prices
+//   "B" -> one column per competitor (dynamic headers based on slugs present)
 function exportToCSV(products, exportType = "A", competitorMeta = {}) {
   const escape = (val) => { const s = String(val ?? ""); return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s; };
 
@@ -92,6 +88,32 @@ function exportToCSV(products, exportType = "A", competitorMeta = {}) {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
+
+  if (exportType === "B") {
+    const slugMap = {};
+    products.forEach((p) => {
+      (p.competitor_prices || []).forEach((c) => {
+        if (!slugMap[c.slug]) slugMap[c.slug] = competitorMeta?.[c.slug]?.name || c.name || c.slug;
+      });
+    });
+    const slugs = Object.keys(slugMap);
+    const headers = ["Product Name", "Item Code", "Ranking Position", "Competing With", "Price", "SAP Price", "Mrp Price", "Item Groups", ...slugs.map((s) => slugMap[s])];
+    const rows = products.map((p) => {
+      const compMap = {};
+      (p.competitor_prices || []).forEach((c) => {
+        compMap[c.slug] = (c.price === null || c.price === undefined || c.stock === 0) ? "Out Of Stock" : c.price;
+      });
+      return [
+        p.product_name || "", p.product_code || p.product_ean_id || "",
+        p.user_notification_data?.rank_pos || p.rank_by || "", p.user_notification_data?.Competing_with ?? "",
+        p.product_price ?? "", p.product_sap_price ?? "", p.product_store_price ?? "",
+        p.product_item_group || p.product_category || "",
+        ...slugs.map((s) => compMap[s] ?? "Out Of Stock"),
+      ].map(escape).join(",");
+    });
+    triggerDownload([headers.map(escape).join(","), ...rows].join("\r\n"));
+    return;
+  }
 
   const headers = ["Product Name", "Item Code", "Ranking Position", "Competing With", "Price", "SAP Price", "Store Price", "Item Groups", "Competitor Detail"];
   const rows = products.map((p) => {
@@ -115,17 +137,7 @@ function ProductImage({ src, alt }) {
   if (!src || err) {
     return (
       <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-[#151a2a] shadow-sm">
-        <svg
-          viewBox="0 0 24 24"
-          width="16"
-          height="16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="text-slate-300 dark:text-slate-600"
-        >
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-300 dark:text-slate-600">
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <circle cx="9" cy="9" r="1.5" fill="currentColor" stroke="none" />
           <path d="M21 15l-5-5a2 2 0 0 0-2.8 0L3 19" />
@@ -136,33 +148,21 @@ function ProductImage({ src, alt }) {
   return <img src={src} alt={alt} onError={() => setErr(true)} className="h-10 w-10 shrink-0 rounded-lg border border-slate-100 dark:border-slate-700/50 object-contain shadow-sm bg-slate-50 dark:bg-[#151a2a]" />;
 }
 
-function CompetitorLogo({ name = "", slug = "", logo = "" }) {
+function CompetitorLogo({ name = "", slug = "", logo = "", size = "md" }) {
   const [imgErr, setImgErr] = useState(false);
   const bg = slugColor(slug || name);
   const label = (name || slug).slice(0, 8).toLowerCase();
   const logoSrc = resolveLogoUrl(logo);
+  const dim = size === "sm" ? "h-5 w-5" : "h-6 w-6";
 
   if (logoSrc && !imgErr) {
     return (
-      <div className="flex h-6 w-6 items-center justify-center rounded overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0">
+      <div className={`flex ${dim} items-center justify-center rounded overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shrink-0`}>
         <img src={logoSrc} alt={name} onError={() => setImgErr(true)} className="w-full h-full object-contain" />
       </div>
     );
   }
-  return <div className="flex h-6 min-w-[52px] items-center justify-center rounded px-1 text-[8px] font-bold uppercase tracking-wider text-white shrink-0" style={{ backgroundColor: bg }}>{label}</div>;
-}
-
-function TableSparkline({ data, width = 50, height = 20, color = "#3b82f6" }) {
-  if (!data || data.length < 2) return null;
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const points = data.map((v, i) => `${(i / (data.length - 1)) * width},${height - ((v - min) / range) * height}`).join(" ");
-  return (
-    <svg width={width} height={height} className="inline-block align-middle opacity-80">
-      <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  return <div className={`flex ${dim} min-w-[26px] items-center justify-center rounded px-1 text-[8px] font-bold uppercase tracking-wider text-white shrink-0`} style={{ backgroundColor: bg }}>{label.slice(0, 2)}</div>;
 }
 
 function RankBadge({ product }) {
@@ -185,50 +185,33 @@ function RankBadge({ product }) {
 
 function PriceGapBadge({ value, ean }) {
   const navigate = useNavigate();
-
   const hasData = value !== null && value !== undefined;
-  
-  // Convert value to a strict number and safely check if it is 0
   const numericValue = Number(value);
-  const isZero  = hasData && (numericValue === 0 || isNaN(numericValue)); 
-  const isNeg   = hasData && numericValue < 0;
-  
+  const isZero = hasData && (numericValue === 0 || isNaN(numericValue));
+  const isNeg = hasData && numericValue < 0;
   const baseColors = isNeg ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700";
-  const barColor   = isNeg ? "bg-emerald-500" : "bg-amber-500";
+  const barColor = isNeg ? "bg-emerald-500" : "bg-amber-500";
 
   return (
     <div className="flex flex-col items-start gap-2">
-      {/* Percentage badge — only show when data exists AND it is NOT exactly 0 */}
       {hasData && !isZero && (
         <div className={`relative inline-flex items-center gap-1 rounded-full pr-3 pl-2 py-1 text-[11px] font-bold ${baseColors}`}>
-          <svg
-            className={`w-3 h-3 ${isNeg ? "text-emerald-500 rotate-180" : "text-amber-500"}`}
-            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
-            strokeLinecap="round" strokeLinejoin="round"
-          >
+          <svg className={`w-3 h-3 ${isNeg ? "text-emerald-500 rotate-180" : "text-amber-500"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
             <path d="M5 12h14M12 5l7 7-7 7" />
           </svg>
           <div className={`w-0.5 h-3 opacity-30 ${barColor} mx-0.5 rounded-full`} />
           <span>{Math.abs(numericValue)}% {isNeg ? "below" : "above"} market</span>
         </div>
       )}
-
-      {/* History shortcut links — Always show if EAN exists */}
       {ean && (
         <div className="flex items-center mt-0.5 bg-white dark:bg-[#151a2a] rounded-full border border-slate-200 dark:border-slate-700/60 shadow-sm overflow-hidden w-fit transition-all hover:shadow-md hover:border-slate-300">
-          <button
-            onClick={() => navigate(`/product-history?ean=${ean}&range=7`)}
-            className="group flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-extrabold tracking-wider text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all border-r border-slate-200 dark:border-slate-700/60"
-          >
+          <button onClick={() => navigate(`/product-history?ean=${ean}&range=7`)} className="group flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-extrabold tracking-wider text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all border-r border-slate-200 dark:border-slate-700/60">
             <svg viewBox="0 0 24 24" className="w-3 h-3 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" strokeWidth="3">
               <circle cx="12" cy="12" r="9" /><path d="M12 6v6l4 2" />
             </svg>
             7 DAYS
           </button>
-          <button
-            onClick={() => navigate(`/product-history?ean=${ean}&range=30`)}
-            className="group flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-extrabold tracking-wider text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all"
-          >
+          <button onClick={() => navigate(`/product-history?ean=${ean}&range=30`)} className="group flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-extrabold tracking-wider text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all">
             <svg viewBox="0 0 24 24" className="w-3 h-3 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" strokeWidth="3">
               <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
             </svg>
@@ -295,13 +278,7 @@ function CompetitorPrices({ product, competitorMeta }) {
                 <span className="font-bold text-slate-400 text-[10px] uppercase bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">Out of Stock</span>
               </>
             ) : c.url ? (
-              <a
-                href={c.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={`Open on ${c.name}`}
-                className="flex items-center gap-2 hover:opacity-75 transition-opacity"
-              >
+              <a href={c.url} target="_blank" rel="noopener noreferrer" title={`Open on ${c.name}`} className="flex items-center gap-2 hover:opacity-75 transition-opacity">
                 <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
                 <span className="font-bold text-slate-800 dark:text-white text-[13px]">₹{c.price.toLocaleString("en-IN")}</span>
               </a>
@@ -311,17 +288,12 @@ function CompetitorPrices({ product, competitorMeta }) {
                 <span className="font-bold text-slate-800 dark:text-white text-[13px]">₹{c.price.toLocaleString("en-IN")}</span>
               </>
             )}
-
             {!isOos && (
-              <button
-                onClick={() => navigate(`/product-history?ean=${product.product_ean_id}&range=30`)}
-                className="group flex items-center justify-center text-sky-500 hover:text-sky-700 transition-colors shrink-0"
-                title="View price history"
-              >
+              <button onClick={() => navigate(`/product-history?ean=${product.product_ean_id}&range=30`)} className="group flex items-center justify-center text-sky-500 hover:text-sky-700 transition-colors shrink-0" title="View price history">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none">
-                  <rect x="3"  y="13" width="3.2" height="8"  rx="0.8" fill="currentColor" />
-                  <rect x="9"  y="9"  width="3.2" height="12" rx="0.8" fill="currentColor" />
-                  <rect x="15" y="4"  width="3.2" height="17" rx="0.8" fill="currentColor" />
+                  <rect x="3" y="13" width="3.2" height="8" rx="0.8" fill="currentColor" />
+                  <rect x="9" y="9" width="3.2" height="12" rx="0.8" fill="currentColor" />
+                  <rect x="15" y="4" width="3.2" height="17" rx="0.8" fill="currentColor" />
                 </svg>
               </button>
             )}
@@ -333,46 +305,33 @@ function CompetitorPrices({ product, competitorMeta }) {
 }
 
 function ProductCell({ product }) {
-   const linkUrl = product.product_url;
+  const linkUrl = product.product_url;
   return (
     <div className="flex items-center gap-4">
       {linkUrl ? (
-        <a
-          href={linkUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Open product page"
-          className="shrink-0 hover:opacity-80 transition-opacity"
-        >
+        <a href={linkUrl} target="_blank" rel="noopener noreferrer" title="Open product page" className="shrink-0 hover:opacity-80 transition-opacity">
           <ProductImage src={resolveProductImage(product)} alt={product.product_name} />
         </a>
       ) : (
         <ProductImage src={resolveProductImage(product)} alt={product.product_name} />
       )}
-      {/* <ProductImage src={product.product_image} alt={product.product_name} /> */}
       <div>
-          {linkUrl ? (
-            <a
-              href={linkUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Open product page"
-              className="inline-flex items-center gap-1 font-bold text-slate-800 dark:text-white text-[13px] hover:text-black dark:hover:text-black"
-            >
-              {product.product_name || "Unnamed Product"}
-              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" className="shrink-0 opacity-60">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <path d="M15 3h6v6" />
-                <path d="M10 14 21 3" />
-              </svg>
-            </a>
-          ) : (
-            <p className="font-bold text-slate-800 dark:text-white text-[13px]">{product.product_name || "Unnamed Product"}</p>
-          )}
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-            {product.product_brand && <span>{product.product_brand} · </span>}
-            {product.product_ean_id || product.product_code || product._id}
-          </p>
+        {linkUrl ? (
+          <a href={linkUrl} target="_blank" rel="noopener noreferrer" title="Open product page" className="inline-flex items-center gap-1 font-bold text-slate-800 dark:text-white text-[13px] hover:text-black dark:hover:text-black">
+            {product.product_name || "Unnamed Product"}
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" className="shrink-0 opacity-60">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <path d="M15 3h6v6" />
+              <path d="M10 14 21 3" />
+            </svg>
+          </a>
+        ) : (
+          <p className="font-bold text-slate-800 dark:text-white text-[13px]">{product.product_name || "Unnamed Product"}</p>
+        )}
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+          {product.product_brand && <span>{product.product_brand} · </span>}
+          {product.product_ean_id || product.product_code || product._id}
+        </p>
       </div>
     </div>
   );
@@ -464,10 +423,7 @@ function FilterSelect({ label, options, value, onChange }) {
   return (
     <div className="relative flex-1 min-w-[140px] sm:min-w-[160px] max-w-full sm:max-w-[220px]">
       <p className="mb-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide">{label}</p>
-      <div
-        className={`flex items-center gap-2 rounded-lg border bg-white dark:bg-slate-800 px-3 py-2.5 shadow-sm cursor-text ${open ? "border-blue-300 ring-2 ring-blue-100" : "border-slate-200 dark:border-slate-700"}`}
-        onClick={() => { setOpen(true); inputRef.current?.focus(); }}
-      >
+      <div className={`flex items-center gap-2 rounded-lg border bg-white dark:bg-slate-800 px-3 py-2.5 shadow-sm cursor-text ${open ? "border-blue-300 ring-2 ring-blue-100" : "border-slate-200 dark:border-slate-700"}`} onClick={() => { setOpen(true); inputRef.current?.focus(); }}>
         <input
           ref={inputRef}
           value={displayValue}
@@ -493,11 +449,7 @@ function FilterSelect({ label, options, value, onChange }) {
               <p className="px-3 py-2 text-sm text-slate-400">No matches</p>
             ) : (
               matched.map((opt, i) => (
-                <button
-                  key={opt || "__all__"}
-                  onMouseDown={(e) => { e.preventDefault(); commit(opt); }}
-                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${i === cursor ? "bg-blue-50 text-blue-700" : opt === value ? "bg-slate-50 font-medium text-slate-800" : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"}`}
-                >
+                <button key={opt || "__all__"} onMouseDown={(e) => { e.preventDefault(); commit(opt); }} className={`w-full text-left px-3 py-2 text-sm transition-colors ${i === cursor ? "bg-blue-50 text-blue-700" : opt === value ? "bg-slate-50 font-medium text-slate-800" : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700"}`}>
                   {opt || ALL_LABEL}
                 </button>
               ))
@@ -509,79 +461,43 @@ function FilterSelect({ label, options, value, onChange }) {
   );
 }
 
-// ─── Market Competitors Layout Components ──────────────────────────────────────
-const generateTrend = (seed, delta) => {
-  const normalizedSeed = Math.max(1, seed || 1);
-  const base = 30 + ((normalizedSeed * 7919) % 40); 
-  const isNeg = String(delta || '').includes('-');
-  const deltaNum = parseFloat(String(delta || '0').replace('%', '')) || 0;
-  const isFlat = deltaNum === 0 || !seed;
-  const trendStrength = Math.min(Math.abs(deltaNum) / 100, 3) * 0.5;
-  
-  return Array.from({ length: 7 }, (_, i) => {
-    if (isFlat) return 50;
-    const noise = (((seed || 1) * (i + 3)) % 20) - 10;
-    const trend = isNeg ? -i * trendStrength - (i * i) * 0.1 : i * trendStrength + (i * i) * 0.05;
-    return Math.max(10, Math.min(90, base + noise + trend));
-  });
-};
-
-const AreaSparkline = ({ productsTracked, avgPriceDelta }) => {
-  const points = generateTrend(productsTracked, avgPriceDelta);
-  const w = 100, h = 30;
-  const min = Math.min(...points);
-  const max = Math.max(...points);
-  const range = max - min || 1;
-  const coords = points.map((v, i) => `${(i / (points.length - 1)) * w},${h - ((v - min) / range) * (h - 6) - 3}`);
-  const pathD = `M ${coords.join(' L ')}`;
-  const areaD = `M ${coords[0]} L ${coords.join(' L ')} L ${w},${h} L 0,${h} Z`;
-  const isNeg = String(avgPriceDelta || '').includes('-');
-  const line = isNeg ? '#ef5350' : '#1976d2';
-  const fill = isNeg ? '#ffebee' : '#e3f2fd';
-  return (
-    <div className="w-[120px] h-[35px] flex items-end">
-      <svg width="100%" height="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-        <path d={areaD} fill={fill} fillOpacity="0.6" />
-        <path d={pathD} fill="none" stroke={line} strokeWidth="2" strokeLinejoin="round" />
-      </svg>
-    </div>
-  );
-};
-
-const CompetitorRow = ({ data, onClick }) => {
-  const isNegDelta = String(data.avgPriceDelta).includes('-');
+// ─── Competitor Tab Bar ────────────────────────────────────────────────────────
+function CompetitorTab({ data, isActive, onClick, liveCount }) {
   const isOffline = !data.isActive;
-  const logoUrl = resolveLogoUrl(data.logo);
+  const isNegDelta = String(data.avgPriceDelta).includes('-');
+  // Falls back across common field name variants until the backend's actual key is confirmed.
+  // liveCount (from the products API, only known for the active tab) always wins when present.
+  const productCount = liveCount ?? (data.productCount ?? data.totalProducts ?? data.product_count ?? data.count ?? data.productsCount ?? null);
 
   return (
-    <div className="group relative">
-      <div onClick={() => !isOffline && onClick(data)} className={`flex flex-col sm:flex-row sm:items-center p-4 border rounded-lg mb-3 transition-all duration-150 shadow-sm gap-3 sm:gap-0 ${isOffline ? 'bg-gray-100 border-gray-200 dark:border-slate-700 cursor-not-allowed opacity-60' : 'bg-white dark:bg-slate-800 border-blue-200 cursor-pointer hover:shadow-md hover:bg-blue-50 dark:hover:bg-slate-700'}`}>
-        <div className="flex items-center gap-4 w-full sm:w-[45%]">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded border border-gray-200 dark:border-slate-700 flex items-center justify-center overflow-hidden shrink-0 shadow-sm" >
-            {logoUrl ? <img src={logoUrl} alt={data.name} className="w-full h-full object-contain" onError={(e) => { e.target.style.display = 'none'; }} /> : <span className="text-[12px] font-bold text-white uppercase">{data.name.substring(0, 2).toUpperCase()}</span>}
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className={`text-sm font-bold truncate ${isOffline ? 'text-gray-400 dark:text-slate-500' : 'text-gray-800 dark:text-white'}`}>{data.name}</span>
-            {isOffline ? <span className="mt-0.5 w-fit bg-gray-200 text-gray-500 rounded px-1.5 py-0.5 text-[9px] font-black uppercase">Offline</span> : <span className="sm:hidden text-[10px] text-blue-500 font-medium">Tap to view products</span>}
-          </div>
-        </div>
-        <div className="flex items-center justify-between sm:contents w-full border-t sm:border-none pt-2 sm:pt-0">
-          <div className="sm:w-[20%] flex flex-col sm:block">
-            <span className="sm:hidden text-[10px] font-bold text-gray-400 uppercase mb-1">Avg Delta</span>
-            <span className={`text-sm font-black ${isOffline ? 'text-gray-300' : isNegDelta ? 'text-red-600' : 'text-green-600'}`}>{isNegDelta ? '▼' : '▲'} {data.avgPriceDelta || '+0.0%'}</span>
-          </div>
-          <div className="sm:w-[20%] flex flex-col sm:block text-right sm:text-left">
-            <span className="sm:hidden text-[10px] font-bold text-gray-400 uppercase mb-1">Tracking</span>
-            <span className={`text-sm font-bold sm:font-medium ${isOffline ? 'text-gray-300' : 'text-gray-800 dark:text-white'}`}>{data.productsTracked ?? 0} <span className="text-[10px] sm:text-sm uppercase sm:normal-case">Items</span></span>
-          </div>
-          <div className="hidden sm:flex sm:w-[15%] justify-end pr-2">
-            {!isOffline && <span className="text-xl font-light text-blue-300 group-hover:translate-x-1 transition-transform">›</span>}
-          </div>
-        </div>
-      </div>
-    </div>
+    <button
+      onClick={() => !isOffline && onClick(data)}
+      disabled={isOffline}
+      className={`group flex items-center gap-2 shrink-0 rounded-full border px-3.5 py-2 text-sm font-semibold transition-all
+        ${isOffline
+          ? "cursor-not-allowed border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 text-slate-300 dark:text-slate-600"
+          : isActive
+            ? "border-[#2B86C5] bg-[#2B86C5] text-white shadow-sm shadow-[#2B86C5]/30"
+            : "border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151a2a] text-slate-600 dark:text-slate-300 hover:border-[#2B86C5]/50 hover:text-[#2B86C5]"
+        }`}
+    >
+      <CompetitorLogo name={data.name} slug={data.slug} logo={data.logo} size="sm" />
+      <span className="whitespace-nowrap">{data.name}</span>
+      {productCount !== null && (
+        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${isActive ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300"}`}>
+          {productCount === "loading" ? "…" : Number(productCount).toLocaleString("en-IN")}
+        </span>
+      )}
+      {isOffline ? (
+        <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[9px] font-black uppercase text-gray-500">Offline</span>
+      ) : (
+        <span className={`text-[10px] font-bold ${isActive ? "text-white/90" : isNegDelta ? "text-red-500" : "text-green-600"}`}>
+          {isNegDelta ? '▼' : '▲'} {data.avgPriceDelta || '+0.0%'}
+        </span>
+      )}
+    </button>
   );
-};
+}
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 const MarketCompetitor = () => {
@@ -591,31 +507,34 @@ const MarketCompetitor = () => {
   const setCompetitorsLoading = useStore((s) => s.setCompetitorsLoading);
   const activeStoreId = useStore((s) => s.activeStoreId);
 
-  // Meta data for dropdowns
   const productsMeta = useStore((s) => s.productsMeta);
   const setProductsMeta = useStore((s) => s.setProductsMeta);
 
-  // Build the competitorMeta map needed by the Product Table components
+  // Same export settings pattern as Products.jsx
+  const exportType = useStore((s) => s.exportType) || "A";
+  const canExport  = useStore((s) => (s.user?.export_option ?? "yes") !== "no");
+
   const competitorMeta = {};
   competitors.forEach((c) => {
     competitorMeta[c.slug] = { isActive: c.isActive, logo: c.logo || "", name: c.name };
   });
 
-  // State for product display
+  // Tab / product state
   const [selectedCompetitor, setSelectedCompetitor] = useState(null);
   const [competitorProducts, setCompetitorProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
-  
+
   // Filter & Pagination State
   const [search, setSearch] = useState("");
   const [brandFilter, setBrandFilter] = useState("");
   const [catFilter, setCatFilter] = useState("");
   const [rankFilter, setRankFilter] = useState("");
   const [itemGroupFilter, setItemGroupFilter] = useState("");
-  
+
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [exporting, setExporting] = useState(false);
 
   const loadCompetitors = async () => {
     setCompetitorsLoading(true);
@@ -633,6 +552,14 @@ const MarketCompetitor = () => {
     loadCompetitors();
     fetchProductsMeta().then(setProductsMeta).catch(() => {});
   }, [activeStoreId]);
+
+  // Auto-select the first active competitor once the list loads
+  useEffect(() => {
+    if (!selectedCompetitor && competitors.length > 0) {
+      const firstActive = competitors.find((c) => c.isActive);
+      if (firstActive) setSelectedCompetitor(firstActive);
+    }
+  }, [competitors]);
 
   const loadCompetitorProducts = async (competitor, page = 1) => {
     setProductsLoading(true);
@@ -660,27 +587,53 @@ const MarketCompetitor = () => {
     }
   };
 
-  // Re-fetch products when filters or pagination changes
   useEffect(() => {
     if (selectedCompetitor) {
       loadCompetitorProducts(selectedCompetitor, currentPage);
     }
   }, [selectedCompetitor, currentPage, search, brandFilter, catFilter, rankFilter, itemGroupFilter]);
 
-  const handleCompetitorClick = (competitor) => {
+  const handleTabClick = (competitor) => {
+    if (competitor.slug === selectedCompetitor?.slug) return;
     setSearch("");
     setBrandFilter("");
     setCatFilter("");
     setRankFilter("");
     setItemGroupFilter("");
     setCurrentPage(1);
+    setCompetitorProducts([]);
+    setTotalItems(0);
+    setTotalPages(1);
     setSelectedCompetitor(competitor);
   };
 
   const handlePageChange = (page) => setCurrentPage(page);
 
-  const eanList = competitors.filter((c) => c.mappingType === 'EAN');
-  const nonEanList = competitors.filter((c) => c.mappingType === 'NON_EAN');
+  // Export now mirrors Products.jsx: hits the backend export endpoint directly
+  // (with the current competitor + filters applied), instead of manually
+  // paging through fetchProducts on the frontend to assemble the full list.
+  const handleExport = async () => {
+    if (!selectedCompetitor || exporting) return;
+    setExporting(true);
+    try {
+      const result = await exportProductsCSV({
+        competitorSlug: selectedCompetitor.slug,
+        search: search || undefined,
+        brand: brandFilter || undefined,
+        category: catFilter || undefined,
+        rank: rankFilter || undefined,
+        itemGroup: itemGroupFilter || undefined,
+      });
+      exportToCSV(result.data || [], exportType, competitorMeta);
+    } catch (err) {
+      console.error('Failed to export products:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const eanList = competitors.filter((c) => c.mappingType === 'EAN').sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const nonEanList = competitors.filter((c) => c.mappingType === 'NON_EAN').sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   if (competitorsLoading) {
     return (
@@ -690,193 +643,168 @@ const MarketCompetitor = () => {
     );
   }
 
-  // ── VIEW 2: FULL PRODUCT TABLE FOR SELECTED COMPETITOR ──
-  if (selectedCompetitor) {
+  if (competitors.length === 0) {
     return (
-      <div className="p-3 sm:p-6 bg-white dark:bg-[#0b101e] min-h-screen font-sans">
-        
-        {/* Navigation & Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-          <button 
-            onClick={() => setSelectedCompetitor(null)}
-            className="flex items-center gap-2 text-sm font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg transition-colors border border-blue-200"
-          >
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 19l-7-7 7-7"/>
-            </svg>
-            Back to Competitors
-          </button>
-          <div className="flex items-center gap-3">
-            <CompetitorLogo name={selectedCompetitor.name} slug={selectedCompetitor.slug} logo={selectedCompetitor.logo} />
-            <h2 className="text-xl font-bold text-slate-800 dark:text-white">
-              Products for {selectedCompetitor.name}
-            </h2>
-          </div>
-        </div>
-
-        {/* ── Filters Section (Search, Export, Dropdowns) ── */}
-        <div className="mb-6 space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            {/* Search */}
-            <div className="flex w-full sm:max-w-sm items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-blue-100 dark:focus-within:ring-blue-900/40">
-              <svg className="text-slate-400" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-              </svg>
-              <input
-                type="text" placeholder="Search by name, brand or EAN…" value={search}
-                onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
-                className="w-full border-0 bg-transparent text-sm text-slate-800 dark:text-white outline-none placeholder:text-slate-400"
-              />
-            </div>
-            {/* Export */}
-            <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-              <button
-                onClick={() => exportToCSV(competitorProducts, "A", competitorMeta)}
-                className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors"
-              >
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                Export
-              </button>
-            </div>
-          </div>
-
-          {/* Dropdowns */}
-          <div className="flex flex-wrap gap-3">
-            <FilterSelect label="Item Group" options={productsMeta?.itemGroups || []} value={itemGroupFilter} onChange={(v) => { setItemGroupFilter(v); setCurrentPage(1); }} />
-            <FilterSelect label="Brand"      options={productsMeta?.brands || []}     value={brandFilter}     onChange={(v) => { setBrandFilter(v); setCurrentPage(1); }} />
-            <FilterSelect label="Category"   options={productsMeta?.categories || []} value={catFilter}       onChange={(v) => { setCatFilter(v); setCurrentPage(1); }} />
-            <FilterSelect label="Rank"       options={productsMeta?.ranks || []}      value={rankFilter}      onChange={(v) => { setRankFilter(v); setCurrentPage(1); }} />
-          </div>
-        </div>
-
-        {/* Product Table */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-          {productsLoading ? (
-            <div className="flex min-h-[400px] items-center justify-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 dark:border-slate-700 border-t-blue-500" />
-            </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[1000px] border-collapse text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#0b101e]/50">
-                      <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Product</th>
-                      <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price</th>
-                      <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Rank</th>
-                      <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price Gap</th>
-                      <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Competitor Prices</th>
-                      <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Market</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                    {competitorProducts.length === 0 ? (
-                      <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-400">No products found for this competitor.</td></tr>
-                    ) : (
-                      competitorProducts.map((p) => (
-                        <tr key={p._id} className="hover:bg-slate-50 dark:hover:bg-[#151a2a]/80 transition-colors">
-                          <td className="px-5 py-4"><ProductCell product={p} /></td>
-                          <td className="px-5 py-4"><PriceCell product={p} /></td>
-                          <td className="px-5 py-4"><RankBadge product={p} /></td>
-                          <td className="px-5 py-4"><PriceGapBadge value={priceGap(p)} ean={p.product_ean_id} /></td>
-                          <td className="px-5 py-4"><CompetitorPrices product={p} competitorMeta={competitorMeta} /></td>
-                          <td className="px-5 py-4"><MarketGapCell product={p} competitorMeta={competitorMeta} /></td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              <Pagination 
-                currentPage={currentPage} 
-                totalPages={totalPages} 
-                itemsOnPage={competitorProducts.length} 
-                totalItems={totalItems}
-                onPageChange={handlePageChange} 
-              />
-            </>
-          )}
+      <div className="p-3 sm:p-6 bg-white dark:bg-[#0b101e] min-h-screen">
+        <div className="py-12 text-center text-sm text-gray-400 dark:text-slate-500 italic">
+          No competitors found.
         </div>
       </div>
     );
   }
 
-  // ── VIEW 1: COMPETITOR LIST ──
   return (
-    <div className="p-3 sm:p-6 bg-white dark:bg-[#0b101e] min-h-screen flex justify-center font-sans">
-      <div className="w-full max-w-[1000px] h-fit border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl overflow-hidden shadow-sm">
+    <div className="p-3 sm:p-6 bg-white dark:bg-[#0b101e] min-h-screen font-sans">
+      <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4">Competitor Listings</h2>
 
-        {/* Header */}
-        <div className="bg-[#475e77] text-white p-4 px-5">
-          <h2 className="text-xs sm:text-sm font-bold">
-            Competitor Listings <span className="hidden sm:inline">— Click a competitor to view their products</span>
-          </h2>
-        </div>
-
-        {competitors.length === 0 ? (
-          <div className="p-3 sm:p-6 bg-[#f8fafd] dark:bg-slate-800">
-            <div className="py-12 text-center text-sm text-gray-400 dark:text-slate-500 italic">
-              No competitors found.
+      {/* ── Tab bar (grouped EAN / Non-EAN) ── */}
+      <div className="flex flex-col gap-3 sm:flex-row">
+        {eanList.length > 0 && (
+          <div className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-[#151a2a]/60 p-3">
+            <div className="mb-2 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">EAN Competitors</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {eanList.map((item) => (
+                <CompetitorTab
+                  key={item.id}
+                  data={item}
+                  isActive={item.slug === selectedCompetitor?.slug}
+                  onClick={handleTabClick}
+                  liveCount={item.slug === selectedCompetitor?.slug ? (productsLoading ? "loading" : totalItems) : undefined}
+                />
+              ))}
             </div>
           </div>
-        ) : (
-          <>
-            {/* ── EAN Section ── */}
-            {eanList.length > 0 && (
-              <>
-                <div className="px-5 pt-4 pb-1 bg-[#f8fafd] dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-                  <span className="text-[11px] font-black text-gray-500 dark:text-slate-400 uppercase tracking-widest">
-                    EAN Competitors
-                  </span>
-                  <span className="text-[10px] font-bold bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300 rounded-full px-2 py-0.5">{eanList.length}</span>
-                </div>
-                {/* Column headings */}
-                <div className="hidden sm:flex px-8 pt-3 pb-2 bg-[#f8fafd] dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700">
-                  <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest w-[45%]">Competitor</span>
-                  <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest w-[20%]">Avg. Price Delta</span>
-                  <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest w-[20%]">Products Tracked</span>
-                  <span className="w-[15%]" />
-                </div>
-                <div className="p-3 sm:p-6 bg-[#f8fafd] dark:bg-slate-800">
-                  {eanList.map((item) => (
-                    <CompetitorRow key={item.id} data={item} onClick={handleCompetitorClick} />
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* ── NON-EAN Section ── */}
-            {nonEanList.length > 0 && (
-              <>
-                <div className="px-5 pt-4 pb-1 bg-[#f8fafd] dark:bg-slate-800 border-t-2 border-b border-gray-200 dark:border-slate-600 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-violet-500 inline-block" />
-                  <span className="text-[11px] font-black text-gray-500 dark:text-slate-400 uppercase tracking-widest">
-                    Non-EAN Competitors
-                  </span>
-                  <span className="text-[10px] font-bold bg-violet-100 text-violet-600 dark:bg-violet-900/40 dark:text-violet-300 rounded-full px-2 py-0.5">{nonEanList.length}</span>
-                </div>
-                {/* Column headings */}
-                <div className="hidden sm:flex px-8 pt-3 pb-2 bg-[#f8fafd] dark:bg-slate-800 border-b border-gray-100 dark:border-slate-700">
-                  <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest w-[45%]">Competitor</span>
-                  <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest w-[20%]">Avg. Price Delta</span>
-                  <span className="text-[11px] font-black text-gray-400 dark:text-slate-500 uppercase tracking-widest w-[20%]">Products Tracked</span>
-                  <span className="w-[15%]" />
-                </div>
-                <div className="p-3 sm:p-6 bg-[#f8fafd] dark:bg-slate-800">
-                  {nonEanList.map((item) => (
-                    <CompetitorRow key={item.id} data={item} onClick={handleCompetitorClick} />
-                  ))}
-                </div>
-              </>
-            )}
-          </>
+        )}
+        {nonEanList.length > 0 && (
+          <div className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-[#151a2a]/60 p-3">
+            <div className="mb-2 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-violet-500 inline-block" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-violet-500">Non-EAN Competitors</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {nonEanList.map((item) => (
+                <CompetitorTab
+                  key={item.id}
+                  data={item}
+                  isActive={item.slug === selectedCompetitor?.slug}
+                  onClick={handleTabClick}
+                  liveCount={item.slug === selectedCompetitor?.slug ? (productsLoading ? "loading" : totalItems) : undefined}
+                />
+              ))}
+            </div>
+          </div>
         )}
       </div>
+
+      {!selectedCompetitor ? (
+        <div className="py-16 text-center text-sm text-slate-400 italic">Select a competitor tab to view their products.</div>
+      ) : (
+        <div className="mt-5">
+          {/* ── Selected competitor heading ── */}
+          <div className="mb-4 flex items-center gap-2.5">
+            <CompetitorLogo name={selectedCompetitor.name} slug={selectedCompetitor.slug} logo={selectedCompetitor.logo || ""} />
+            <h3 className="text-base font-bold text-slate-800 dark:text-white">{selectedCompetitor.name}</h3>
+            <span className="text-xs text-slate-400">· product listing</span>
+            <span className="ml-1 rounded-full bg-slate-100 dark:bg-slate-700 px-2 py-0.5 text-[11px] font-bold text-slate-500 dark:text-slate-300">
+              {productsLoading ? "…" : `${totalItems.toLocaleString("en-IN")} ${totalItems === 1 ? "product" : "products"}`}
+            </span>
+          </div>
+
+          {/* ── Filters Section (Search, Export, Dropdowns) ── */}
+          <div className="mb-6 space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <div className="flex w-full sm:max-w-sm items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-blue-100 dark:focus-within:ring-blue-900/40">
+                <svg className="text-slate-400" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+                </svg>
+                <input
+                  type="text" placeholder="Search by name, brand or EAN…" value={search}
+                  onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+                  className="w-full border-0 bg-transparent text-sm text-slate-800 dark:text-white outline-none placeholder:text-slate-400"
+                />
+              </div>
+              <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                {canExport && (
+                  <button onClick={handleExport} disabled={exporting} className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] disabled:opacity-60 disabled:cursor-not-allowed transition-colors">
+                    {exporting ? (
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" className="animate-spin">
+                        <circle cx="12" cy="12" r="9" strokeOpacity="0.25" />
+                        <path d="M21 12a9 9 0 0 0-9-9" />
+                      </svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                    )}
+                    {exporting ? "Exporting…" : "Export"}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <FilterSelect label="Item Group" options={productsMeta?.itemGroups || []} value={itemGroupFilter} onChange={(v) => { setItemGroupFilter(v); setCurrentPage(1); }} />
+              <FilterSelect label="Brand" options={productsMeta?.brands || []} value={brandFilter} onChange={(v) => { setBrandFilter(v); setCurrentPage(1); }} />
+              <FilterSelect label="Category" options={productsMeta?.categories || []} value={catFilter} onChange={(v) => { setCatFilter(v); setCurrentPage(1); }} />
+              <FilterSelect label="Rank" options={productsMeta?.ranks || []} value={rankFilter} onChange={(v) => { setRankFilter(v); setCurrentPage(1); }} />
+            </div>
+          </div>
+
+          {/* Product Table */}
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+            {productsLoading ? (
+              <div className="flex min-h-[400px] items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 dark:border-slate-700 border-t-blue-500" />
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[1000px] border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-[#0b101e]/50">
+                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Product</th>
+                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price</th>
+                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Rank</th>
+                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Price Gap</th>
+                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Competitor Prices</th>
+                        <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500">Market</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                      {competitorProducts.length === 0 ? (
+                        <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-400">No products found for this competitor.</td></tr>
+                      ) : (
+                        competitorProducts.map((p) => (
+                          <tr key={p._id} className="hover:bg-slate-50 dark:hover:bg-[#151a2a]/80 transition-colors">
+                            <td className="px-5 py-4"><ProductCell product={p} /></td>
+                            <td className="px-5 py-4"><PriceCell product={p} /></td>
+                            <td className="px-5 py-4"><RankBadge product={p} /></td>
+                            <td className="px-5 py-4"><PriceGapBadge value={priceGap(p)} ean={p.product_ean_id} /></td>
+                            <td className="px-5 py-4"><CompetitorPrices product={p} competitorMeta={competitorMeta} /></td>
+                            <td className="px-5 py-4"><MarketGapCell product={p} competitorMeta={competitorMeta} /></td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  itemsOnPage={competitorProducts.length}
+                  totalItems={totalItems}
+                  onPageChange={handlePageChange}
+                />
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

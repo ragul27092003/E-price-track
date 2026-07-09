@@ -40,7 +40,7 @@ export function AppSidebar() {
                 className={cn(
                   "flex items-center justify-center rounded-lg p-2.5 transition-all duration-150",
                   isActive
-                    ? "bg-[#00a884] text-white" // Matching the teal/green color in your screenshot
+                    ? "bg-[#2B86C5] text-white" // Matching the teal/green color in your screenshot
                     : "text-sidebar-foreground hover:bg-accent hover:text-foreground"
                 )}
               >
@@ -51,9 +51,9 @@ export function AppSidebar() {
               <div className="invisible group-hover:visible absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50">
                 <div className="relative flex items-center">
                   {/* Arrow */}
-                  <div className="w-0 h-0 border-y-[6px] border-y-transparent border-r-[6px] border-r-[#00a884]" />
+                  <div className="w-0 h-0 border-y-[6px] border-y-transparent border-r-[6px] border-r-[#2B86C5]" />
                   {/* Label */}
-                  <div className="whitespace-nowrap rounded-md bg-[#00a884] px-3 py-1.5 text-sm font-medium text-white shadow-lg">
+                  <div className="whitespace-nowrap rounded-md bg-[#2B86C5] px-3 py-1.5 text-sm font-medium text-white shadow-lg">
                     {item.title}
                   </div>
                 </div>
