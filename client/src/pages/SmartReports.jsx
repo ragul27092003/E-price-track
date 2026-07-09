@@ -24,6 +24,12 @@ function getCompPrices(product) {
     .filter((c) => c.price !== null);
 }
 
+function getListedCompetitors(product) {
+  return (product.competitor_prices || [])
+    .filter((c) => c.is_listed)
+    .map((c) => ({ ...c, price: parsePrice(c.price) }));
+}
+
 function computeRank(product) {
   const ourPrice = parsePrice(product.product_price);
   if (ourPrice === null) return null;
@@ -243,6 +249,22 @@ function smoothPath(pts) {
   return d;
 }
 
+function toHistoryTimestamp(row = {}) {
+  const raw = row?.display_date || row?.date || "";
+  const ts = Date.parse(raw);
+  return Number.isNaN(ts) ? null : ts;
+}
+
+function getChronologicalHistory(priceHistory = [], days = 30) {
+  const sliced = priceHistory.slice(-days);
+  return [...sliced].sort((a, b) => {
+    const ta = toHistoryTimestamp(a);
+    const tb = toHistoryTimestamp(b);
+    if (ta !== null && tb !== null) return ta - tb;
+    return String(a?.display_date || "").localeCompare(String(b?.display_date || ""));
+  });
+}
+
 function HistoricalPriceChart({ product, days, competitorMeta }) {
   const svgRef     = useRef(null);
   const wrapperRef = useRef(null);
@@ -251,7 +273,7 @@ function HistoricalPriceChart({ product, days, competitorMeta }) {
 
   const history = useMemo(() => {
     if (!product?.price_history_30days) return [];
-    return product.price_history_30days.slice(-days);
+    return getChronologicalHistory(product.price_history_30days, days);
   }, [product, days]);
 
   const slugs = useMemo(() => getCompPrices(product).map((c) => c.slug), [product]);
@@ -469,7 +491,7 @@ function PriceGapChart({ product }) {
   const [hoverContainerY, setHoverContainerY] = useState(0);
 
   const data = useMemo(() => {
-    return (product?.price_history_30days || []).map((h) => {
+    return getChronologicalHistory(product?.price_history_30days || [], 30).map((h) => {
       const ourPrice = parsePrice(h.product_price);
       const compPrices = Object.values(h.competitors || {})
         .map((v) => parsePrice(v))
@@ -591,25 +613,29 @@ function PriceGapChart({ product }) {
 
 function CompetitorTable({ product, tab, competitorMeta }) {
   const ourPrice = parsePrice(product.product_price);
-  const comps = getCompPrices(product);
+  const listedComps = getListedCompetitors(product);
+  const comps = listedComps.filter((c) => c.price !== null);
 
  const allEntries = [
     { name: "My Price", slug: "me", price: ourPrice, isMe: true },
-    ...comps.map((c) => ({
+    ...listedComps.map((c) => ({
       ...c,
       name: competitorMeta?.[c.slug]?.name || c.name || c.slug,
       logo: competitorMeta?.[c.slug]?.logo || "",
       isMe: false,
     })),
   ]
-    .filter((e) => e.price !== null)
     .sort((a, b) => {
+      const aHasPrice = a.price !== null;
+      const bHasPrice = b.price !== null;
+      if (aHasPrice && !bHasPrice) return -1;
+      if (!aHasPrice && bHasPrice) return 1;
       if (a.price !== b.price) return a.price - b.price;
       // Tie-breaker: Place competitors (isMe: false) before our store (isMe: true)
       return a.isMe ? 1 : -1;
     });
 
-  const rank1Price = allEntries[0]?.price;
+  const rank1Price = allEntries.find((entry) => entry.price !== null)?.price ?? null;
   const colLabel = tab === "Negative Trend" ? "Higher By" : tab === "Positive Trend" ? "Higher By" : tab === "Neutral Trend" ? "Price Status" : "Cheaper By";
 
   return (
@@ -635,7 +661,10 @@ function CompetitorTable({ product, tab, competitorMeta }) {
                 diffColor = "text-rose-600";
               } else { diffLabel = "—"; }
             } else {
-              if (tab === "Positive Trend" || tab === "Easy Gain" || tab === "Neutral Trend" || tab === "Clever Move") {
+              if (entry.price === null) {
+                diffLabel = "Out of Stock";
+                diffColor = "text-slate-400";
+              } else if (tab === "Positive Trend" || tab === "Easy Gain" || tab === "Neutral Trend" || tab === "Clever Move") {
                 diffVal = entry.price - (ourPrice || 0);
                 diffLabel = diffVal >= 0 ? `${fmt(diffVal)} higher` : `${fmt(Math.abs(diffVal))} lower`;
                 diffColor = diffVal > 0 ? "text-sky-600" : "text-rose-600";
@@ -650,13 +679,39 @@ function CompetitorTable({ product, tab, competitorMeta }) {
               <tr key={entry.slug} className={`transition-colors ${entry.isMe ? "bg-blue-50/60 dark:bg-blue-950/20 font-semibold" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    {entry.isMe ? <div className="flex h-6 w-6 items-center justify-center rounded bg-[#2B86C5] text-[8px] font-bold text-white uppercase shrink-0">ME</div> : <CompetitorLogo name={entry.name} slug={entry.slug} logo={entry.logo} />}
-                    <span className="text-slate-800 dark:text-white">{entry.name}</span>
+                    {entry.isMe ? (
+                      <>
+                        <div className="flex h-6 w-6 items-center justify-center rounded bg-[#2B86C5] text-[8px] font-bold text-white uppercase shrink-0">ME</div>
+                        <span className="text-slate-800 dark:text-white">{entry.name}</span>
+                      </>
+                    ) : entry.url ? (
+                      <a
+                        href={entry.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Open ${entry.name}`}
+                        className="inline-flex items-center gap-2 text-slate-800 dark:text-white hover:text-[#1e6191] dark:hover:text-blue-400 transition-colors"
+                      >
+                        <CompetitorLogo name={entry.name} slug={entry.slug} logo={entry.logo} />
+                        <span>{entry.name}</span>
+                      </a>
+                    ) : (
+                      <>
+                        <CompetitorLogo name={entry.name} slug={entry.slug} logo={entry.logo} />
+                        <span className="text-slate-800 dark:text-white">{entry.name}</span>
+                      </>
+                    )}
                     {rankNum === 1 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 rounded-full px-1.5 py-0.5">Rank 1</span>}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-right font-bold text-slate-800 dark:text-white">{fmt(entry.price)}</td>
-                <td className="px-4 py-3 text-center"><RankBadge rank={rankNum} total={allEntries.length} /></td>
+                <td className="px-4 py-3 text-right font-bold text-slate-800 dark:text-white">
+                  {entry.price === null ? (
+                    <span className="text-slate-400 dark:text-slate-500 text-xs font-semibold uppercase tracking-wide">Out of Stock</span>
+                  ) : (
+                    fmt(entry.price)
+                  )}
+                </td>
+                <td className="px-4 py-3 text-center">{entry.price === null ? "—" : <RankBadge rank={rankNum} total={allEntries.length} />}</td>
                 <td className={`px-4 py-3 text-right text-xs font-semibold ${diffColor}`}>{diffLabel}</td>
               </tr>
             );
@@ -1168,7 +1223,7 @@ if (activeTab === "Neutral Trend") {
                     <HeaderMetrics product={selectedProduct} tab={activeTab} />
                   </div>
 
-                  {activeTab !== "Non Competitors" && getCompPrices(selectedProduct).length > 0 && (
+                  {activeTab !== "Non Competitors" && getListedCompetitors(selectedProduct).length > 0 && (
                     <div className="overflow-x-auto rounded-xl">
                       <CompetitorTable product={selectedProduct} tab={activeTab} competitorMeta={competitorMeta} />
                     </div>
