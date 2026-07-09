@@ -555,8 +555,16 @@ const MarketCompetitor = () => {
 
   // Auto-select the first active competitor once the list loads
   useEffect(() => {
-    if (!selectedCompetitor && competitors.length > 0) {
-      const firstActive = competitors.find((c) => c.isActive);
+  if (!selectedCompetitor && competitors.length > 0) {
+      const eanSorted = competitors
+        .filter((c) => c.mappingType === 'EAN')
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      const nonEanSorted = competitors
+        .filter((c) => c.mappingType === 'NON_EAN')
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+      const orderedList = [...eanSorted, ...nonEanSorted];
+      const firstActive = orderedList.find((c) => c.isActive);
       if (firstActive) setSelectedCompetitor(firstActive);
     }
   }, [competitors]);

@@ -570,11 +570,11 @@ useEffect(() => {
           </p>
         )}
  
-        {!selectedProduct ? (
-          <div className="flex h-64 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 dark:border-[#262c3d] dark:bg-[#151a2a]">
-            No products found
-          </div>
-        ) : (
+          {!selectedProduct ? (
+            <div className="flex h-64 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 dark:border-[#262c3d] dark:bg-[#151a2a]">
+              No products found
+            </div>
+          ) : (
           <>
             {/* Stat Cards - Responsive Grid */}
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -714,20 +714,30 @@ useEffect(() => {
                     <div className="mb-4 rounded border border-gray-200 p-3 shadow-sm dark:border-[#262c3d]">
                       <p className="mb-2 text-[11px] font-semibold text-gray-600 dark:text-gray-400">Lowest Price Alert</p>
                       {lowest && lowestComp ? (
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <CompetitorLogo competitor={lowestComp} size={22} />
-                            <div>
-                              <span className="text-xs font-semibold text-gray-800 dark:text-gray-300 truncate max-w-[80px] inline-block align-bottom">{lowestComp.name}</span>
-                              <span className="text-xs font-bold text-[#2a4365] dark:text-blue-400 ml-1">{fmt(lowest.price)}</span>
-                            </div>
-                          </div>
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400">
-                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" />
-                            </svg>
-                          </div>
-                        </div>
+  <div className="flex items-center justify-between">
+    {lowest.url ? (
+      <a href={lowest.url} target="_blank" rel="noopener noreferrer" title={`Open on ${lowestComp.name}`} className="flex items-center gap-2 hover:opacity-75 transition-opacity">
+        <CompetitorLogo competitor={lowestComp} size={22} />
+        <div>
+          <span className="text-xs font-semibold text-gray-800 dark:text-gray-300 truncate max-w-[80px] inline-block align-bottom">{lowestComp.name}</span>
+          <span className="text-xs font-bold text-[#2a4365] dark:text-blue-400 ml-1">{fmt(lowest.price)}</span>
+        </div>
+      </a>
+    ) : (
+      <div className="flex items-center gap-2">
+        <CompetitorLogo competitor={lowestComp} size={22} />
+        <div>
+          <span className="text-xs font-semibold text-gray-800 dark:text-gray-300 truncate max-w-[80px] inline-block align-bottom">{lowestComp.name}</span>
+          <span className="text-xs font-bold text-[#2a4365] dark:text-blue-400 ml-1">{fmt(lowest.price)}</span>
+        </div>
+      </div>
+    )}
+    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19" /><polyline points="19 12 12 19 5 12" />
+      </svg>
+    </div>
+  </div>
                       ) : (
                         <p className="text-xs text-gray-400">No competitor data</p>
                       )}
@@ -748,10 +758,18 @@ useEffect(() => {
                         const ourPrice = parsePrice(selectedProduct.product_price);
                         const diff     = ourPrice !== null ? cp.price - ourPrice : null;
                         return (
-                          <div key={cp.slug} className="flex items-center justify-between">
+                          <a
+                            key={cp.slug}
+                            href={cp.url || comp.website || "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between hover:opacity-80 transition-opacity"
+                          >
                             <div className="flex items-center gap-2">
                               <CompetitorLogo competitor={comp} size={20} />
-                              <span className="text-[11px] font-medium text-gray-700 dark:text-gray-300 truncate max-w-[70px]">{comp.name}</span>
+                              <span className="text-[11px] font-medium text-gray-700 dark:text-gray-300 truncate max-w-[70px]">
+                                {comp.name}
+                              </span>
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-bold text-gray-800 dark:text-white">{fmt(cp.price)}</span>
@@ -761,7 +779,7 @@ useEffect(() => {
                                 </span>
                               )}
                             </div>
-                          </div>
+                          </a>
                         );
                       })}
                     {!(selectedProduct.competitor_prices || []).some((c) => c.price !== null) && (
