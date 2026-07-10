@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import { useStore, selectCurrentStoreId } from "@/store";
 import { fetchCompetitorCountsData } from '../services/dashboardService';
+import { fetchSmartReportTabCounts } from '../services/smartReportsService';
 import API from "../hooks/useApi"; // Ensure this matches your API hook path
 
 // ─── animation presets ─────────────────────────────────────────────────────────
@@ -164,6 +165,7 @@ export default function Dashboard() {
   const activeShopName = useStore((s) => s.activeShopName) || "Store";
   const [activityLogs, setActivityLogs] = useState([]);
   const [logsLoading, setLogsLoading] = useState(true);
+  const [smartTabCounts, setSmartTabCounts] = useState(null);
   const isSuperAdmin = useStore((s) => s.user?.user_type === 'super_admin');
 
   const {
@@ -198,6 +200,12 @@ export default function Dashboard() {
         }
       };
       fetchCompetitorCounts();
+
+      fetchSmartReportTabCounts()
+        .then((data) => {
+          if (data?.counts) setSmartTabCounts(data.counts);
+        })
+        .catch(() => setSmartTabCounts(null));
 
       // ── Competitor Activity Log ──
       const loadActivityLog = async () => {
@@ -271,13 +279,16 @@ export default function Dashboard() {
   const goToReport = (tab) => navigate('/smart-reports', { state: { tab } });
 
   const total = stats?.varCompletedProductCount ?? '--';
+  const totalNum = Number(total) || 0;
+  const pct = (count) => (totalNum > 0 && count != null ? ((count / totalNum) * 100).toFixed(1) : null);
+
   const trendCards = [
-  { id: 'easyGain',  title: 'Easy Gain',      count: stats?.varEasyGainCount,        percent: stats?.varEasyGainPercent,        total, progressColor: 'bg-emerald-500', btnClass: 'bg-emerald-500 hover:bg-emerald-600', titleColor: 'text-amber-600',        onView: () => goToReport('Easy Gain')       },
-  { id: 'clever',    title: 'Clever Move',     count: stats?.varCleverMoveCount,       percent: stats?.varCleverMovePercent,       total, progressColor: 'bg-amber-500',  btnClass: 'bg-amber-500 hover:bg-amber-600',   titleColor: 'text-amber-500',        onView: () => goToReport('Clever Move')     },
-  { id: 'nonComp',   title: 'Non Competitors', count: stats?.varNonCompetitorCount,    percent: stats?.varNonCompetitorPercent,    total, progressColor: 'bg-rose-600',   btnClass: 'bg-rose-700 hover:bg-rose-800',    titleColor: 'text-muted-foreground', onView: () => goToReport('Non Competitors') },
-  { id: 'posTrend',  title: 'Positive Trend',  count: stats?.varPostiveTrendingCount,  percent: stats?.varPostiveTrendingPercent,  total, progressColor: 'bg-emerald-500', btnClass: 'bg-emerald-500 hover:bg-emerald-600', titleColor: 'text-emerald-600',      onView: () => goToReport('Positive Trend')  },
-  { id: 'neutTrend', title: 'Neutral Trend',   count: stats?.varEqualTrendingCount,    percent: stats?.varEqualTrendingPercent,    total, progressColor: 'bg-amber-500',  btnClass: 'bg-amber-500 hover:bg-amber-600',   titleColor: 'text-amber-500',        onView: () => goToReport('Neutral Trend')   },
-  { id: 'negTrend',  title: 'Negative Trend',  count: stats?.varNegativeTrendingCount, percent: stats?.varNegativeTrendingPercent, total, progressColor: 'bg-red-500',    btnClass: 'bg-red-500 hover:bg-red-600',      titleColor: 'text-red-500',          onView: () => goToReport('Negative Trend')  },
+  { id: 'easyGain',  title: 'Easy Gain',      count: smartTabCounts?.['Easy Gain']       ?? stats?.varEasyGainCount,        percent: pct(smartTabCounts?.['Easy Gain'])       ?? stats?.varEasyGainPercent,        total, progressColor: 'bg-emerald-500', btnClass: 'bg-emerald-500 hover:bg-emerald-600', titleColor: 'text-amber-600',        onView: () => goToReport('Easy Gain')       },
+  { id: 'clever',    title: 'Clever Move',     count: smartTabCounts?.['Clever Move']      ?? stats?.varCleverMoveCount,       percent: pct(smartTabCounts?.['Clever Move'])      ?? stats?.varCleverMovePercent,       total, progressColor: 'bg-amber-500',  btnClass: 'bg-amber-500 hover:bg-amber-600',   titleColor: 'text-amber-500',        onView: () => goToReport('Clever Move')     },
+  { id: 'nonComp',   title: 'Non Competitors', count: smartTabCounts?.['Non Competitors']  ?? stats?.varNonCompetitorCount,    percent: pct(smartTabCounts?.['Non Competitors'])  ?? stats?.varNonCompetitorPercent,    total, progressColor: 'bg-rose-600',   btnClass: 'bg-rose-700 hover:bg-rose-800',    titleColor: 'text-muted-foreground', onView: () => goToReport('Non Competitors') },
+  { id: 'posTrend',  title: 'Positive Trend',  count: smartTabCounts?.['Positive Trend']   ?? stats?.varPostiveTrendingCount,  percent: pct(smartTabCounts?.['Positive Trend'])   ?? stats?.varPostiveTrendingPercent,  total, progressColor: 'bg-emerald-500', btnClass: 'bg-emerald-500 hover:bg-emerald-600', titleColor: 'text-emerald-600',      onView: () => goToReport('Positive Trend')  },
+  { id: 'neutTrend', title: 'Neutral Trend',   count: smartTabCounts?.['Neutral Trend']    ?? stats?.varEqualTrendingCount,    percent: pct(smartTabCounts?.['Neutral Trend'])    ?? stats?.varEqualTrendingPercent,    total, progressColor: 'bg-amber-500',  btnClass: 'bg-amber-500 hover:bg-amber-600',   titleColor: 'text-amber-500',        onView: () => goToReport('Neutral Trend')   },
+  { id: 'negTrend',  title: 'Negative Trend',  count: smartTabCounts?.['Negative Trend']  ?? stats?.varNegativeTrendingCount, percent: pct(smartTabCounts?.['Negative Trend'])  ?? stats?.varNegativeTrendingPercent, total, progressColor: 'bg-red-500',    btnClass: 'bg-red-500 hover:bg-red-600',      titleColor: 'text-red-500',          onView: () => goToReport('Negative Trend')  },
 ];
 
   // Map API data into Pie Chart structure

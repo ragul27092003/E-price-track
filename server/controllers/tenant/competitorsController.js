@@ -15,7 +15,8 @@ const SLUG_TO_COLLECTION = {
 function toPrice(raw) {
   if (raw === null || raw === undefined || raw === 'No Result' || raw === 'no result' || raw === '') return null;
   const n = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(/[₹,\s]/g, ''));
-  return isNaN(n) ? null : n;
+  if (isNaN(n) || n <= 0) return null;
+  return n;
 }
 
 // ─── helper: compute avg price delta for one competitor ───────────────────────
@@ -25,7 +26,7 @@ async function computeAvgPriceDelta(db, slug, ourPriceMap) {
 
   // Only products with a real numeric price
   const cmpProducts = await db.collection(colName).find({
-    product_price: { $exists: true, $nin: ['No Result', null, '', 'no result'] },
+    product_price: { $exists: true, $nin: ['No Result', null, '', 'no result', 0, '0'] },
   }).toArray();
 
   const deltas = [];
@@ -41,7 +42,7 @@ async function computeAvgPriceDelta(db, slug, ourPriceMap) {
 
     const ourPrice = ourPriceMap[mappedProductCode];
 
-    if (!isNaN(cmpPrice) && ourPrice && ourPrice > 0) {
+    if (!isNaN(cmpPrice) && cmpPrice > 0 && ourPrice && ourPrice > 0) {
       deltas.push(((cmpPrice - ourPrice) / ourPrice) * 100);
     }
   }
@@ -99,7 +100,7 @@ async function computeProductsTracked(db, slug) {
             $match: {
               // Competitor product MUST be active, have a price, and be in stock
               status: 'active',
-              product_price: { $exists: true, $nin: ['No Result', null, '', 'no result'] },
+              product_price: { $exists: true, $nin: ['No Result', null, '', 'no result', 0, '0'] },
               product_stock: { $nin: ['Out Of Stock', 'Out of stock', 'out of stock', '0', 0] },
               
               // MUST match at least one of the IDs (ignoring nulls/empty strings)

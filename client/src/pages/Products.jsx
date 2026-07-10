@@ -9,8 +9,20 @@ import API from "../hooks/useApi";
 
 function parsePrice(raw) {
   if (raw === null || raw === undefined || raw === "No Result" || raw === "") return null;
-  const n = typeof raw === "number" ? raw : parseFloat(raw);
-  return isNaN(n) ? null : n;
+  const n = typeof raw === "number" ? raw : parseFloat(String(raw).replace(/[₹,\s]/g, ""));
+  if (isNaN(n) || n <= 0) return null;
+  return n;
+}
+
+function isCompetitorOos(c) {
+  if (
+    String(c.stock).toLowerCase().includes("out of stock") ||
+    String(c.stock) === "0"
+  ) {
+    return true;
+  }
+  // Listed but no valid price — still on site, temporarily unavailable
+  return !!(c.is_listed && (c.price == null || c.price <= 0));
 }
 
 function marketStats(product) {
@@ -175,7 +187,7 @@ function RankBadge({ product }) {
   if (!String(rank).includes('/')) {
     // Only count active competitors that are NOT out of stock
     const active = (product.competitor_prices || []).filter(
-      (c) => c.price !== null && !String(c.stock).toLowerCase().includes('out of stock') && String(c.stock) !== '0'
+      (c) => c.price != null && c.price > 0 && !String(c.stock).toLowerCase().includes('out of stock') && String(c.stock) !== '0'
     ).length;
     displayRank = `${rank}/${active + 1}`;
   }
@@ -281,7 +293,7 @@ function MarketGapCell({ product, competitorMeta }) {
   // Only compare against valid prices that are in stock
   const active = (product.competitor_prices || [])
     .map((c) => ({ ...c, price: parsePrice(c.price) }))
-    .filter((c) => c.price !== null && !String(c.stock).toLowerCase().includes('out of stock') && String(c.stock) !== '0');
+    .filter((c) => c.price != null && c.price > 0 && !String(c.stock).toLowerCase().includes('out of stock') && String(c.stock) !== '0');
 
   if (!active.length) return <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>;
 
@@ -335,8 +347,8 @@ function CompetitorPrices({ product, competitorMeta }) {
 
   // Sort: Valid in-stock prices first, then Out Of Stock
   const sorted = [...listed].sort((a, b) => {
-    const aOos = a.price === null || String(a.stock).toLowerCase().includes('out of stock') || String(a.stock) === '0';
-    const bOos = b.price === null || String(b.stock).toLowerCase().includes('out of stock') || String(b.stock) === '0';
+    const aOos = isCompetitorOos(a);
+    const bOos = isCompetitorOos(b);
     
     if (!aOos && bOos) return -1;
     if (aOos && !bOos) return 1;
@@ -348,7 +360,7 @@ function CompetitorPrices({ product, competitorMeta }) {
   <div className="flex items-center gap-6 flex-wrap">
     {sorted.map((c) => {
       const meta = competitorMeta?.[c.slug] || {};
-      const isOos = c.price === null || String(c.stock).toLowerCase().includes('out of stock') || String(c.stock) === '0';
+      const isOos = isCompetitorOos(c);
 
       return (
         <div key={c.slug} className={`flex items-center gap-2 ${isOos ? 'opacity-60 grayscale' : ''}`}>
@@ -698,7 +710,7 @@ function exportToCSV(products, exportType = "A", competitorMeta = {}) {
   if (exportType === "B") {
     const slugMap = {};
     products.forEach((p) => {
-      (p.competitor_prices || []).forEach((c) => {
+      (p.competitor_prices || []).filter((c) => c.is_listed).forEach((c) => {
         if (!slugMap[c.slug]) slugMap[c.slug] = competitorMeta?.[c.slug]?.name || c.name || c.slug;
       });
     });
@@ -706,15 +718,15 @@ function exportToCSV(products, exportType = "A", competitorMeta = {}) {
     const headers = ["Product Name", "Item Code", "Ranking Position", "Competing With", "Price", "SAP Price", "Mrp Price", "Item Groups", ...slugs.map((s) => slugMap[s])];
     const rows = products.map((p) => {
       const compMap = {};
-      (p.competitor_prices || []).forEach((c) => {
-        compMap[c.slug] = (c.price === null || c.price === undefined || c.stock === 0) ? "Out Of Stock" : c.price;
+      (p.competitor_prices || []).filter((c) => c.is_listed).forEach((c) => {
+        compMap[c.slug] = isCompetitorOos(c) ? "Out Of Stock" : c.price;
       });
       return [
         p.product_name || "", p.product_code || p.product_ean_id || "",
         p.user_notification_data?.rank_pos || p.rank_by || "", p.user_notification_data?.Competing_with ?? "",
         p.product_price ?? "", p.product_sap_price ?? "", p.product_store_price ?? "",
         p.product_item_group || p.product_category || "",
-        ...slugs.map((s) => compMap[s] ?? "Out Of Stock"),
+        ...slugs.map((s) => compMap[s] ?? ""),
       ].map(escape).join(",");
     });
     triggerDownload([headers.map(escape).join(","), ...rows].join("\r\n"));
@@ -723,10 +735,10 @@ function exportToCSV(products, exportType = "A", competitorMeta = {}) {
 
   const headers = ["Product Name", "Item Code", "Ranking Position", "Competing With", "Price", "SAP Price", "Store Price", "Item Groups", "Competitor Detail"];
   const rows = products.map((p) => {
-    const compDetail = (p.competitor_prices || []).map((c) => {
-      const outOfStock = c.price === null || c.price === undefined || c.stock === 0;
+    const compDetail = (p.competitor_prices || []).filter((c) => c.is_listed).map((c) => {
+      const outOfStock = isCompetitorOos(c);
       return outOfStock ? `${c.name} : Out Of Stock` : `${c.name} : ${c.price}`;
-    }).join(" | ");
+    }).join(", ");
     return [
       p.product_name || "", p.product_code || p.product_ean_id || "",
       p.user_notification_data?.rank_pos || p.rank_by || "", p.user_notification_data?.Competing_with ?? "",
@@ -1255,7 +1267,7 @@ export default function Products() {
                         ) : (
                           paginated.map((p) => {
                             const { low, avg, high } = marketStats(p);
-                            const active = (p.competitor_prices || []).filter((c) => c.price !== null);
+                            const active = (p.competitor_prices || []).filter((c) => c.price != null && c.price > 0);
                             return (
                               <tr key={p._id} className="hover:bg-slate-50 dark:hover:bg-[#151a2a]/80 transition-colors">
                                 <td className="px-5 py-4"><ProductCell product={p} /></td>

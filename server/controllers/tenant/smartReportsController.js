@@ -2,14 +2,17 @@ const User = require('../../models/User');
 const { enrichProducts, enrichProductsLight } = require('../../utils/productEnrichment');
 const {
   VALID_TABS,
+  TAB_API_KEYS,
   loadFilterContext,
   productMatchesTab,
+  countProductsByTab,
   matchesSearch,
   filterProductsForTab,
 } = require('../../utils/smartReportFilter');
 
 const SCAN_BATCH = 100;
 const scanCache = new Map();
+const tabCountCache = new Map();
 
 const BASE_FILTER = {
   status: 'active',
@@ -89,6 +92,65 @@ async function ensureAllProducts(db, tenantId, tab) {
   return state;
 }
 
+async function computeAllTabCounts(db, tenantId) {
+  const context = await loadFilterContext(db, tenantId);
+  const counts = Object.fromEntries(VALID_TABS.map((tab) => [tab, 0]));
+  const col = db.collection('ept_product_details_new');
+  let skip = 0;
+
+  while (true) {
+    const batch = await col.find(BASE_FILTER).skip(skip).limit(SCAN_BATCH).toArray();
+    if (!batch.length) break;
+
+    const enriched = await enrichProductsLight(db, batch);
+    const batchCounts = countProductsByTab(enriched, context);
+    for (const tab of VALID_TABS) {
+      counts[tab] += batchCounts[tab];
+    }
+
+    skip += batch.length;
+    if (batch.length < SCAN_BATCH) break;
+  }
+
+  const apiCounts = {};
+  for (const tab of VALID_TABS) {
+    apiCounts[TAB_API_KEYS[tab]] = counts[tab];
+  }
+
+  return { counts, apiCounts, context };
+}
+
+async function getCachedTabCounts(db, tenantId, force = false) {
+  if (!force && tabCountCache.has(tenantId)) {
+    return tabCountCache.get(tenantId);
+  }
+
+  const result = await computeAllTabCounts(db, tenantId);
+  tabCountCache.set(tenantId, result);
+  return result;
+}
+
+function invalidateTenantCaches(tenantId) {
+  for (const key of [...scanCache.keys()]) {
+    if (key.startsWith(`${tenantId}:`)) scanCache.delete(key);
+  }
+  tabCountCache.delete(tenantId);
+}
+
+// GET /api/smart-reports/tab-counts
+exports.getTabCounts = async (req, res) => {
+  try {
+    const db = req.tenantDb;
+    const tenantId = req.tenantId;
+    const force = req.query.refresh === '1';
+    const { counts, apiCounts } = await getCachedTabCounts(db, tenantId, force);
+    res.json({ counts, ...apiCounts });
+  } catch (err) {
+    console.error('smartReportsController.getTabCounts error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // GET /api/smart-reports?tab=Easy+Gain&page=1&limit=50&search=
 exports.getTabProducts = async (req, res) => {
   try {
@@ -116,9 +178,12 @@ exports.getTabProducts = async (req, res) => {
     }
 
     const data = list.slice((page - 1) * limit, page * limit);
+    let tabCounts = null;
     if (!search) {
       await ensureAllProducts(db, tenantId, tab);
       list = state.products;
+      const freshCounts = await getCachedTabCounts(db, tenantId, true);
+      tabCounts = freshCounts.counts;
     }
 
     const total = list.length;
@@ -130,6 +195,7 @@ exports.getTabProducts = async (req, res) => {
     res.json({
       data,
       total,
+      tabCounts,
       page,
       limit,
       totalPages: Math.max(1, Math.ceil(total / limit)),
@@ -181,7 +247,7 @@ exports.exportTab = async (req, res) => {
     const tenantId = req.tenantId;
     const context = await loadFilterContext(db, tenantId);
 
-    scanCache.delete(cacheKey(tenantId, tab));
+    invalidateTenantCaches(tenantId);
     const state = await ensureAllProducts(db, tenantId, tab);
     let list = filterProductsForTab(state.products, tab, search, context);
 

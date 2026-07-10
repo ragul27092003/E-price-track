@@ -1,5 +1,10 @@
 import API from '../hooks/useApi';
 
+export const fetchSmartReportTabCounts = (refresh = false) => {
+  const params = refresh ? '?refresh=1' : '';
+  return API.get(`/smart-reports/tab-counts${params}`).then((r) => r.data);
+};
+
 export const fetchSmartReportProducts = ({
   tab,
   page = 1,

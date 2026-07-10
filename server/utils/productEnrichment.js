@@ -1,7 +1,37 @@
 function toPrice(raw) {
-  if (raw === null || raw === undefined || raw === 'No Result' || raw === '') return null;
-  const n = typeof raw === 'number' ? raw : parseFloat(raw);
-  return isNaN(n) ? null : n;
+  if (raw === null || raw === undefined || raw === 'No Result' || raw === 'no result' || raw === '') return null;
+  const n = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(/[₹,\s]/g, ''));
+  if (isNaN(n) || n <= 0) return null;
+  return n;
+}
+
+function isRemovedProduct(raw) {
+  if (raw === null || raw === undefined || raw === '' || raw === 'No Result' || raw === 'no result') return true;
+  const n = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(/[₹,\s]/g, ''));
+  if (isNaN(n)) return true;
+  return n <= 0;
+}
+
+function isExplicitlyOosStock(raw) {
+  const stockStr = String(raw || '').toLowerCase();
+  return stockStr.includes('out of stock') || stockStr === '0';
+}
+
+function resolveListing(cd) {
+  if (!cd) return { is_listed: false, compPrice: null };
+
+  // Out of stock — product still on site, may return later
+  if (isExplicitlyOosStock(cd.product_stock)) {
+    return { is_listed: true, compPrice: toPrice(cd.product_price) };
+  }
+
+  // Removed from site — no product (0, No Result, null, empty, NaN, etc.)
+  if (isRemovedProduct(cd.product_price)) {
+    return { is_listed: false, compPrice: null };
+  }
+
+  const compPrice = toPrice(cd.product_price);
+  return { is_listed: compPrice !== null, compPrice };
 }
 
 function toStock(raw) {
@@ -76,10 +106,7 @@ function mapCompetitorPrices(product, onlineCompetitors, competitorMap) {
   return onlineCompetitors.map((comp) => {
     const slug      = comp.competitor_slug;
     const cd        = competitorMap[slug]?.[ean];
-    const compPrice = toPrice(cd?.product_price);
-    const stockStr  = String(cd?.product_stock || '').toLowerCase();
-    const isExplicitlyOos = stockStr.includes('out of stock') || stockStr === '0';
-    const is_listed = !!cd && (compPrice !== null || isExplicitlyOos);
+    const { is_listed, compPrice } = resolveListing(cd);
 
     return {
       slug,

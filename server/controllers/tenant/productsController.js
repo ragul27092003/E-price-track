@@ -4,9 +4,37 @@ const User         = require('../../models/User');
 const { buildAlertQuery } = require('../../utils/alertquery');
 
 function toPrice(raw) {
-  if (raw === null || raw === undefined || raw === 'No Result' || raw === '') return null;
-  const n = typeof raw === 'number' ? raw : parseFloat(raw);
-  return isNaN(n) ? null : n;
+  if (raw === null || raw === undefined || raw === 'No Result' || raw === 'no result' || raw === '') return null;
+  const n = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(/[₹,\s]/g, ''));
+  if (isNaN(n) || n <= 0) return null;
+  return n;
+}
+
+function isRemovedProduct(raw) {
+  if (raw === null || raw === undefined || raw === '' || raw === 'No Result' || raw === 'no result') return true;
+  const n = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(/[₹,\s]/g, ''));
+  if (isNaN(n)) return true;
+  return n <= 0;
+}
+
+function isExplicitlyOosStock(raw) {
+  const stockStr = String(raw || '').toLowerCase();
+  return stockStr.includes('out of stock') || stockStr === '0';
+}
+
+function resolveListing(cd) {
+  if (!cd) return { is_listed: false, compPrice: null };
+
+  if (isExplicitlyOosStock(cd.product_stock)) {
+    return { is_listed: true, compPrice: toPrice(cd.product_price) };
+  }
+
+  if (isRemovedProduct(cd.product_price)) {
+    return { is_listed: false, compPrice: null };
+  }
+
+  const compPrice = toPrice(cd.product_price);
+  return { is_listed: compPrice !== null, compPrice };
 }
 
 // 🆕 ADD THIS — sanitizes product_stock: only valid non-negative numbers pass through
@@ -112,16 +140,7 @@ async function enrichProducts(db, products) {
     const competitor_prices = onlineCompetitors.map((comp) => {
       const slug      = comp.competitor_slug;
       const cd        = competitorMap[slug]?.[ean];
-      const compPrice = toPrice(cd?.product_price);
-      
-      // ── THE FIX: Smart "is_listed" logic ──
-      // 1. Check if the database explicitly says it's out of stock
-      const stockStr = String(cd?.product_stock || '').toLowerCase();
-      const isExplicitlyOos = stockStr.includes('out of stock') || stockStr === '0';
-      
-      // 2. Only consider it "listed" if we have a real price OR it is explicitly out of stock.
-      // This forces "No Result" scraping errors to be ignored and hidden from the UI.
-      const is_listed = !!cd && (compPrice !== null || isExplicitlyOos);
+      const { is_listed, compPrice } = resolveListing(cd);
 
       return {
         slug,

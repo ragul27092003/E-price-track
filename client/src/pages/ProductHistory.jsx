@@ -9,7 +9,8 @@ import API from "../hooks/useApi";
 function parsePrice(raw) {
   if (raw === null || raw === undefined || raw === "No Result" || raw === "") return null;
   const n = typeof raw === "number" ? raw : parseFloat(String(raw).replace(/[₹,\s]/g, ""));
-  return isNaN(n) ? null : n;
+  if (isNaN(n) || n <= 0) return null;
+  return n;
 }
  
 function fmt(v) {

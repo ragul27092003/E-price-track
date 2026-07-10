@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useStore } from "../store";
-import { fetchSmartReportProducts, fetchSmartReportProductDetail, exportSmartReportProducts } from "../services/smartReportsService";
+import { fetchSmartReportProducts, fetchSmartReportProductDetail, exportSmartReportProducts, fetchSmartReportTabCounts } from "../services/smartReportsService";
 import { fetchCompetitors } from "../services/competitorsService";
 import API from "../hooks/useApi";
 
@@ -9,8 +9,19 @@ import API from "../hooks/useApi";
 
 function parsePrice(raw) {
   if (raw === null || raw === undefined || raw === "No Result" || raw === "") return null;
-  const n = typeof raw === "number" ? raw : parseFloat(raw);
-  return isNaN(n) ? null : n;
+  const n = typeof raw === "number" ? raw : parseFloat(String(raw).replace(/[₹,\s]/g, ""));
+  if (isNaN(n) || n <= 0) return null;
+  return n;
+}
+
+function isCompetitorOos(c) {
+  if (
+    String(c.stock).toLowerCase().includes("out of stock") ||
+    String(c.stock) === "0"
+  ) {
+    return true;
+  }
+  return !!(c.is_listed && (c.price == null || c.price <= 0));
 }
 
 function fmt(v) {
@@ -33,8 +44,9 @@ function getListedCompetitors(product) {
 // Match Products page export — Type A: single "Competitor Detail" column
 function buildProductsTypeACompetitorDetail(product) {
   return (product.competitor_prices || [])
+    .filter((c) => c.is_listed)
     .map((c) => {
-      const outOfStock = c.price === null || c.price === undefined || c.stock === 0;
+      const outOfStock = isCompetitorOos(c);
       return outOfStock ? `${c.name} : Out Of Stock` : `${c.name} : ${c.price}`;
     })
     .join(", ");
@@ -44,7 +56,7 @@ function buildProductsTypeACompetitorDetail(product) {
 function buildProductsTypeBSlugMap(products, competitorMeta) {
   const slugMap = {};
   products.forEach((p) => {
-    (p.competitor_prices || []).forEach((c) => {
+    (p.competitor_prices || []).filter((c) => c.is_listed).forEach((c) => {
       if (!slugMap[c.slug]) {
         slugMap[c.slug] = competitorMeta?.[c.slug]?.name || c.name || c.slug;
       }
@@ -55,8 +67,8 @@ function buildProductsTypeBSlugMap(products, competitorMeta) {
 
 function buildProductsTypeBCompetitorMap(product) {
   const compMap = {};
-  (product.competitor_prices || []).forEach((c) => {
-    compMap[c.slug] = (c.price === null || c.price === undefined || c.stock === 0)
+  (product.competitor_prices || []).filter((c) => c.is_listed).forEach((c) => {
+    compMap[c.slug] = isCompetitorOos(c)
       ? "Out Of Stock"
       : c.price;
   });
@@ -934,7 +946,7 @@ const HISTORY_FILTERS = [
 
 export default function SmartReports() {
   const location = useLocation();
-  const { competitors, setCompetitors, overallStatistics, fetchOverallStatistics, activeStoreId, fetchMerchant } = useStore();
+  const { competitors, setCompetitors, activeStoreId, fetchMerchant } = useStore();
   const exportType = useStore((s) => s.exportType) || "A";
   const canExport  = useStore((s) => (s.user?.export_option ?? "yes") !== "no");
 
@@ -953,7 +965,7 @@ export default function SmartReports() {
   const [exporting, setExporting] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [tabLiveTotals, setTabLiveTotals] = useState({});
+  const [tabCounts, setTabCounts] = useState(() => Object.fromEntries(TABS.map((tab) => [tab, 0])));
 
   const sidebarRef = useRef(null);
   const fetchIdRef = useRef(0);
@@ -967,12 +979,14 @@ export default function SmartReports() {
     if (activeStoreId) {
       fetchMerchant(activeStoreId);
     }
-    setTabLiveTotals({});
+    setTabCounts(Object.fromEntries(TABS.map((tab) => [tab, 0])));
+    fetchSmartReportTabCounts()
+      .then((data) => {
+        if (data?.counts) setTabCounts(data.counts);
+      })
+      .catch(() => {});
     if (!competitors.length) {
       fetchCompetitors().then((data) => setCompetitors(data)).catch(() => {});
-    }
-    if (!overallStatistics) {
-      fetchOverallStatistics();
     }
   }, [activeStoreId]);
 
@@ -1001,7 +1015,11 @@ export default function SmartReports() {
         const fetchedTotal = res?.total ?? data.length;
         setListProducts(data);
         setTotal(fetchedTotal);
-        setTabLiveTotals((prev) => ({ ...prev, [activeTab]: fetchedTotal }));
+        if (res?.tabCounts) {
+          setTabCounts(res.tabCounts);
+        } else if (!search.trim()) {
+          setTabCounts((prev) => ({ ...prev, [activeTab]: fetchedTotal }));
+        }
         setHasMore(!!res?.hasMore);
         setPage(1);
         if (data.length) {
@@ -1072,7 +1090,6 @@ export default function SmartReports() {
       if (search.trim()) {
         const fetchedTotal = res?.total ?? 0;
         setTotal(fetchedTotal);
-        setTabLiveTotals((prev) => ({ ...prev, [activeTab]: fetchedTotal }));
       }
     } catch (err) {
       console.error("Error loading more smart report products:", err);
@@ -1102,30 +1119,7 @@ export default function SmartReports() {
     return listProducts.find((p) => p.product_ean_id === selectedEan) || listProducts[0];
   }, [selectedProductDetail, listProducts, selectedEan]);
 
-  // Tab badges: dashboard stats by default; live API total once each tab has loaded
-  const tabCounts = useMemo(() => {
-    const s = overallStatistics;
-    const counts = s
-      ? {
-          "Easy Gain":       s.varEasyGainCount        ?? 0,
-          "Clever Move":     s.varCleverMoveCount       ?? 0,
-          "Non Competitors": s.varNonCompetitorCount    ?? 0,
-          "Positive Trend":  s.varPostiveTrendingCount  ?? 0,
-          "Neutral Trend":   s.varEqualTrendingCount    ?? 0,
-          "Negative Trend":  s.varNegativeTrendingCount ?? 0,
-        }
-      : Object.fromEntries(TABS.map((tab) => [tab, 0]));
-
-    if (!search.trim()) {
-      TABS.forEach((tab) => {
-        if (tabLiveTotals[tab] != null) {
-          counts[tab] = tabLiveTotals[tab];
-        }
-      });
-    }
-
-    return counts;
-  }, [overallStatistics, tabLiveTotals, search]);
+  const displayTotal = search.trim() ? total : (tabCounts[activeTab] ?? total);
 
   const handleExport = async () => {
     setExporting(true);
@@ -1230,8 +1224,8 @@ export default function SmartReports() {
               >
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">
                   {search.trim() !== ""
-                    ? `${total} Match${total !== 1 ? "es" : ""}`
-                    : `${total} Product${total !== 1 ? "s" : ""}`
+                    ? `${displayTotal} Match${displayTotal !== 1 ? "es" : ""}`
+                    : `${displayTotal} Product${displayTotal !== 1 ? "s" : ""}`
                   }
                 </p>
 
