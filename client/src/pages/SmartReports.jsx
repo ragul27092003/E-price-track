@@ -30,6 +30,39 @@ function getListedCompetitors(product) {
     .map((c) => ({ ...c, price: parsePrice(c.price) }));
 }
 
+// Match Products page export — Type A: single "Competitor Detail" column
+function buildProductsTypeACompetitorDetail(product) {
+  return (product.competitor_prices || [])
+    .map((c) => {
+      const outOfStock = c.price === null || c.price === undefined || c.stock === 0;
+      return outOfStock ? `${c.name} : Out Of Stock` : `${c.name} : ${c.price}`;
+    })
+    .join(", ");
+}
+
+// Match Products page export — Type B: one column per competitor slug
+function buildProductsTypeBSlugMap(products, competitorMeta) {
+  const slugMap = {};
+  products.forEach((p) => {
+    (p.competitor_prices || []).forEach((c) => {
+      if (!slugMap[c.slug]) {
+        slugMap[c.slug] = competitorMeta?.[c.slug]?.name || c.name || c.slug;
+      }
+    });
+  });
+  return slugMap;
+}
+
+function buildProductsTypeBCompetitorMap(product) {
+  const compMap = {};
+  (product.competitor_prices || []).forEach((c) => {
+    compMap[c.slug] = (c.price === null || c.price === undefined || c.stock === 0)
+      ? "Out Of Stock"
+      : c.price;
+  });
+  return compMap;
+}
+
 function computeRank(product) {
   const ourPrice = parsePrice(product.product_price);
   if (ourPrice === null) return null;
@@ -844,13 +877,7 @@ function exportSmartReportCSV(products, tab, competitorMeta, exportType = "A") {
 
   let slugMap = {};
   if (exportType === "B" && !isNonComp) {
-    products.forEach((p) => {
-      (p.competitor_prices || []).forEach((c) => {
-        if (!slugMap[c.slug]) {
-          slugMap[c.slug] = competitorMeta?.[c.slug]?.name || c.name || c.slug;
-        }
-      });
-    });
+    slugMap = buildProductsTypeBSlugMap(products, competitorMeta);
   }
   const bSlugs = Object.keys(slugMap);
 
@@ -883,14 +910,10 @@ function exportSmartReportCSV(products, tab, competitorMeta, exportType = "A") {
     if (isNonComp) {
       row = [p.product_name || "", p.product_ean_id || p.product_code || "", fmtNum(ourPrice), sap, store, p.product_brand || "", pGroup, fmtNum(low), fmtNum(avg), fmtNum(high), p.product_stock ?? ""];
     } else if (exportType === "B") {
-      const compMap = {};
-      (p.competitor_prices || []).forEach((c) => {
-        const outOfStock = c.price === null || c.price === undefined || c.stock === 0;
-        compMap[c.slug] = outOfStock ? "Out Of Stock" : c.price;
-      });
+      const compMap = buildProductsTypeBCompetitorMap(p);
       row = [p.product_name || "", p.product_ean_id || p.product_code || "", rank !== null ? `="${rank}/${rankTotal}"` : "", fmtNum(ourPrice), sap, store, fmtNum(gapAmount), lowestName, fmtNum(lowest?.price), p.product_brand || "", pGroup, p.product_stock ?? "", ...bSlugs.map((s) => compMap[s] ?? "Out Of Stock")];
     } else {
-      const compDetail = comps.map((c) => { const m = competitorMeta?.[c.slug] || {}; return `${m.name || c.name || c.slug}: ₹${c.price.toLocaleString("en-IN")}`; }).join(" | ");
+      const compDetail = buildProductsTypeACompetitorDetail(p);
       row = [p.product_name || "", p.product_ean_id || p.product_code || "", rank !== null ? `="${rank}/${rankTotal}"` : "", fmtNum(ourPrice), sap, store, fmtNum(gapAmount), lowestName, fmtNum(lowest?.price), p.product_brand || "", pGroup, compDetail, p.product_stock ?? ""];
     }
     return row.map(escape).join(",");
@@ -911,7 +934,7 @@ const HISTORY_FILTERS = [
 
 export default function SmartReports() {
   const location = useLocation();
-  const { competitors, setCompetitors, overallStatistics, fetchOverallStatistics, activeStoreId } = useStore();
+  const { competitors, setCompetitors, overallStatistics, fetchOverallStatistics, activeStoreId, fetchMerchant } = useStore();
   const exportType = useStore((s) => s.exportType) || "A";
   const canExport  = useStore((s) => (s.user?.export_option ?? "yes") !== "no");
 
@@ -930,6 +953,7 @@ export default function SmartReports() {
   const [exporting, setExporting] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [tabLiveTotals, setTabLiveTotals] = useState({});
 
   const sidebarRef = useRef(null);
   const fetchIdRef = useRef(0);
@@ -940,6 +964,10 @@ export default function SmartReports() {
   }, [searchInput]);
 
   useEffect(() => {
+    if (activeStoreId) {
+      fetchMerchant(activeStoreId);
+    }
+    setTabLiveTotals({});
     if (!competitors.length) {
       fetchCompetitors().then((data) => setCompetitors(data)).catch(() => {});
     }
@@ -957,7 +985,6 @@ export default function SmartReports() {
       setListProducts([]);
       setPage(1);
       setHasMore(false);
-      setTotal(0);
       setSelectedEan(null);
       setSelectedProductDetail(null);
 
@@ -971,8 +998,10 @@ export default function SmartReports() {
         if (!isMounted || fetchId !== fetchIdRef.current) return;
 
         const data = res?.data || [];
+        const fetchedTotal = res?.total ?? data.length;
         setListProducts(data);
-        setTotal(res?.total ?? data.length);
+        setTotal(fetchedTotal);
+        setTabLiveTotals((prev) => ({ ...prev, [activeTab]: fetchedTotal }));
         setHasMore(!!res?.hasMore);
         setPage(1);
         if (data.length) {
@@ -1041,7 +1070,9 @@ export default function SmartReports() {
       setPage(nextPage);
       setHasMore(!!res?.hasMore);
       if (search.trim()) {
-        setTotal(res?.total ?? 0);
+        const fetchedTotal = res?.total ?? 0;
+        setTotal(fetchedTotal);
+        setTabLiveTotals((prev) => ({ ...prev, [activeTab]: fetchedTotal }));
       }
     } catch (err) {
       console.error("Error loading more smart report products:", err);
@@ -1071,21 +1102,30 @@ export default function SmartReports() {
     return listProducts.find((p) => p.product_ean_id === selectedEan) || listProducts[0];
   }, [selectedProductDetail, listProducts, selectedEan]);
 
-  // Maps the backend statistics directly into tab counts instantly on load
+  // Tab badges: dashboard stats by default; live API total once each tab has loaded
   const tabCounts = useMemo(() => {
     const s = overallStatistics;
-    if (s) {
-      return {
-        "Easy Gain":       s.varEasyGainCount        ?? 0,
-        "Clever Move":     s.varCleverMoveCount       ?? 0,
-        "Non Competitors": s.varNonCompetitorCount    ?? 0,
-        "Positive Trend":  s.varPostiveTrendingCount  ?? 0,
-        "Neutral Trend":   s.varEqualTrendingCount    ?? 0,
-        "Negative Trend":  s.varNegativeTrendingCount ?? 0,
-      };
+    const counts = s
+      ? {
+          "Easy Gain":       s.varEasyGainCount        ?? 0,
+          "Clever Move":     s.varCleverMoveCount       ?? 0,
+          "Non Competitors": s.varNonCompetitorCount    ?? 0,
+          "Positive Trend":  s.varPostiveTrendingCount  ?? 0,
+          "Neutral Trend":   s.varEqualTrendingCount    ?? 0,
+          "Negative Trend":  s.varNegativeTrendingCount ?? 0,
+        }
+      : Object.fromEntries(TABS.map((tab) => [tab, 0]));
+
+    if (!search.trim()) {
+      TABS.forEach((tab) => {
+        if (tabLiveTotals[tab] != null) {
+          counts[tab] = tabLiveTotals[tab];
+        }
+      });
     }
-    return Object.fromEntries(TABS.map((tab) => [tab, 0]));
-  }, [overallStatistics]);
+
+    return counts;
+  }, [overallStatistics, tabLiveTotals, search]);
 
   const handleExport = async () => {
     setExporting(true);

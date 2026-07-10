@@ -120,7 +120,7 @@ function exportToCSV(products, exportType = "A", competitorMeta = {}) {
     const compDetail = (p.competitor_prices || []).map((c) => {
       const outOfStock = c.price === null || c.price === undefined || c.stock === 0;
       return outOfStock ? `${c.name} : Out Of Stock` : `${c.name} : ${c.price}`;
-    }).join(" | ");
+    }).join(", ");
     return [
       p.product_name || "", p.product_code || p.product_ean_id || "",
       p.user_notification_data?.rank_pos || p.rank_by || "", p.user_notification_data?.Competing_with ?? "",

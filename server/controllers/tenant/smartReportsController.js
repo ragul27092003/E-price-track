@@ -2,7 +2,7 @@ const User = require('../../models/User');
 const { enrichProducts, enrichProductsLight } = require('../../utils/productEnrichment');
 const {
   VALID_TABS,
-  TAB_COUNT_FIELDS,
+  loadFilterContext,
   productMatchesTab,
   matchesSearch,
   filterProductsForTab,
@@ -23,13 +23,26 @@ function cacheKey(tenantId, tab) {
 function getOrCreateScanState(tenantId, tab) {
   const key = cacheKey(tenantId, tab);
   if (!scanCache.has(key)) {
-    scanCache.set(key, { products: [], scanSkip: 0, scanComplete: false });
+    scanCache.set(key, {
+      products: [],
+      scanSkip: 0,
+      scanComplete: false,
+      context: null,
+    });
   }
   return scanCache.get(key);
 }
 
-async function scanMoreProducts(db, tab, state) {
+async function ensureContext(db, tenantId, state) {
+  if (!state.context) {
+    state.context = await loadFilterContext(db, tenantId);
+  }
+  return state.context;
+}
+
+async function scanMoreProducts(db, tab, state, tenantId) {
   const col = db.collection('ept_product_details_new');
+  const context = await ensureContext(db, tenantId, state);
 
   while (!state.scanComplete) {
     const batch = await col.find(BASE_FILTER).skip(state.scanSkip).limit(SCAN_BATCH).toArray();
@@ -40,7 +53,7 @@ async function scanMoreProducts(db, tab, state) {
 
     const enriched = await enrichProductsLight(db, batch);
     for (const product of enriched) {
-      if (productMatchesTab(product, tab)) {
+      if (productMatchesTab(product, tab, context)) {
         state.products.push(product);
       }
     }
@@ -59,7 +72,7 @@ async function ensureProducts(db, tenantId, tab, minCount) {
   const state = getOrCreateScanState(tenantId, tab);
 
   while (state.products.length < minCount && !state.scanComplete) {
-    await scanMoreProducts(db, tab, state);
+    await scanMoreProducts(db, tab, state, tenantId);
     if (state.scanComplete) break;
   }
 
@@ -70,23 +83,10 @@ async function ensureAllProducts(db, tenantId, tab) {
   const state = getOrCreateScanState(tenantId, tab);
 
   while (!state.scanComplete) {
-    await scanMoreProducts(db, tab, state);
+    await scanMoreProducts(db, tab, state, tenantId);
   }
 
   return state;
-}
-
-async function getTabCountFromStats(db, tab) {
-  const docs = await db
-    .collection('ept_dashboard_overall_statistics')
-    .find({ status: 'active' })
-    .sort({ _id: -1 })
-    .limit(1)
-    .toArray();
-
-  if (!docs.length) return 0;
-  const field = TAB_COUNT_FIELDS[tab];
-  return docs[0][field] ?? 0;
 }
 
 // GET /api/smart-reports?tab=Easy+Gain&page=1&limit=50&search=
@@ -111,14 +111,12 @@ exports.getTabProducts = async (req, res) => {
       : state.products;
 
     while (search && list.length < needed && !state.scanComplete) {
-      await scanMoreProducts(db, tab, state);
+      await scanMoreProducts(db, tab, state, tenantId);
       list = state.products.filter((p) => matchesSearch(p, search));
     }
 
     const data = list.slice((page - 1) * limit, page * limit);
     if (!search) {
-      // Keep tab count consistent with export by using the same live filter source.
-      // This completes a full scan once and then serves from cache.
       await ensureAllProducts(db, tenantId, tab);
       list = state.products;
     }
@@ -181,10 +179,11 @@ exports.exportTab = async (req, res) => {
 
     const db = req.tenantDb;
     const tenantId = req.tenantId;
-    // Always rebuild this tab cache for export to avoid stale in-memory matches.
+    const context = await loadFilterContext(db, tenantId);
+
     scanCache.delete(cacheKey(tenantId, tab));
     const state = await ensureAllProducts(db, tenantId, tab);
-    let list = filterProductsForTab(state.products, tab, search);
+    let list = filterProductsForTab(state.products, tab, search, context);
 
     if (tab === 'Non Competitors' && list.length) {
       list = await enrichProducts(db, list);
