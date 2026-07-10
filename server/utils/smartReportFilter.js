@@ -1,3 +1,5 @@
+const { toPrice } = require('./productEnrichment');
+
 const VALID_TABS = [
   'Easy Gain',
   'Clever Move',
@@ -25,14 +27,6 @@ const TAB_API_KEYS = {
   'Negative Trend':  'negativeTrend',
 };
 
-// Mirrors PHP: floatval(trim(preg_replace('/[^a-zA-Z0-9.]/', '', $value)))
-function parsePhpPrice(raw) {
-  if (raw === null || raw === undefined || raw === '' || raw === 'No Result') return null;
-  const n = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(/[^a-zA-Z0-9.]/g, ''));
-  if (isNaN(n) || n <= 0) return null;
-  return n;
-}
-
 function isActiveProduct(product) {
   return (
     product.status === 'active' &&
@@ -40,224 +34,168 @@ function isActiveProduct(product) {
   );
 }
 
-function getRankPos(product) {
-  const raw = product.user_notification_data?.rank_pos ?? product.rank_pos ?? product.rank_by;
-  if (raw === null || raw === undefined) return null;
-  const s = String(raw).trim();
-  return s === '' ? null : s;
+// Mirrors productEnrichment.js's isExplicitlyOosStock — a competitor whose
+// live stock string says "out of stock" (or "0") must not be treated as the
+// "next competitor" for Easy Gain, even though it still counts for ranking.
+function isOutOfStock(comp) {
+  const s = String(comp.stock ?? '').toLowerCase();
+  return s.includes('out of stock') || s === '0';
 }
 
-function getCompetitorDetailsPrice(product, slug) {
-  if (!slug) return null;
-  const details = product[`${slug}_details`];
-  if (!Array.isArray(details) || !details.length) return null;
-  return parsePhpPrice(details[0]?.product_price);
+function getOurPrice(product) {
+  return toPrice(product.product_price);
 }
 
-function getRankPrice(product, slug) {
-  if (!slug) return null;
-  const detailsPrice = getCompetitorDetailsPrice(product, slug);
-  if (detailsPrice !== null) return detailsPrice;
-
-  const rankPrices = product.arrrank_price_by;
-  if (!rankPrices) return null;
-  if (typeof rankPrices === 'object' && !Array.isArray(rankPrices)) {
-    return parsePhpPrice(rankPrices[slug]);
-  }
-  return parsePhpPrice(rankPrices[slug]);
+// Only competitors that are actually listed with a real price count — this
+// is the SAME live data (built by enrichProductsLight/enrichProducts) that
+// drives the Rank badge and price panel on screen, so tab classification
+// can never disagree with what the user sees on the product page again.
+function getLiveCompetitors(product) {
+  return (product.competitor_prices || [])
+    .filter((c) => c && c.is_listed && c.price !== null && c.price !== undefined)
+    .map((c) => ({ ...c, price: toPrice(c.price) }))
+    .filter((c) => c.price !== null)
+    .sort((a, b) => a.price - b.price);
 }
 
-function getRankNames(product) {
-  return Array.isArray(product.arrrank_name_by) ? product.arrrank_name_by : [];
-}
-
-function findCompanyRankIndex(rankNames, companyIds = []) {
-  const ids = Array.isArray(companyIds) ? companyIds : [companyIds];
-  for (const companyId of ids) {
-    if (!companyId) continue;
-    const target = String(companyId).toLowerCase();
-    const idx = rankNames.findIndex((name) => String(name).toLowerCase() === target);
-    if (idx >= 0) return idx;
-  }
-  return -1;
-}
-
-function getStoredHigherBy(product) {
-  const raw = product.higher_by ?? product.user_notification_data?.higher_by;
-  if (raw === null || raw === undefined || raw === '') return null;
-  const n = parsePhpPrice(raw);
-  return n === null ? null : n;
-}
-
-function computeTrendHigherBy(product) {
-  if (getRankPos(product) === null) return null;
-
-  const ourPrice = parsePhpPrice(product.product_price);
+// Single pass that computes everything the tab rules need for a product:
+// our price, the live-sorted competitor list, our live rank, and the
+// competitor sitting directly "above" us (the one we need to beat/match).
+function getLiveTrendContext(product) {
+  const ourPrice = getOurPrice(product);
   if (ourPrice === null) return null;
 
-  const rankNames = getRankNames(product);
-  const rank1Slug = product.price_rank_1 || rankNames[0];
-  const rank1Price = getRankPrice(product, rank1Slug);
-  if (rank1Price === null) return null;
+  const sorted = getLiveCompetitors(product);
+  const cheaperOrEqualCount = sorted.filter((c) => c.price <= ourPrice).length;
+  const rank = cheaperOrEqualCount + 1;
+  const aboveIdx = cheaperOrEqualCount - 1;
+  const aboveComp = aboveIdx >= 0 && aboveIdx < sorted.length ? sorted[aboveIdx] : null;
 
-  return ourPrice - rank1Price;
+  return { ourPrice, sorted, rank, aboveComp };
 }
 
-function getTrendHigherBy(product) {
-  return getStoredHigherBy(product) ?? computeTrendHigherBy(product);
+// ── Positive Trend: we are currently rank 1 ─────────────────────────────────
+function matchesPositiveTrend(product) {
+  const ctx = getLiveTrendContext(product);
+  return !!ctx && ctx.rank === 1;
 }
 
-// ── PHP: ESY_GN ─────────────────────────────────────────────────────────────
+// ── Easy Gain ────────────────────────────────────────────────────────────────
+// Rules: we must be rank 1 right now. Compare against the cheapest competitor
+// who actually has a live, IN-STOCK price — out-of-stock competitors are
+// skipped, not just the fixed "rank 2" slot. The gap must clear the
+// per-store easyGainPercentage threshold (0 if the store has no override).
 function matchesEasyGain(product, easyGainPercentage = 0) {
-  const ourPrice = parsePhpPrice(product.product_price);
-  const rank2Slug = product.price_rank_2;
-  const rank2Price = getCompetitorDetailsPrice(product, rank2Slug);
+  const ctx = getLiveTrendContext(product);
+  if (!ctx || ctx.rank !== 1) return false;
 
-  if (ourPrice === null || ourPrice <= 0 || rank2Price === null || rank2Price <= 0) {
-    return false;
-  }
-  if (ourPrice > rank2Price) return false;
+  const nextComp = ctx.sorted.find((c) => !isOutOfStock(c));
+  if (!nextComp) return false;
 
-  const percentageDifference = Math.round(((rank2Price - ourPrice) / rank2Price) * 100);
+  const compPrice = nextComp.price;
+  if (ctx.ourPrice > compPrice) return false;
+
+  const percentageDifference = Math.round(((compPrice - ctx.ourPrice) / compPrice) * 100);
   if (percentageDifference < easyGainPercentage) return false;
 
-  const higherBy = rank2Price - ourPrice;
-  return higherBy !== 0;
+  return compPrice - ctx.ourPrice !== 0;
 }
 
-// ── PHP: CLVR_MV ────────────────────────────────────────────────────────────
-function matchesCleverMove(product, companyIds) {
-  const rankBy = parseInt(product.rank_by, 10);
-  if (isNaN(rankBy) || rankBy <= 1) return false;
+// ── Clever Move ──────────────────────────────────────────────────────────────
+// We are NOT rank 1, but we're matching or just ₹1 above the competitor
+// immediately above us — a tiny price drop would leapfrog them.
+function matchesCleverMove(product) {
+  const ctx = getLiveTrendContext(product);
+  if (!ctx || ctx.rank <= 1 || !ctx.aboveComp) return false;
 
-  const rankNames = getRankNames(product);
-  if (!rankNames.length) return false;
-
-  let compPos = -1;
-  const ourPos = findCompanyRankIndex(rankNames, companyIds);
-  if (ourPos > 0) {
-    compPos = ourPos - 1;
-  } else if (rankBy > 1 && rankNames.length >= rankBy - 1) {
-    compPos = rankBy - 2;
-  }
-
-  if (compPos < 0) return false;
-
-  const compSlug = rankNames[compPos];
-  const compPrice = getRankPrice(product, compSlug);
-  const ourPrice = parsePhpPrice(product.product_price);
-
-  if (compPrice === null || ourPrice === null) return false;
-  if (compPrice > ourPrice) return false;
-
-  const difference = ourPrice - compPrice;
+  const difference = ctx.ourPrice - ctx.aboveComp.price;
   return difference === 0 || difference === 1;
 }
 
-// ── PHP: Non competitors (no priced competitors in rank map) ────────────────
+// ── Non Competitors: nobody with a live, listed price to compare against ────
 function matchesNonCompetitors(product) {
-  const rankNames = getRankNames(product);
-  if (!rankNames.length) return true;
-  if (rankNames.length === 1) return true;
-
-  const rankPrices = product.arrrank_price_by;
-  if (!rankPrices || typeof rankPrices !== 'object') return rankNames.length <= 1;
-
-  const pricedCompetitors = Object.entries(rankPrices).filter(([, price]) => {
-    const p = parsePhpPrice(price);
-    return p !== null && p > 0;
-  });
-
-  return pricedCompetitors.length === 0;
+  return getLiveCompetitors(product).length === 0;
 }
 
-// ── PHP: POS_TREND — rank 1 ─────────────────────────────────────────────────
-function matchesPositiveTrend(product) {
-  const rankBy = parseInt(product.rank_by, 10);
-  return !isNaN(rankBy) && rankBy === 1;
-}
-
-// ── PHP: EQL_TREND ──────────────────────────────────────────────────────────
+// ── Neutral Trend: tied in price with EVERY competitor ranked at-or-above us ─
+// Not enough for just the immediately-above competitor to match — if any
+// competitor between us and rank 1 has a different (lower) price, we're
+// not truly tied, we're just tied with one of several distinct price points.
+// e.g. Amazon 1999 (rank1), Croma 2000 (rank2), us 2000 (rank3) -> NOT neutral,
+// because Amazon's 1999 breaks the tie. Only 1999/1999/1999 all-round is neutral.
 function matchesNeutralTrend(product) {
-  const trendType = product.trend_type;
-  const higherBy = getTrendHigherBy(product);
-  if (trendType) {
-    return trendType === 'EQUAL_TREND' && higherBy === 0;
-  }
-  return higherBy === 0 && getRankNames(product).length > 1;
+  const ctx = getLiveTrendContext(product);
+  if (!ctx || ctx.rank <= 1) return false;
+
+  // All competitors priced <= us (i.e. ranked ahead of/tied with us) — since
+  // ctx.sorted is ascending, these are exactly the first (rank - 1) entries.
+  const previousComps = ctx.sorted.slice(0, ctx.rank - 1);
+  if (previousComps.length === 0) return false;
+
+  return previousComps.every((c) => c.price === ctx.ourPrice);
 }
 
-// ── PHP: NGV_TREND ──────────────────────────────────────────────────────────
+// ── Negative Trend: priced higher than AT LEAST ONE competitor ranked
+// at-or-above us — i.e. higher_by > 0 against any of them, not just the
+// immediately-above one. This is the natural complement of Neutral Trend:
+// previousComps are all <= ourPrice by definition, so if they're not ALL
+// equal to us (Neutral), at least one must be strictly cheaper than us.
+// e.g. Amazon 1999 (rank1), Croma 2000 (rank2), us 2000 (rank3) -> Negative,
+// because we're higher_by 1 against Amazon even though tied with Croma.
 function matchesNegativeTrend(product) {
-  const stored = product.higher_by ?? product.user_notification_data?.higher_by;
-  if (stored !== null && stored !== undefined && String(stored).trim() !== '') {
-    const n = parsePhpPrice(stored);
-    return n !== null && n !== 0;
+  const ctx = getLiveTrendContext(product);
+  if (!ctx || ctx.rank <= 1) return false;
+
+  const previousComps = ctx.sorted.slice(0, ctx.rank - 1);
+  if (previousComps.length === 0) return false;
+
+  return previousComps.some((c) => c.price < ctx.ourPrice);
+}
+
+function escapeRegex(str) {
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Per-store Easy Gain % lives in the shared admin database, not the tenant
+// stats collection: plm_admin_manage_info.plm_admin_companies.trend_report.easy_gain.percentage
+// Falls back to 0 when the store has no override / no trend_report field at all.
+async function loadEasyGainPercentage(db, tenantId) {
+  try {
+    const adminDb = db.client.db('plm_admin_manage_info');
+    const col = adminDb.collection('plm_admin_companies');
+
+    let companyDoc = await col.findOne({ cmpid: tenantId }, { projection: { trend_report: 1 } });
+    if (!companyDoc) {
+      companyDoc = await col.findOne(
+        { cmpid: { $regex: `^${escapeRegex(tenantId)}$`, $options: 'i' } },
+        { projection: { trend_report: 1 } }
+      );
+    }
+
+    const pct = companyDoc?.trend_report?.easy_gain?.percentage;
+    return typeof pct === 'number' && !isNaN(pct) ? pct : 0;
+  } catch {
+    return 0;
   }
-  const higherBy = computeTrendHigherBy(product);
-  return higherBy !== null && higherBy > 0;
 }
 
 async function loadFilterContext(db, tenantId) {
-  const docs = await db
-    .collection('ept_dashboard_overall_statistics')
-    .find({ status: 'active' })
-    .sort({ _id: -1 })
-    .limit(1)
-    .toArray();
-
-  const stats = docs[0] || {};
-
-  const companyIds = [tenantId];
-  if (stats.company_id) companyIds.push(stats.company_id);
-  if (stats.cmpid) companyIds.push(stats.cmpid);
-  if (stats.store_slug) companyIds.push(stats.store_slug);
-
-  try {
-    const ownComp = await db.collection('ept_competitor_info').findOne({
-      competitor_status: 'enable',
-      $or: [
-        { competitor_slug: tenantId },
-        { cmpid: tenantId },
-      ],
-    });
-    if (ownComp?.competitor_slug) companyIds.push(ownComp.competitor_slug);
-  } catch {
-    // optional lookup
-  }
-
-  const uniqueCompanyIds = [...new Set(companyIds.filter(Boolean))];
-
-  return {
-    companyId: tenantId,
-    companyIds: uniqueCompanyIds,
-    easyGainPercentage:
-      stats.varEasyGainPercentage ??
-      stats.var_easy_gain_percentage ??
-      stats.varEasyGainPercentThreshold ??
-      0,
-  };
+  const easyGainPercentage = await loadEasyGainPercentage(db, tenantId);
+  return { easyGainPercentage };
 }
 
 function productMatchesTab(product, tab, context = {}) {
   if (!VALID_TABS.includes(tab)) return false;
   if (!isActiveProduct(product)) return false;
 
-  const companyIds = context.companyIds || [context.companyId].filter(Boolean);
   const easyGainPercentage = context.easyGainPercentage ?? 0;
 
-  if (tab === 'Non Competitors') {
-    return matchesNonCompetitors(product);
-  }
-
-  const ourPrice = parsePhpPrice(product.product_price);
-  if (ourPrice === null) return false;
-
-  if (tab === 'Easy Gain') return matchesEasyGain(product, easyGainPercentage);
-  if (tab === 'Clever Move') return matchesCleverMove(product, companyIds);
-  if (tab === 'Positive Trend') return matchesPositiveTrend(product);
-  if (tab === 'Neutral Trend') return matchesNeutralTrend(product);
-  if (tab === 'Negative Trend') return matchesNegativeTrend(product);
+  if (tab === 'Non Competitors') return matchesNonCompetitors(product);
+  if (tab === 'Easy Gain')       return matchesEasyGain(product, easyGainPercentage);
+  if (tab === 'Clever Move')     return matchesCleverMove(product);
+  if (tab === 'Positive Trend')  return matchesPositiveTrend(product);
+  if (tab === 'Neutral Trend')   return matchesNeutralTrend(product);
+  if (tab === 'Negative Trend')  return matchesNegativeTrend(product);
 
   return false;
 }
