@@ -1017,7 +1017,8 @@ export default function SmartReports() {
         setTotal(fetchedTotal);
         if (res?.tabCounts) {
           setTabCounts(res.tabCounts);
-        } else if (!search.trim()) {
+        }
+        if (!search.trim()) {
           setTabCounts((prev) => ({ ...prev, [activeTab]: fetchedTotal }));
         }
         setHasMore(!!res?.hasMore);
@@ -1119,7 +1120,7 @@ export default function SmartReports() {
     return listProducts.find((p) => p.product_ean_id === selectedEan) || listProducts[0];
   }, [selectedProductDetail, listProducts, selectedEan]);
 
-  const displayTotal = search.trim() ? total : (tabCounts[activeTab] ?? total);
+  const displayTotal = search.trim() ? total : (total > 0 ? total : (tabCounts[activeTab] ?? 0));
 
   const handleExport = async () => {
     setExporting(true);

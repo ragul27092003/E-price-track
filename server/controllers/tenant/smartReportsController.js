@@ -184,6 +184,8 @@ exports.getTabProducts = async (req, res) => {
       list = state.products;
       const freshCounts = await getCachedTabCounts(db, tenantId, true);
       tabCounts = freshCounts.counts;
+      // Keep the active tab count in sync with the scanned product list
+      tabCounts[tab] = list.length;
     }
 
     const total = list.length;
