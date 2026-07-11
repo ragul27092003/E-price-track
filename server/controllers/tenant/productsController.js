@@ -3,7 +3,47 @@ const mongoose     = require('mongoose');
 const User         = require('../../models/User');
 const { buildAlertQuery } = require('../../utils/alertquery');
 
-const { toPrice, toStock } = require('../../utils/priceUtils');
+function toPrice(raw) {
+  if (raw === null || raw === undefined || raw === 'No Result' || raw === 'no result' || raw === '') return null;
+  const n = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(/[₹,\s]/g, ''));
+  if (isNaN(n) || n <= 0) return null;
+  return n;
+}
+
+function isRemovedProduct(raw) {
+  if (raw === null || raw === undefined || raw === '' || raw === 'No Result' || raw === 'no result') return true;
+  const n = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(/[₹,\s]/g, ''));
+  if (isNaN(n)) return true;
+  return n <= 0;
+}
+
+function isExplicitlyOosStock(raw) {
+  const stockStr = String(raw || '').toLowerCase();
+  return stockStr.includes('out of stock') || stockStr === '0';
+}
+
+function resolveListing(cd) {
+  if (!cd) return { is_listed: false, compPrice: null };
+
+  if (isExplicitlyOosStock(cd.product_stock)) {
+    return { is_listed: true, compPrice: toPrice(cd.product_price) };
+  }
+
+  if (isRemovedProduct(cd.product_price)) {
+    return { is_listed: false, compPrice: null };
+  }
+
+  const compPrice = toPrice(cd.product_price);
+  return { is_listed: compPrice !== null, compPrice };
+}
+
+// 🆕 ADD THIS — sanitizes product_stock: only valid non-negative numbers pass through
+function toStock(raw) {
+  if (raw === null || raw === undefined || raw === 'No Result' || raw === '') return null;
+  const n = typeof raw === 'number' ? raw : parseFloat(raw);
+  return (isNaN(n) || n < 0) ? null : n;
+}
+
 
 // ── Shared enrichment: adds competitor_prices + price_history_30days to each product ──
 async function enrichProducts(db, products) {
