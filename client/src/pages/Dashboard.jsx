@@ -166,6 +166,7 @@ export default function Dashboard() {
   const [activityLogs, setActivityLogs] = useState([]);
   const [logsLoading, setLogsLoading] = useState(true);
   const [smartTabCounts, setSmartTabCounts] = useState(null);
+  const [webUpdateStatus, setWebUpdateStatus] = useState(null); // { status, var_end_time } — nandilathgmart only
   const isSuperAdmin = useStore((s) => s.user?.user_type === 'super_admin');
 
   const {
@@ -186,6 +187,15 @@ export default function Dashboard() {
       fetchOverallStatistics();
       fetchRankAnalysis();
       fetchBrandAnalyticsBrands();
+
+      // ── WEB Price Update Status (nandilathgmart only) ──
+      if (activeShopName?.toLowerCase() === 'nandilathgmart') {
+        API.get('/dashboard/web-update-status')
+          .then((res) => setWebUpdateStatus(res.data))
+          .catch(() => setWebUpdateStatus(null));
+      } else {
+        setWebUpdateStatus(null);
+      }
 
       // Fetch the competitor counts for the list and pie chart
       const fetchCompetitorCounts = async () => {
@@ -356,7 +366,20 @@ export default function Dashboard() {
         <KpiCard
           label={`SAP : ${sap.date}`}
           value={sap.time}
-          subtext={`${activeShopName.toUpperCase()} Price Last Updated On This App`}
+          subtext={
+            <>
+              {`${activeShopName.toUpperCase()} Price Last Updated On This App`}
+              {activeShopName?.toLowerCase() === 'nandilathgmart' && webUpdateStatus?.status && (
+                <span
+                  className={`block mt-1 text-[14px] font-bold uppercase ${
+                    webUpdateStatus.status === 'success' ? 'text-emerald-700' : 'text-red-600'
+                  }`}
+                >
+                  WEB PRICE UPT : {webUpdateStatus.status === 'success' ? 'SUCCESS' : 'FAILED'}
+                </span>
+              )}
+            </>
+          }
           icon={Calendar} color="text-info" bg="bg-info/10"
           loading={sapUpdateStatusLoading}
         />

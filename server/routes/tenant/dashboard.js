@@ -8,6 +8,7 @@ const {
   getRankAnalysis,
   getBrandAnalyticsBrands,
   getBrandAnalytics,
+  getWebUpdateStatus,
   getCompetitorCounts // <--- 1. Ensure this is imported
 } = require('../../controllers/tenant/dashboardController');
 
@@ -16,7 +17,7 @@ router.get('/overall-statistics',         auth, tenantResolver, getOverallStatis
 router.get('/rank-analysis',              auth, tenantResolver, getRankAnalysis);
 router.get('/brand-analytics/brands',     auth, tenantResolver, getBrandAnalyticsBrands);
 router.get('/brand-analytics',            auth, tenantResolver, getBrandAnalytics);
-
+router.get('/web-update-status', auth, tenantResolver, getWebUpdateStatus);
 // <--- 2. Ensure this exact line is added and the file is SAVED
 router.get('/competitor-counts',          auth, tenantResolver, getCompetitorCounts); 
 

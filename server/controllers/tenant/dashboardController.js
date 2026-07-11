@@ -3,7 +3,6 @@ const { buildAlertQuery } = require('../../utils/alertquery');
 
 exports.getRankAnalysis = async (req, res) => {
   try {
-    // status is nested: competitor_rank1_count.status
     const docs = await req.tenantDb
       .collection('ept_dashboard_rank_analysis')
       .find({ 'competitor_rank1_count.status': 'active' })
@@ -15,8 +14,6 @@ exports.getRankAnalysis = async (req, res) => {
 
     const inner   = docs[0].competitor_rank1_count || {};
     const rawData = inner.competitor_rank1_data    || {};
-
-    // Transform { amazon: 6, croma: 3 } → [{ name, count }]
     const competitors = Object.entries(rawData).map(([name, count]) => ({ name, count }));
 
     res.json({
@@ -59,7 +56,6 @@ exports.getBrandAnalytics = async (req, res) => {
       docs.map((d) => d.category_name).filter((c) => c && c !== 'all_category')
     )].sort();
 
-    // "All Category" selected in UI → category comes as '' from frontend
     const selectedCategory = category || 'all_category';
     const record = docs.find((d) => d.category_name === selectedCategory);
 
@@ -88,6 +84,30 @@ exports.getSapUpdateStatus = async (req, res) => {
   }
 };
 
+// ─── GET /api/dashboard/web-update-status ────────────────────────────────────
+// Only relevant for nandilathgmart — daily web scrape/update success-failure status
+exports.getWebUpdateStatus = async (req, res) => {
+  try {
+    const docs = await req.tenantDb
+      .collection('ept_web_product_update_status')
+      .find({})
+      .sort({ _id: -1 })
+      .limit(1)
+      .toArray();
+
+    if (!docs.length) return res.json({ status: null, var_end_time: null });
+
+    const doc = docs[0];
+    res.json({
+      status: doc.product_update_status || null, // 'success' | 'failed' | null
+      var_end_time: doc.var_end_time || null,
+    });
+  } catch (err) {
+    console.error('dashboardController.getWebUpdateStatus error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // ─── GET /api/dashboard/overall-statistics ───────────────────────────────────
 exports.getOverallStatistics = async (req, res) => {
   try {
@@ -100,10 +120,6 @@ exports.getOverallStatistics = async (req, res) => {
 
     if (!docs.length) return res.json(null);
 
-    // varNotificationCounts in the precomputed doc is a stale/tenant-wide
-    // figure. Replace it with a live count scoped to the logged-in user's
-    // own alert subscriptions (user_alert_id) + their store (cmpid), same
-    // rule used by GET /api/products/alert.
     let varNotificationCounts = docs[0].varNotificationCounts ?? 0;
     try {
       const alertquery = await buildAlertQuery(req);
@@ -117,9 +133,10 @@ exports.getOverallStatistics = async (req, res) => {
     res.json({ ...docs[0], varNotificationCounts });
   } catch (err) {
     console.error('dashboardController.getOverallStatistics error:', err);
-    res.status(500).jsongetCompetitorActivityLog({ message: err.message });
+    res.status(500).json({ message: err.message }); // fixed typo bug (was .jsongetCompetitorActivityLog)
   }
 };
+
 // ─── GET /api/dashboard/competitor-counts ───────────────────────────────────
 exports.getCompetitorCounts = async (req, res) => {
   try {
@@ -127,7 +144,7 @@ exports.getCompetitorCounts = async (req, res) => {
       .collection('ept_dashbaord_statics')
       .find({ status: 'active' })
       .toArray();
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
 
     const formatted = docs.map((d) => {
       const rawCount = d.competitor_count?.$numberLong || d.competitor_count?.toString() || 0;

@@ -5,6 +5,7 @@ import { useStore } from "../store";
 import { fetchProducts, fetchProductsMeta, configureProduct, removeProductConfiguration,exportProductsCSV } from "../services/productsService";
 import { fetchCompetitors } from "../services/competitorsService";
 import API from "../hooks/useApi";
+import { Rss, Globe } from "lucide-react";
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function parsePrice(raw) {
@@ -102,11 +103,6 @@ function resolveProductImage(product) {
   }
 
   const competitors = product.competitor_prices || [];
-  console.log("Step 2 - competitor list:", competitors.map(c => ({
-    slug: c.slug,
-    image: c.image,
-    stock: c.stock,
-  })));
 
   // 2. Prefer an in-stock competitor that has a valid image
   const inStockWithImage = competitors.find(
@@ -117,20 +113,16 @@ function resolveProductImage(product) {
   );
 
   if (inStockWithImage) {
-    console.log("✅ Found in-stock competitor with image:", inStockWithImage.slug, inStockWithImage.image);
     return inStockWithImage.image;
   }
-  console.log("❌ No in-stock competitor has a valid image, checking any competitor...");
 
   // 3. Fallback: any competitor with a valid image, even out of stock
   const anyWithImage = competitors.find((c) => isValidImage(c.image));
 
   if (anyWithImage) {
-    console.log("✅ Found out-of-stock competitor with image:", anyWithImage.slug, anyWithImage.image);
     return anyWithImage.image;
   }
 
-  console.log("❌ No competitor has any valid image. Returning null (placeholder will show).");
   return null;
 }
 
@@ -233,7 +225,6 @@ function PriceGapBadge({ value, ean }) {
       )}
 
       {/* History shortcut links — Always show if EAN exists */}
-       {/* History shortcut links — Always show if EAN exists */}
       {ean && (
         <div className="flex items-center mt-0.5 bg-white dark:bg-[#151a2a] rounded-full border border-slate-200 dark:border-slate-700/60 shadow-sm overflow-hidden w-fit transition-all hover:shadow-md hover:border-slate-300">
           <button
@@ -349,78 +340,78 @@ function CompetitorPrices({ product, competitorMeta }) {
   const sorted = [...listed].sort((a, b) => {
     const aOos = isCompetitorOos(a);
     const bOos = isCompetitorOos(b);
-    
+
     if (!aOos && bOos) return -1;
     if (aOos && !bOos) return 1;
     if (!aOos && !bOos) return a.price - b.price;
     return 0;
   });
 
- return (
-  <div className="flex items-center gap-6 flex-wrap">
-    {sorted.map((c) => {
-      const meta = competitorMeta?.[c.slug] || {};
-      const isOos = isCompetitorOos(c);
+  return (
+    <div className="flex items-center gap-6 flex-wrap">
+      {sorted.map((c) => {
+        const meta = competitorMeta?.[c.slug] || {};
+        const isOos = isCompetitorOos(c);
 
-      return (
-        <div key={c.slug} className="flex items-center gap-2">
-          {isOos ? (
-            c.url ? (
+        return (
+          <div key={c.slug} className="flex items-center gap-2">
+            {isOos ? (
+              c.url ? (
+                <a
+                  href={c.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={`Open on ${c.name}`}
+                  className="flex items-center gap-2 hover:opacity-75 transition-opacity cursor-pointer"
+                >
+                  <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
+                  <span className="font-bold text-rose-600 dark:text-rose-400 text-[10px] uppercase tracking-wider bg-rose-50 dark:bg-rose-950/30 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-800">Out of Stock</span>
+                </a>
+              ) : (
+                <>
+                  <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
+                  <span className="font-bold text-rose-600 dark:text-rose-400 text-[10px] uppercase tracking-wider bg-rose-50 dark:bg-rose-950/30 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-800">Out of Stock</span>
+                </>
+              )
+            ) : c.url ? (
               <a
                 href={c.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 title={`Open on ${c.name}`}
-                className="flex items-center gap-2 hover:opacity-75 transition-opacity cursor-pointer"
+                className="flex items-center gap-2 hover:opacity-75 transition-opacity"
               >
                 <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
-                <span className="font-bold text-rose-600 dark:text-rose-400 text-[10px] uppercase tracking-wider bg-rose-50 dark:bg-rose-950/30 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-800">Out of Stock</span>
+                <span className="font-bold text-slate-800 dark:text-white text-[13px]">
+                  ₹{c.price.toLocaleString("en-IN")}
+                </span>
               </a>
             ) : (
               <>
                 <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
-                <span className="font-bold text-rose-600 dark:text-rose-400 text-[10px] uppercase tracking-wider bg-rose-50 dark:bg-rose-950/30 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-800">Out of Stock</span>
+                <span className="font-bold text-slate-800 dark:text-white text-[13px]">₹{c.price.toLocaleString("en-IN")}</span>
               </>
-            )
-          ) : c.url ? (
-            <a
-              href={c.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={`Open on ${c.name}`}
-              className="flex items-center gap-2 hover:opacity-75 transition-opacity"
-            >
-              <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
-              <span className="font-bold text-slate-800 dark:text-white text-[13px]">
-                ₹{c.price.toLocaleString("en-IN")}
-              </span>
-            </a>
-          ) : (
-            <>
-              <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
-              <span className="font-bold text-slate-800 dark:text-white text-[13px]">₹{c.price.toLocaleString("en-IN")}</span>
-            </>
-          )}
+            )}
 
-          {!isOos && (
-            <button
-              onClick={() => navigate(buildProductHistoryUrl(product.product_ean_id, 30))}
-              className="group flex items-center justify-center h-6 w-6 rounded-full border border-sky-200 bg-sky-50 text-sky-600 hover:bg-sky-500 hover:text-white hover:border-sky-500 hover:shadow-sm transition-all shrink-0"
-              title="View price history"
-            >
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
-                <rect x="3"  y="14" width="3.5" height="7" rx="1" fill="currentColor" />
-                <rect x="8"  y="10" width="3.5" height="11" rx="1" fill="currentColor" />
-                <rect x="13" y="6"  width="3.5" height="15" rx="1" fill="currentColor" />
-                <rect x="18" y="3"  width="3.5" height="18" rx="1" fill="currentColor" />
-              </svg>
-            </button>
-          )}
-        </div>
-      );
-    })}
-  </div>
-);
+            {!isOos && (
+              <button
+                onClick={() => navigate(buildProductHistoryUrl(product.product_ean_id, 30))}
+                className="group flex items-center justify-center h-6 w-6 rounded-full border border-sky-200 bg-sky-50 text-sky-600 hover:bg-sky-500 hover:text-white hover:border-sky-500 hover:shadow-sm transition-all shrink-0"
+                title="View price history"
+              >
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none">
+                  <rect x="3"  y="14" width="3.5" height="7" rx="1" fill="currentColor" />
+                  <rect x="8"  y="10" width="3.5" height="11" rx="1" fill="currentColor" />
+                  <rect x="13" y="6"  width="3.5" height="15" rx="1" fill="currentColor" />
+                  <rect x="18" y="3"  width="3.5" height="18" rx="1" fill="currentColor" />
+                </svg>
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // ── Searchable filter dropdown ─────────────────────────────────────────────────
@@ -519,9 +510,9 @@ function Pagination({ currentPage, totalPages, itemsOnPage, totalItems, onPageCh
   const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1;
   const endItem = startItem + (itemsOnPage || 0) - 1;
   const formattedTotal = (totalItems || 0).toLocaleString("en-IN"); // formats like 2,858
-  
-  const displayString = itemsOnPage > 0 
-    ? `showing ${startItem}-${endItem} of ${formattedTotal} items` 
+
+  const displayString = itemsOnPage > 0
+    ? `showing ${startItem}-${endItem} of ${formattedTotal} items`
     : `showing 0 items`;
 
   const pageBtn = (p, label) => (
@@ -621,7 +612,6 @@ function ProductCell({ product }) {
       ) : (
         <ProductImage src={resolveProductImage(product)} alt={product.product_name} />
       )}
-      {/* <ProductImage src={product.product_image} alt={product.product_name} /> */}
       <div>
          {product.product_url ? (
           <a
@@ -645,13 +635,12 @@ function ProductCell({ product }) {
           {product.product_brand && <span>{product.product_brand} · </span>}
           {product.product_ean_id || product.product_code || product._id}
         </p>
-        {/* 🆕 Stock add pannunga */}
         {product.product_stock !== null && (
           <div className="flex items-center gap-1.5 mt-1">
             <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Quantity:</span>
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-              product.product_stock > 0 
-                ? "text-emerald-600 bg-emerald-50" 
+              product.product_stock > 0
+                ? "text-emerald-600 bg-emerald-50"
                 : "text-rose-600 bg-rose-50"
             }`}>
               {product.product_stock} units
@@ -681,16 +670,33 @@ function webPriceColorClass(rank) {
 }
 
 function PriceCell({ product }) {
+  const activeShopName = useStore((s) => s.activeShopName) || "";
   const web = parsePrice(product.product_price);
   const store = parsePrice(product.product_store_price);
   const sap = parsePrice(product.product_sap_price);
   const rank = product.user_notification_data?.rank_pos ?? product.rank_by;
   const fmt = (v) => v !== null ? `₹${v.toLocaleString("en-IN")}` : "—";
 
+  const isNandilathgmart = activeShopName.toLowerCase() === "nandilathgmart";
+  const isWebScrape = product.is_website_scrape_price === "yes";
+
   return (
     <div className="flex flex-col gap-1.5 min-w-[110px]">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Web</span>
+        <span className="flex items-center gap-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+          Web
+          {isNandilathgmart && (
+            <span className="relative inline-flex group">
+              {isWebScrape
+                ? <Globe className="h-3 w-3 text-blue-500 cursor-help" />
+                : <Rss className="h-3 w-3 text-orange-500 cursor-help" />
+              }
+              <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md bg-slate-800 px-2 py-1 text-[10px] font-medium normal-case text-white opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100 z-10">
+                {isWebScrape ? "Website Price" : "SAP Price"}
+              </span>
+            </span>
+          )}
+        </span>
         <span className={`text-[12px] font-bold ${webPriceColorClass(rank)}`}>{fmt(web)}</span>
       </div>
       <div className="flex items-center justify-between gap-3">
@@ -991,11 +997,11 @@ export default function Products() {
       });
       const rows       = Array.isArray(res) ? res : (res?.data || []);
       const totalPages = Array.isArray(res) ? Math.ceil(res.length / ITEMS_PER_PAGE) : (res?.totalPages || 1);
-      const total      = Array.isArray(res) ? res.length : (res?.total || 0); // <-- ADD THIS
-      
+      const total      = Array.isArray(res) ? res.length : (res?.total || 0);
+
       setProducts(rows);
       setProductsTotalPages(totalPages);
-      setTotalItems(total); // <-- ADD THIS
+      setTotalItems(total);
     } catch (err) {
       setProductsError(err.response?.data?.message || err.message);
     } finally {
@@ -1149,17 +1155,6 @@ export default function Products() {
               />
             </div>
             <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-              {/* <button
-                onClick={() => exportToCSV(filtered, exportType, competitorMeta)}
-                className="flex items-center gap-2 rounded-lg bg-[#2B86C5] px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-[#226fa3] transition-colors"
-              >
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                Export
-              </button> */}
               {canExport && (
                 <button
                   onClick={async () => {
@@ -1253,11 +1248,11 @@ export default function Products() {
                         )}
                       </tbody>
                     </table>
-                   <Pagination 
-                        currentPage={currentPage} 
-                        totalPages={totalPages} 
-                        itemsOnPage={paginated.length} 
-                        onPageChange={setCurrentPage} 
+                   <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        itemsOnPage={paginated.length}
+                        onPageChange={setCurrentPage}
                    />
                   </div>
                 )}
@@ -1310,12 +1305,12 @@ export default function Products() {
                         )}
                       </tbody>
                     </table>
-                     <Pagination 
-                      currentPage={currentPage} 
-                      totalPages={totalPages} 
-                      itemsOnPage={paginated.length} 
+                     <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      itemsOnPage={paginated.length}
                       totalItems={totalItems}
-                      onPageChange={setCurrentPage} 
+                      onPageChange={setCurrentPage}
                     />
                   </div>
                 )}
@@ -1323,12 +1318,12 @@ export default function Products() {
                 {/* ── PRICE ANALYSIS ── */}
                 {activeTab === "analysis" && (
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm">
-                    <Pagination 
-                      currentPage={currentPage} 
-                      totalPages={totalPages} 
-                      itemsOnPage={paginated.length} 
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      itemsOnPage={paginated.length}
                       totalItems={totalItems}
-                      onPageChange={setCurrentPage} 
+                      onPageChange={setCurrentPage}
                     />
                     <div className="overflow-x-auto [-webkit-overflow-scrolling:touch]">
                       <table className="w-full min-w-[1000px] border-collapse text-sm">
@@ -1383,7 +1378,6 @@ export default function Products() {
                                 <td className="px-5 py-4"><PriceCell product={p} /></td>
                                 <td className="px-5 py-4"><RankBadge product={p} /></td>
                                 <td className="px-5 py-4">
-                                  {/* PriceGapBadge returns null when no data — cell stays empty */}
                                   <PriceGapBadge value={priceGap(p)} ean={p.product_ean_id} />
                                 </td>
                                 <td className="px-5 py-4"><CompetitorPrices product={p} competitorMeta={competitorMeta} /></td>
@@ -1394,12 +1388,12 @@ export default function Products() {
                         </tbody>
                       </table>
                     </div>
-                     <Pagination 
-                      currentPage={currentPage} 
-                      totalPages={totalPages} 
-                      itemsOnPage={paginated.length} 
+                     <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      itemsOnPage={paginated.length}
                       totalItems={totalItems}
-                      onPageChange={setCurrentPage} 
+                      onPageChange={setCurrentPage}
                     />
                   </div>
                 )}
