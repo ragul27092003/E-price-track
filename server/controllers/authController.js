@@ -6,6 +6,26 @@ const Company = require('../models/Company');
 const Merchant = require('../models/Merchant');
 const Access = require('../models/Access');
 const { getTenantDb, getAdminDb } = require('../config/db');
+const { sendOtpEmail } = require('../services/emailService');
+const { validatePassword, isValidEmail } = require('../utils/passwordValidation');
+
+const OTP_VALIDITY_MS = 5 * 60 * 1000;
+const MAX_OTP_ATTEMPTS = 5;
+
+function hashOtp(otp, userId) {
+  const secret = process.env.JWT_SECRET || 'otp-secret';
+  return crypto.createHash('sha256').update(`${otp}:${userId}:${secret}`).digest('hex');
+}
+
+function generateOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function clearOtpFields(user) {
+  user.reset_otp_hash = '';
+  user.reset_otp_expires_at = undefined;
+  user.reset_otp_attempts = 0;
+}
 
 const generateToken = (payload) =>
   jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
@@ -276,5 +296,145 @@ exports.getMerchant = async (req, res) => {
     res.json(merchant);
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+// ─── POST /api/auth/forgot-password ───────────────────────────────────────────
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  if (!email || !isValidEmail(email)) {
+    return res.status(400).json({ message: 'Please enter a valid email address' });
+  }
+
+  try {
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email_address: normalizedEmail });
+    if (!user) {
+      return res.status(404).json({ message: 'No account found with this email address' });
+    }
+
+    const access = await Access.findOne({
+      user_id: user.user_id,
+      cmpid: user.cmpid,
+      archived: 0,
+    });
+    if (!access) {
+      return res.status(403).json({ message: 'Account access is disabled. Please contact admin.' });
+    }
+
+    const otp = generateOtp();
+    user.reset_otp_hash = hashOtp(otp, user.user_id);
+    user.reset_otp_expires_at = new Date(Date.now() + OTP_VALIDITY_MS);
+    user.reset_otp_attempts = 0;
+    await user.save();
+
+    const emailResult = await sendOtpEmail({ to: user.email_address, otp });
+
+    res.json({
+      message: 'OTP sent to your email address',
+      expiresInMinutes: 5,
+      devOtp: emailResult.devMode ? otp : undefined,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Failed to send OTP' });
+  }
+};
+
+// ─── POST /api/auth/verify-otp ────────────────────────────────────────────────
+exports.verifyOtp = async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !isValidEmail(email)) {
+    return res.status(400).json({ message: 'Please enter a valid email address' });
+  }
+  if (!otp || !/^\d{6}$/.test(String(otp).trim())) {
+    return res.status(400).json({ message: 'Please enter a valid 6-digit OTP' });
+  }
+
+  try {
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email_address: normalizedEmail });
+    if (!user || !user.reset_otp_hash || !user.reset_otp_expires_at) {
+      return res.status(400).json({ message: 'Invalid or expired OTP. Please request a new one.' });
+    }
+
+    if (user.reset_otp_attempts >= MAX_OTP_ATTEMPTS) {
+      clearOtpFields(user);
+      await user.save();
+      return res.status(429).json({ message: 'Too many failed attempts. Please request a new OTP.' });
+    }
+
+    if (new Date() > user.reset_otp_expires_at) {
+      clearOtpFields(user);
+      await user.save();
+      return res.status(400).json({ message: 'OTP has expired. Please request a new one.' });
+    }
+
+    const otpHash = hashOtp(String(otp).trim(), user.user_id);
+    if (otpHash !== user.reset_otp_hash) {
+      user.reset_otp_attempts += 1;
+      await user.save();
+      const remaining = MAX_OTP_ATTEMPTS - user.reset_otp_attempts;
+      return res.status(400).json({
+        message: remaining > 0
+          ? `Invalid OTP. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`
+          : 'Too many failed attempts. Please request a new OTP.',
+      });
+    }
+
+    const resetToken = jwt.sign(
+      { purpose: 'password_reset', user_id: user.user_id, email: user.email_address },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    clearOtpFields(user);
+    await user.save();
+
+    res.json({
+      message: 'OTP verified successfully',
+      resetToken,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Failed to verify OTP' });
+  }
+};
+
+// ─── POST /api/auth/reset-password ────────────────────────────────────────────
+exports.resetPassword = async (req, res) => {
+  const { resetToken, newPassword } = req.body;
+  if (!resetToken) {
+    return res.status(400).json({ message: 'Reset token is required' });
+  }
+
+  const passwordError = validatePassword(newPassword);
+  if (passwordError) {
+    return res.status(400).json({ message: passwordError });
+  }
+
+  try {
+    let payload;
+    try {
+      payload = jwt.verify(resetToken, process.env.JWT_SECRET);
+    } catch {
+      return res.status(400).json({ message: 'Reset session expired. Please start again.' });
+    }
+
+    if (payload.purpose !== 'password_reset' || !payload.user_id) {
+      return res.status(400).json({ message: 'Invalid reset token' });
+    }
+
+    const user = await User.findOne({ user_id: payload.user_id });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.password = newPassword;
+    user.password_new = newPassword;
+    clearOtpFields(user);
+    await user.save();
+
+    res.json({ message: 'Password reset successfully. You can now sign in.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message || 'Failed to reset password' });
   }
 };

@@ -26,6 +26,9 @@ const userSchema = new mongoose.Schema({
   login_cookie:             { type: String, default: '' },
   modifiedon:               { type: String, default: '' },
   profile_picture_location: { type: String, default: '' },
+  reset_otp_hash:           { type: String, default: '' },
+  reset_otp_expires_at:     { type: Date },
+  reset_otp_attempts:       { type: Number, default: 0 },
 }, { collection: 'plm_admin_users' });
 
 userSchema.pre('save', function () {

@@ -17,3 +17,12 @@ export const fetchAllStores = () =>
 
 export const getMerchant = (companyId) =>
   API.get(`/auth/merchant/${companyId}`).then((r) => r.data);
+
+export const requestPasswordOtp = (email) =>
+  API.post('/auth/forgot-password', { email }).then((r) => r.data);
+
+export const verifyPasswordOtp = (email, otp) =>
+  API.post('/auth/verify-otp', { email, otp }).then((r) => r.data);
+
+export const resetPasswordWithToken = (resetToken, newPassword) =>
+  API.post('/auth/reset-password', { resetToken, newPassword }).then((r) => r.data);
