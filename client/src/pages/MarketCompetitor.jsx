@@ -282,12 +282,19 @@ function CompetitorPrices({ product, competitorMeta }) {
         const meta = competitorMeta?.[c.slug] || {};
         const isOos = isCompetitorOos(c);
         return (
-          <div key={c.slug} className={`flex items-center gap-2 ${isOos ? 'opacity-60 grayscale' : ''}`}>
+          <div key={c.slug} className="flex items-center gap-2">
             {isOos ? (
-              <>
-                <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
-                <span className="font-bold text-slate-400 text-[10px] uppercase bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">Out of Stock</span>
-              </>
+              c.url ? (
+                <a href={c.url} target="_blank" rel="noopener noreferrer" title={`Open on ${c.name}`} className="flex items-center gap-2 hover:opacity-75 transition-opacity cursor-pointer">
+                  <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
+                  <span className="font-bold text-rose-600 dark:text-rose-400 text-[10px] uppercase bg-rose-50 dark:bg-rose-950/30 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-800">Out of Stock</span>
+                </a>
+              ) : (
+                <>
+                  <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
+                  <span className="font-bold text-rose-600 dark:text-rose-400 text-[10px] uppercase bg-rose-50 dark:bg-rose-950/30 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-800">Out of Stock</span>
+                </>
+              )
             ) : c.url ? (
               <a href={c.url} target="_blank" rel="noopener noreferrer" title={`Open on ${c.name}`} className="flex items-center gap-2 hover:opacity-75 transition-opacity">
                 <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />

@@ -708,7 +708,7 @@ function CompetitorTable({ product, tab, competitorMeta }) {
             } else {
               if (entry.price === null) {
                 diffLabel = "Out of Stock";
-                diffColor = "text-slate-400";
+                diffColor = "text-rose-600 dark:text-rose-400";
               } else if (tab === "Positive Trend" || tab === "Easy Gain" || tab === "Neutral Trend" || tab === "Clever Move") {
                 diffVal = entry.price - (ourPrice || 0);
                 diffLabel = diffVal >= 0 ? `${fmt(diffVal)} higher` : `${fmt(Math.abs(diffVal))} lower`;
@@ -751,7 +751,19 @@ function CompetitorTable({ product, tab, competitorMeta }) {
                 </td>
                 <td className="px-4 py-3 text-right font-bold text-slate-800 dark:text-white">
                   {entry.price === null ? (
-                    <span className="text-slate-400 dark:text-slate-500 text-xs font-semibold uppercase tracking-wide">Out of Stock</span>
+                    entry.url && !entry.isMe ? (
+                      <a
+                        href={entry.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Open ${entry.name}`}
+                        className="text-rose-600 dark:text-rose-400 text-xs font-semibold uppercase tracking-wide hover:text-rose-700 dark:hover:text-rose-300 transition-colors"
+                      >
+                        Out of Stock
+                      </a>
+                    ) : (
+                      <span className="text-rose-600 dark:text-rose-400 text-xs font-semibold uppercase tracking-wide">Out of Stock</span>
+                    )
                   ) : (
                     fmt(entry.price)
                   )}
