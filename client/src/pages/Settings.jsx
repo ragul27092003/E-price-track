@@ -210,25 +210,27 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
                   </div>
                 )}
               </div>
-              <div className="flex flex-col gap-2">
-                <label className="cursor-pointer">
-                  <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
-                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors cursor-pointer select-none">
-                    <Camera className="h-3.5 w-3.5" />
-                    {photoUrl ? "Change Logo" : "Upload Logo"}
-                  </span>
-                </label>
-                {photoUrl && (
-                  <button
-                    onClick={handleRemoveLogo}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                    Remove Logo
-                  </button>
-                )}
-                <p className="text-[10px] text-gray-400 dark:text-slate-500">PNG, JPG, SVG · Shown in header</p>
-              </div>
+              {!isUser && (
+                <div className="flex flex-col gap-2">
+                  <label className="cursor-pointer">
+                    <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
+                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors cursor-pointer select-none">
+                      <Camera className="h-3.5 w-3.5" />
+                      {photoUrl ? "Change Logo" : "Upload Logo"}
+                    </span>
+                  </label>
+                  {photoUrl && (
+                    <button
+                      onClick={handleRemoveLogo}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Remove Logo
+                    </button>
+                  )}
+                  <p className="text-[10px] text-gray-400 dark:text-slate-500">PNG, JPG, SVG · Shown in header</p>
+                </div>
+              )}
             </div>
           </div>
 

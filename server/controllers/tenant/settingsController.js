@@ -225,6 +225,9 @@ exports.addUser = async (req, res) => {
      
     });
 
+     
+    
+
     await Access.create({
       cmpid:     targetCmpid,
       user_id,
