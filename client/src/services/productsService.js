@@ -51,3 +51,20 @@ export const configureProduct = (id, data) =>
 
 export const removeProductConfiguration = (id) =>
   API.patch(`/products/${id}/remove-configuration`).then((r) => r.data);
+
+export const fetchPendingProducts = ({
+  page = 1, limit = 2, status = 'pending',
+  competitorSlug = null,
+  search, brandsearch, itemgroupsearch, categorysearch,
+} = {}) => {
+  const params = new URLSearchParams({ page, limit, status });
+  if (competitorSlug) params.set('competitor', competitorSlug);
+  if (search)     params.set('search',     search);
+  if (brandsearch) params.set('brand',      brandsearch);
+  if (categorysearch)   params.set('category',   categorysearch);
+  if (itemgroupsearch)  params.set('itemGroup',  itemgroupsearch);
+  return API.get(`/products?${params}`).then((r) => r.data);
+};
+ 
+export const saveProductMapping = (data) =>
+  API.post('/products/pendingmapping', data).then((r) => r.data);

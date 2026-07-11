@@ -19,6 +19,7 @@ import Products from "./pages/Products";
 import Notifications from "./pages/Notifications";
 import SmartReports from "./pages/SmartReports";
 import MarketCompetitor from "./pages/MarketCompetitor";
+import ProductMapping from "./pages/ProductMapping";
 import { ROUTES } from "./utilis/urls";
 
 const queryClient = new QueryClient();
@@ -51,6 +52,7 @@ const App = () => (
               <Route path="/competitors" element={<Competitors />} />
               <Route path="/products" element={<Products />} />
               <Route path="/market" element={<MarketCompetitor />} />
+              <Route path="/product-mapping" element={<ProductMapping />} />
               <Route path="/smart-reports" element={<SmartReports />} />
             </Route>
             <Route path="*" element={<NotFound />} />
