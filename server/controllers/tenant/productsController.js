@@ -199,6 +199,7 @@ exports.getAll = async (req, res) => {
   try {
     const db    = req.tenantDb;
     const page  = Math.max(1, parseInt(req.query.page  || '1', 10));
+    const status  = req.query.status;
     const limit = Math.max(1, parseInt(req.query.limit || '20', 10)); // Match frontend 20 limit
     const skip  = (page - 1) * limit;
 
@@ -207,7 +208,7 @@ exports.getAll = async (req, res) => {
     // 1. Initial filter for Active & Completed products
     const mongoFilter = {
       status: 'active',
-      ean_product_data_details_scrap_status: 'completed'
+      ean_product_data_details_scrap_status:status,
     };
 
     // ── Use dashboard statics to guarantee exact count ──

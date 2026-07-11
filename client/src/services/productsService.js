@@ -53,7 +53,7 @@ export const removeProductConfiguration = (id) =>
   API.patch(`/products/${id}/remove-configuration`).then((r) => r.data);
 
 export const fetchPendingProducts = ({
-  page = 1, limit = 2, status = 'pending',
+  page = 1, limit = 500, status = 'pending',
   competitorSlug = null,
   search, brandsearch, itemgroupsearch, categorysearch,
 } = {}) => {

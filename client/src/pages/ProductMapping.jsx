@@ -26,7 +26,7 @@ const ProductMapping = () => {
   const [competitors, setCompetitors] = useState([]);
   const [activeTab, setActiveTab] = useState("Pending Products Mapping");
   const [page, setPage] = useState(1);
-  const [limit] = useState(2);
+  const [limit] = useState(500);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -84,6 +84,7 @@ const ProductMapping = () => {
       setData(result.data || []);
       setTotal(result.total || 0);
       setTotalPages(result.totalPages || 1);
+    
 
     } catch (err) {
       console.log(err);
@@ -155,6 +156,7 @@ const ProductMapping = () => {
       };
 
       const result = await saveProductMapping(payload);
+     
 
       if (result.success) {
         Swal.fire({
@@ -189,6 +191,8 @@ const ProductMapping = () => {
       });
     }
   };
+
+ 
 
   return (
     <div>
