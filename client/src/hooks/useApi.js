@@ -39,7 +39,11 @@ API.interceptors.response.use(
   (error) => {
     const isAuthEndpoint = error.config?.url?.includes('/auth/');
     if (error.response?.status === 401 && !isAuthEndpoint) {
+      const rememberedLogin = localStorage.getItem('ept_remember_login');
       localStorage.clear();
+      if (rememberedLogin) {
+        localStorage.setItem('ept_remember_login', rememberedLogin);
+      }
       window.location.href = '/login';
     }
     return Promise.reject(error);

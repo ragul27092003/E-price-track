@@ -6,12 +6,45 @@ import { loginUser } from '../services/authService';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Checkbox } from '../components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { Rss, Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+
+const REMEMBER_KEY = 'ept_remember_login';
+
+function loadRememberedCredentials() {
+  try {
+    const raw = localStorage.getItem(REMEMBER_KEY);
+    if (!raw) return { email: '', password: '', rememberMe: false };
+    const data = JSON.parse(raw);
+    if (!data?.rememberMe) return { email: '', password: '', rememberMe: false };
+    return {
+      email: data.email || '',
+      password: data.password || '',
+      rememberMe: true,
+    };
+  } catch {
+    return { email: '', password: '', rememberMe: false };
+  }
+}
+
+function saveRememberedCredentials(email, password) {
+  localStorage.setItem(
+    REMEMBER_KEY,
+    JSON.stringify({ email, password, rememberMe: true })
+  );
+}
+
+function clearRememberedCredentials() {
+  localStorage.removeItem(REMEMBER_KEY);
+}
+
+const savedCredentials = loadRememberedCredentials();
 
 const Login = () => {
-  const [email,      setEmail]      = useState('');
-  const [password,   setPassword]   = useState('');
+  const [email,      setEmail]      = useState(savedCredentials.email);
+  const [password,   setPassword]   = useState(savedCredentials.password);
+  const [rememberMe, setRememberMe] = useState(savedCredentials.rememberMe);
   const [error,      setError]      = useState('');
   const [loading,    setLoading]    = useState(false);
   const [showPass,   setShowPass]   = useState(false);
@@ -27,6 +60,11 @@ const Login = () => {
     setLoading(true);
     try {
       const data = await loginUser(email, password);
+      if (rememberMe) {
+        saveRememberedCredentials(email, password);
+      } else {
+        clearRememberedCredentials();
+      }
       login(data);
       authLogin(data);
       await useStore.getState().fetchMerchant();
@@ -42,7 +80,7 @@ const Login = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4">
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-2 mb-8">
-          <img src="/src/services/assets/main-logo.png" alt="Logo" class="h-24 w-auto object-contain"></img>
+          <img src="/src/services/assets/main-logo.png" alt="Logo" className="h-24 w-auto object-contain" />
         </div>
 
         <Card>
@@ -93,6 +131,20 @@ const Login = () => {
                     Caps Lock is on
                   </div>
                 )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked === true)}
+                />
+                <Label
+                  htmlFor="rememberMe"
+                  className="text-sm font-normal text-slate-600 dark:text-slate-400 cursor-pointer"
+                >
+                  Remember me
+                </Label>
               </div>
 
               {error && (

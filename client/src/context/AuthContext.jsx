@@ -51,7 +51,11 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    const rememberedLogin = localStorage.getItem('ept_remember_login');
     localStorage.clear();
+    if (rememberedLogin) {
+      localStorage.setItem('ept_remember_login', rememberedLogin);
+    }
     setUser(null);
     setActiveStoreId(null);
     setActiveShopName(null);

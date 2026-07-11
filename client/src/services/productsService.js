@@ -2,11 +2,11 @@ import API from '../hooks/useApi';
 
 // Paginated product fetch — all filter params are optional
 export const fetchProducts = ({
-  page = 1, limit = 15,
+  page = 1, limit = 15, status= "completed",
   competitorSlug = null,
   search, brand, category, rank, itemGroup,
 } = {}) => {
-  const params = new URLSearchParams({ page, limit });
+  const params = new URLSearchParams({ page, limit, status });
   if (competitorSlug) params.set('competitor', competitorSlug);
   if (search)     params.set('search',     search);
   if (brand)      params.set('brand',      brand);
@@ -53,7 +53,7 @@ export const removeProductConfiguration = (id) =>
   API.patch(`/products/${id}/remove-configuration`).then((r) => r.data);
 
 export const fetchPendingProducts = ({
-  page = 1, limit = 500, status = 'pending',
+  page = 1, limit = 15, status = 'pending',
   competitorSlug = null,
   search, brandsearch, itemgroupsearch, categorysearch,
 } = {}) => {

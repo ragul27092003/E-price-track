@@ -26,7 +26,7 @@ const ProductMapping = () => {
   const [competitors, setCompetitors] = useState([]);
   const [activeTab, setActiveTab] = useState("Pending Products Mapping");
   const [page, setPage] = useState(1);
-  const [limit] = useState(500);
+  const [limit] = useState(15);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(false);
