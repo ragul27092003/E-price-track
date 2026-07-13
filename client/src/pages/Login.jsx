@@ -73,6 +73,7 @@ const Login = () => {
     setLoading(true);
     try {
       const data = await loginUser(email, password);
+      
       if (rememberMe) {
         saveRememberedCredentials(email, password);
       } else {
