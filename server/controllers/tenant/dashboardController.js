@@ -154,6 +154,7 @@ exports.getCompetitorCounts = async (req, res) => {
       return {
         id: d._id,
         name: d.competitors || d.competitor_name,
+        slug: (d.competitor_name || d.competitors || '').toLowerCase().trim(),
         logo,
         count: parseInt(rawCount, 10) || 0,
         color: d.competitor_color

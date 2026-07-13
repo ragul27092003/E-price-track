@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { fetchCompetitors } from '../services/competitorsService';
 import { fetchProducts, fetchProductsMeta, exportProductsCSV } from '../services/productsService';
@@ -79,6 +79,29 @@ function slugColor(slug = "") {
   let h = 0;
   for (let i = 0; i < slug.length; i++) h = (h * 31 + slug.charCodeAt(i)) & 0xffff;
   return BRAND_COLORS[h % BRAND_COLORS.length];
+}
+
+function normalizeCompetitorKey(value = "") {
+  return String(value).toLowerCase().trim().replace(/\s+/g, "_");
+}
+
+function findCompetitorByParam(competitors, param) {
+  if (!param || !competitors?.length) return null;
+  const key = normalizeCompetitorKey(param);
+  return competitors.find((c) =>
+    normalizeCompetitorKey(c.slug) === key ||
+    normalizeCompetitorKey(c.name) === key
+  ) || null;
+}
+
+function orderCompetitors(competitors) {
+  const eanSorted = competitors
+    .filter((c) => c.mappingType === 'EAN')
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const nonEanSorted = competitors
+    .filter((c) => c.mappingType === 'NON_EAN')
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  return [...eanSorted, ...nonEanSorted];
 }
 
 // ─── Export Function ──────────────────────────────────────────────────────────
@@ -519,6 +542,9 @@ function CompetitorTab({ data, isActive, onClick, liveCount }) {
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 const MarketCompetitor = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const competitorParam = searchParams.get('competitor') || '';
+
   const competitors = useStore((s) => s.competitors);
   const setCompetitors = useStore((s) => s.setCompetitors);
   const competitorsLoading = useStore((s) => s.competitorsLoading);
@@ -571,21 +597,40 @@ const MarketCompetitor = () => {
     fetchProductsMeta().then(setProductsMeta).catch(() => {});
   }, [activeStoreId]);
 
-  // Auto-select the first active competitor once the list loads
+  // Auto-select competitor from URL param or fall back to the first active tab
   useEffect(() => {
-  if (!selectedCompetitor && competitors.length > 0) {
-      const eanSorted = competitors
-        .filter((c) => c.mappingType === 'EAN')
-        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      const nonEanSorted = competitors
-        .filter((c) => c.mappingType === 'NON_EAN')
-        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    if (competitors.length === 0) return;
 
-      const orderedList = [...eanSorted, ...nonEanSorted];
-      const firstActive = orderedList.find((c) => c.isActive);
-      if (firstActive) setSelectedCompetitor(firstActive);
+    const fromUrl = competitorParam ? findCompetitorByParam(competitors, competitorParam) : null;
+    if (fromUrl?.isActive) {
+      setSelectedCompetitor((prev) => (prev?.slug === fromUrl.slug ? prev : fromUrl));
+      return;
     }
-  }, [competitors]);
+
+    setSelectedCompetitor((prev) => {
+      if (prev) return prev;
+      const firstActive = orderCompetitors(competitors).find((c) => c.isActive);
+      return firstActive || null;
+    });
+  }, [competitors, competitorParam]);
+
+  const lastCompetitorParamRef = useRef(null);
+
+  // Reset filters when arriving from dashboard (or any external URL change)
+  useEffect(() => {
+    if (!competitorParam || competitors.length === 0) return;
+    if (lastCompetitorParamRef.current === competitorParam) return;
+    lastCompetitorParamRef.current = competitorParam;
+
+    const fromUrl = findCompetitorByParam(competitors, competitorParam);
+    if (!fromUrl?.isActive) return;
+    setSearch("");
+    setBrandFilter("");
+    setCatFilter("");
+    setRankFilter("");
+    setItemGroupFilter("");
+    setCurrentPage(1);
+  }, [competitorParam, competitors]);
 
   const loadCompetitorProducts = async (competitor, page = 1) => {
     setProductsLoading(true);
@@ -631,6 +676,7 @@ const MarketCompetitor = () => {
     setTotalItems(0);
     setTotalPages(1);
     setSelectedCompetitor(competitor);
+    setSearchParams({ competitor: competitor.slug });
   };
 
   const handlePageChange = (page) => setCurrentPage(page);

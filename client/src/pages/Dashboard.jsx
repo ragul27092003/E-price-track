@@ -287,6 +287,11 @@ export default function Dashboard() {
   const lspDate    = stats?.lsp_hsp_date || '--';
 
   const goToReport = (tab) => navigate('/smart-reports', { state: { tab } });
+  const goToMarketCompetitor = (comp) => {
+    const key = comp.slug || comp.name;
+    if (!key) return;
+    navigate(`/market?competitor=${encodeURIComponent(key)}`);
+  };
 
   const total = stats?.varCompletedProductCount ?? '--';
   const totalNum = Number(total) || 0;
@@ -544,6 +549,10 @@ export default function Dashboard() {
               return (
                 <div 
                   key={comp.name} 
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => goToMarketCompetitor(comp)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') goToMarketCompetitor(comp); }}
                   onMouseEnter={() => setHoveredComp(comp.name)}
                   onMouseLeave={() => setHoveredComp(null)}
                   className={`flex justify-between items-center px-3 py-3 rounded-lg cursor-pointer transition-all duration-300 ${
