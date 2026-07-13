@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useStore } from '../store';
 import { useAuth } from '../context/AuthContext';
@@ -39,12 +39,10 @@ function clearRememberedCredentials() {
   localStorage.removeItem(REMEMBER_KEY);
 }
 
-const savedCredentials = loadRememberedCredentials();
-
 const Login = () => {
-  const [email,      setEmail]      = useState(savedCredentials.email);
-  const [password,   setPassword]   = useState(savedCredentials.password);
-  const [rememberMe, setRememberMe] = useState(savedCredentials.rememberMe);
+  const [email,      setEmail]      = useState('');
+  const [password,   setPassword]   = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error,      setError]      = useState('');
   const [loading,    setLoading]    = useState(false);
   const [showPass,   setShowPass]   = useState(false);
@@ -53,6 +51,21 @@ const Login = () => {
   const login        = useStore((s) => s.login);
   const { login: authLogin } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const saved = loadRememberedCredentials();
+    setEmail(saved.email);
+    setPassword(saved.password);
+    setRememberMe(saved.rememberMe);
+  }, []);
+
+  const handleRememberMeChange = (checked) => {
+    const isChecked = checked === true;
+    setRememberMe(isChecked);
+    if (!isChecked) {
+      clearRememberedCredentials();
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -137,7 +150,7 @@ const Login = () => {
                 <Checkbox
                   id="rememberMe"
                   checked={rememberMe}
-                  onCheckedChange={(checked) => setRememberMe(checked === true)}
+                  onCheckedChange={handleRememberMeChange}
                 />
                 <Label
                   htmlFor="rememberMe"
