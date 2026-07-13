@@ -2,6 +2,7 @@ const { ObjectId } = require('mongodb');
 const mongoose     = require('mongoose');
 const User         = require('../../models/User');
 const { buildAlertQuery } = require('../../utils/alertquery');
+const crypto = require("crypto");
 
 function toPrice(raw) {
   if (raw === null || raw === undefined || raw === 'No Result' || raw === 'no result' || raw === '') return null;

@@ -154,10 +154,7 @@ const Signup = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4">
       <div className="w-full max-w-lg">
         <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center">
-            <Rss className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-2xl font-bold text-slate-900 dark:text-white">DigitalDataFeed</span>
+          <img src="/src/services/assets/main-logo.png" alt="Logo" className="h-24 w-auto object-contain" />
         </div>
 
         <Card>
@@ -169,11 +166,11 @@ const Signup = () => {
             <form onSubmit={handleSubmit} noValidate className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Company Name *" error={touched.companyName && errors.companyName}>
-                  <Input id="companyName" placeholder="e.g. Hari Electronics" value={form.companyName}
+                  <Input id="companyName" placeholder="Enter company name" value={form.companyName}
                     onChange={handleChange} onBlur={handleBlur} className={inputClass('companyName')} />
                 </Field>
                 <Field label="Company URL *" error={touched.companyUrl && errors.companyUrl}>
-                  <Input id="companyUrl" placeholder="e.g. harielectronics.com" value={form.companyUrl}
+                  <Input id="companyUrl" placeholder="Enter company URL" value={form.companyUrl}
                     onChange={handleChange} onBlur={handleBlur} className={inputClass('companyUrl')} />
                 </Field>
               </div>
@@ -182,7 +179,7 @@ const Signup = () => {
                 <Field label="Email *" error={touched.email && errors.email}
                   success={emailStatus === 'available' ? 'Email is available' : ''}>
                   <div className="relative">
-                    <Input id="email" type="email" placeholder="you@example.com" value={form.email}
+                    <Input id="email" type="email" placeholder="Enter your email" value={form.email}
                       onChange={handleChange} onBlur={handleBlur} className={`pr-8 ${inputClass('email')}`} />
                     {emailStatus === 'checking' && (
                       <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
@@ -190,7 +187,7 @@ const Signup = () => {
                   </div>
                 </Field>
                 <Field label="Phone Number *" error={touched.phone && errors.phone}>
-                  <Input id="phone" type="tel" placeholder="+91 98765 43210" value={form.phone}
+                  <Input id="phone" type="tel" placeholder="Enter your phone number" value={form.phone}
                     onChange={handleChange} onBlur={handleBlur} inputMode="numeric" maxLength={15}
                     className={inputClass('phone')} />
                 </Field>
