@@ -666,7 +666,7 @@ function PriceGapChart({ product }) {
 
 // ─── Competitor Price Table ───────────────────────────────────────────────────
 
-function CompetitorTable({ product, tab, competitorMeta, storePriceLabel = "Store Price" }) {
+function CompetitorTable({ product, tab, competitorMeta }) {
   const ourPrice = parsePrice(product.product_price);
   const ourStorePrice = getStorePrice(product);
   const ourSapPrice = getSapPrice(product);
@@ -704,8 +704,6 @@ function CompetitorTable({ product, tab, competitorMeta, storePriceLabel = "Stor
           <tr className="bg-slate-50 dark:bg-[#151a2a] border-b border-slate-200 dark:border-slate-700">
             <th className="text-left px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">Competitor</th>
             <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">Web Price</th>
-            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">{storePriceLabel}</th>
-            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">SAP Price</th>
             <th className="text-center px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">Rank</th>
             <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">{colLabel}</th>
           </tr>
@@ -784,12 +782,6 @@ function CompetitorTable({ product, tab, competitorMeta, storePriceLabel = "Stor
                     fmt(entry.price)
                   )}
                 </td>
-                <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">
-                  {entry.isMe ? fmt(entry.storePrice) : "—"}
-                </td>
-                <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">
-                  {entry.isMe ? fmt(entry.sapPrice) : "—"}
-                </td>
                 <td className="px-4 py-3 text-center">{entry.price === null ? "—" : <RankBadge rank={rankNum} total={allEntries.length} />}</td>
                 <td className={`px-4 py-3 text-right text-xs font-semibold ${diffColor}`}>{diffLabel}</td>
               </tr>
@@ -803,8 +795,10 @@ function CompetitorTable({ product, tab, competitorMeta, storePriceLabel = "Stor
 
 // ─── Header Metric Bar ────────────────────────────────────────────────────────
 
-function HeaderMetrics({ product, tab }) {
+function HeaderMetrics({ product, tab, storePriceLabel = "Store Price" }) {
   const ourPrice = parsePrice(product.product_price);
+  const ourStorePrice = getStorePrice(product);
+  const ourSapPrice = getSapPrice(product);
   const rank = computeRank(product);
   const rankTotal = getCompPrices(product).length + 1;
   const marketAvg = getMarketAvg(product);
@@ -814,6 +808,10 @@ function HeaderMetrics({ product, tab }) {
     return (
       <div className="flex items-center flex-wrap gap-8">
         <MetricCard label="Current Price" value={fmt(ourPrice)} />
+        <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
+        <MetricCard label={storePriceLabel} value={fmt(ourStorePrice)} />
+        <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
+        <MetricCard label="SAP Price" value={fmt(ourSapPrice)} />
         <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
         <div><p className="text-[11px] font-bold uppercase text-slate-400 mb-1">Rank</p><RankBadge rank={1} total={1} /></div>
         <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
@@ -849,6 +847,10 @@ function HeaderMetrics({ product, tab }) {
   return (
     <div className="flex items-center flex-wrap gap-8">
       <MetricCard label="Current Price" value={fmt(ourPrice)} />
+      <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
+      <MetricCard label={storePriceLabel} value={fmt(ourStorePrice)} />
+      <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
+      <MetricCard label="SAP Price" value={fmt(ourSapPrice)} />
       <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
       <MetricCard label="Market Average" value={fmt(marketAvg)} />
       <div className="h-10 w-px bg-slate-200 dark:bg-slate-700" />
@@ -1312,12 +1314,12 @@ export default function SmartReports() {
                   </div>
 
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#151a2a] p-3 md:p-5 shadow-sm">
-                    <HeaderMetrics product={selectedProduct} tab={activeTab} />
+                    <HeaderMetrics product={selectedProduct} tab={activeTab} storePriceLabel={storePriceLabel} />
                   </div>
 
                   {activeTab !== "Non Competitors" && getListedCompetitors(selectedProduct).length > 0 && (
                     <div className="overflow-x-auto rounded-xl">
-                      <CompetitorTable product={selectedProduct} tab={activeTab} competitorMeta={competitorMeta} storePriceLabel={storePriceLabel} />
+                      <CompetitorTable product={selectedProduct} tab={activeTab} competitorMeta={competitorMeta} />
                     </div>
                   )}
 
