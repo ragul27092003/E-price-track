@@ -4,137 +4,102 @@ const {
   VALID_TABS,
   TAB_API_KEYS,
   loadFilterContext,
-  productMatchesTab,
   countProductsByTab,
-  matchesSearch,
   filterProductsForTab,
 } = require('../../utils/smartReportFilter');
 
-const SCAN_BATCH = 100;
-const scanCache = new Map();
-const tabCountCache = new Map();
+const TENANT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// One cache entry per tenant — NOT per tab. The enriched product list is the
+// same regardless of which tab the user is looking at, so we scan+enrich the
+// whole ept_product_details_new collection exactly once, then every tab's
+// products/counts are derived in-memory (simple array filter, zero DB calls).
+const tenantCache = new Map();
 
 const BASE_FILTER = {
   status: 'active',
   ean_product_data_details_scrap_status: 'completed',
 };
 
-function cacheKey(tenantId, tab) {
-  return `${tenantId}:${tab}`;
-}
-
-function getOrCreateScanState(tenantId, tab) {
-  const key = cacheKey(tenantId, tab);
-  if (!scanCache.has(key)) {
-    scanCache.set(key, {
+function getOrCreateTenantState(tenantId) {
+  if (!tenantCache.has(tenantId)) {
+    tenantCache.set(tenantId, {
       products: [],
-      scanSkip: 0,
       scanComplete: false,
       context: null,
+      scannedAt: null,
+      scanPromise: null, // in-flight scan lock — see getTenantState
     });
   }
-  return scanCache.get(key);
+  return tenantCache.get(tenantId);
 }
 
-async function ensureContext(db, tenantId, state) {
-  if (!state.context) {
-    state.context = await loadFilterContext(db, tenantId);
-  }
-  return state.context;
+// Runs the actual scan from scratch. Only ever called from inside
+// getTenantState, and only ever ONE of these runs per tenant at a time
+// (protected by state.scanPromise below) — this is what prevents two
+// concurrent requests from racing on the same state.products.
+//
+// FIXED: previously this paginated through the collection in 300-doc
+// batches, and enrichProductsLight() re-ran buildCompetitorMap() (which
+// re-queries ept_competitor_info + every ept_product_details_new_<slug>
+// competitor collection) ONCE PER BATCH. For ~5 batches x ~5 competitors
+// that was ~25 serialized round trips instead of ~5 parallel ones — this
+// was the actual source of the 25s first-load. buildCompetitorMap already
+// parallelizes across competitors regardless of how many products it's
+// given, so there's no benefit to chunking — fetch everything once and
+// enrich once.
+async function runFullScan(db, tenantId, state) {
+  state.products = [];
+  state.scanComplete = false;
+  state.context = null;
+
+  const [context, allDocs] = await Promise.all([
+    loadFilterContext(db, tenantId),
+    db.collection('ept_product_details_new').find(BASE_FILTER).toArray(),
+  ]);
+
+  state.context = context;
+  state.products = await enrichProductsLight(db, allDocs);
+  state.scanComplete = true;
+  state.scannedAt = Date.now();
 }
 
-async function scanMoreProducts(db, tab, state, tenantId) {
-  const col = db.collection('ept_product_details_new');
-  const context = await ensureContext(db, tenantId, state);
+// Ensures the tenant's product list is fully scanned+enriched and cached.
+// Rescans from scratch only when forced (?refresh=1), the TTL has expired,
+// or no scan has completed yet. If a scan is ALREADY in flight for this
+// tenant (e.g. another request triggered it a moment ago), concurrent
+// callers wait on that same scan instead of starting a second one — this is
+// what was causing partial/inconsistent counts (e.g. 166 instead of 223)
+// when two requests hit the same tenant at once.
+async function getTenantState(db, tenantId, forceRescan = false) {
+  const state = getOrCreateTenantState(tenantId);
+  const ttlExpired = state.scannedAt && (Date.now() - state.scannedAt > TENANT_CACHE_TTL_MS);
+  const needsRescan = forceRescan || ttlExpired || !state.scanComplete;
 
-  while (!state.scanComplete) {
-    const batch = await col.find(BASE_FILTER).skip(state.scanSkip).limit(SCAN_BATCH).toArray();
-    if (!batch.length) {
-      state.scanComplete = true;
-      break;
+  if (needsRescan) {
+    if (!state.scanPromise) {
+      state.scanPromise = runFullScan(db, tenantId, state).finally(() => {
+        state.scanPromise = null;
+      });
     }
-
-    const enriched = await enrichProductsLight(db, batch);
-    for (const product of enriched) {
-      if (productMatchesTab(product, tab, context)) {
-        state.products.push(product);
-      }
-    }
-
-    state.scanSkip += batch.length;
-    if (batch.length < SCAN_BATCH) {
-      state.scanComplete = true;
-      break;
-    }
-
-    return;
-  }
-}
-
-async function ensureProducts(db, tenantId, tab, minCount) {
-  const state = getOrCreateScanState(tenantId, tab);
-
-  while (state.products.length < minCount && !state.scanComplete) {
-    await scanMoreProducts(db, tab, state, tenantId);
-    if (state.scanComplete) break;
+    await state.scanPromise;
   }
 
   return state;
-}
-
-async function ensureAllProducts(db, tenantId, tab) {
-  const state = getOrCreateScanState(tenantId, tab);
-
-  while (!state.scanComplete) {
-    await scanMoreProducts(db, tab, state, tenantId);
-  }
-
-  return state;
-}
-
-async function computeAllTabCounts(db, tenantId) {
-  const context = await loadFilterContext(db, tenantId);
-  const counts = Object.fromEntries(VALID_TABS.map((tab) => [tab, 0]));
-  const col = db.collection('ept_product_details_new');
-  let skip = 0;
-
-  while (true) {
-    const batch = await col.find(BASE_FILTER).skip(skip).limit(SCAN_BATCH).toArray();
-    if (!batch.length) break;
-
-    const enriched = await enrichProductsLight(db, batch);
-    const batchCounts = countProductsByTab(enriched, context);
-    for (const tab of VALID_TABS) {
-      counts[tab] += batchCounts[tab];
-    }
-
-    skip += batch.length;
-    if (batch.length < SCAN_BATCH) break;
-  }
-
-  const apiCounts = {};
-  for (const tab of VALID_TABS) {
-    apiCounts[TAB_API_KEYS[tab]] = counts[tab];
-  }
-
-  return { counts, apiCounts, context };
-}
-
-async function getCachedTabCounts(db, tenantId, force = false) {
-  if (!force && tabCountCache.has(tenantId)) {
-    return tabCountCache.get(tenantId);
-  }
-
-  const result = await computeAllTabCounts(db, tenantId);
-  tabCountCache.set(tenantId, result);
-  return result;
 }
 
 function invalidateTenantCaches(tenantId) {
-  for (const key of [...scanCache.keys()]) {
-    if (key.startsWith(`${tenantId}:`)) scanCache.delete(key);
-  }
-  tabCountCache.delete(tenantId);
+  tenantCache.delete(tenantId);
+}
+
+// Fire-and-forget cache warmup — call this right after tenant/session is
+// resolved (e.g. in the login controller) so the scan runs in the
+// background while the user is still on another page, instead of blocking
+// the first Smart Reports request. Never awaited by the caller.
+function warmTenantCache(db, tenantId) {
+  getTenantState(db, tenantId, false).catch((err) => {
+    console.error('smartReportsController warmup failed for tenant', tenantId, err);
+  });
 }
 
 // GET /api/smart-reports/tab-counts
@@ -143,7 +108,15 @@ exports.getTabCounts = async (req, res) => {
     const db = req.tenantDb;
     const tenantId = req.tenantId;
     const force = req.query.refresh === '1';
-    const { counts, apiCounts } = await getCachedTabCounts(db, tenantId, force);
+
+    const state = await getTenantState(db, tenantId, force);
+    const counts = countProductsByTab(state.products, state.context);
+
+    const apiCounts = {};
+    for (const tab of VALID_TABS) {
+      apiCounts[TAB_API_KEYS[tab]] = counts[tab];
+    }
+
     res.json({ counts, ...apiCounts });
   } catch (err) {
     console.error('smartReportsController.getTabCounts error:', err);
@@ -158,6 +131,7 @@ exports.getTabProducts = async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page || '1', 10));
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit || '50', 10)));
     const search = (req.query.search || '').trim();
+    const force = req.query.refresh === '1';
 
     if (!VALID_TABS.includes(tab)) {
       return res.status(400).json({ message: 'Invalid tab' });
@@ -165,34 +139,17 @@ exports.getTabProducts = async (req, res) => {
 
     const db = req.tenantDb;
     const tenantId = req.tenantId;
-    const needed = page * limit;
-    const state = await ensureProducts(db, tenantId, tab, needed);
 
-    let list = search
-      ? state.products.filter((p) => matchesSearch(p, search))
-      : state.products;
+    const state = await getTenantState(db, tenantId, force);
 
-    while (search && list.length < needed && !state.scanComplete) {
-      await scanMoreProducts(db, tab, state, tenantId);
-      list = state.products.filter((p) => matchesSearch(p, search));
-    }
-
+    const list = filterProductsForTab(state.products, tab, search, state.context);
     const data = list.slice((page - 1) * limit, page * limit);
-    let tabCounts = null;
-    if (!search) {
-      await ensureAllProducts(db, tenantId, tab);
-      list = state.products;
-      const freshCounts = await getCachedTabCounts(db, tenantId, true);
-      tabCounts = freshCounts.counts;
-      // Keep the active tab count in sync with the scanned product list
-      tabCounts[tab] = list.length;
-    }
-
     const total = list.length;
 
-    const hasMore = search
-      ? list.length > page * limit || !state.scanComplete
-      : state.products.length > page * limit || !state.scanComplete;
+    let tabCounts = null;
+    if (!search) {
+      tabCounts = countProductsByTab(state.products, state.context);
+    }
 
     res.json({
       data,
@@ -201,8 +158,8 @@ exports.getTabProducts = async (req, res) => {
       page,
       limit,
       totalPages: Math.max(1, Math.ceil(total / limit)),
-      hasMore,
-      scanComplete: state.scanComplete,
+      hasMore: page * limit < total,
+      scanComplete: true,
     });
   } catch (err) {
     console.error('smartReportsController.getTabProducts error:', err);
@@ -247,11 +204,11 @@ exports.exportTab = async (req, res) => {
 
     const db = req.tenantDb;
     const tenantId = req.tenantId;
-    const context = await loadFilterContext(db, tenantId);
 
-    invalidateTenantCaches(tenantId);
-    const state = await ensureAllProducts(db, tenantId, tab);
-    let list = filterProductsForTab(state.products, tab, search, context);
+    // Export always gets fresh data — force a rescan (still race-safe: if a
+    // scan is already in flight, this just awaits it instead of racing it).
+    const state = await getTenantState(db, tenantId, true);
+    let list = filterProductsForTab(state.products, tab, search, state.context);
 
     if (tab === 'Non Competitors' && list.length) {
       list = await enrichProducts(db, list);
@@ -263,3 +220,12 @@ exports.exportTab = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+// Call this from wherever product data gets mutated (price edits, re-scrape,
+// tenant re-provisioning, etc.) so stale cached data doesn't linger for the
+// full TTL window.
+exports.invalidateTenantCaches = invalidateTenantCaches;
+
+// Call this right after tenant/session resolution (e.g. login controller)
+// to start scanning in the background before the user opens Smart Reports.
+exports.warmTenantCache = warmTenantCache;
