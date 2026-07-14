@@ -41,6 +41,16 @@ function getListedCompetitors(product) {
     .map((c) => ({ ...c, price: parsePrice(c.price) }));
 }
 
+// Web/Store/SAP price are all OUR prices — competitors only ever have a
+// scraped web price, so these two only ever apply to the "My Price" row.
+function getStorePrice(product) {
+  return parsePrice(product.product_store_price);
+}
+
+function getSapPrice(product) {
+  return parsePrice(product.product_sap_price);
+}
+
 // Match Products page export — Type A: single "Competitor Detail" column
 function buildProductsTypeACompetitorDetail(product) {
   return (product.competitor_prices || [])
@@ -656,17 +666,21 @@ function PriceGapChart({ product }) {
 
 // ─── Competitor Price Table ───────────────────────────────────────────────────
 
-function CompetitorTable({ product, tab, competitorMeta }) {
+function CompetitorTable({ product, tab, competitorMeta, storePriceLabel = "Store Price" }) {
   const ourPrice = parsePrice(product.product_price);
+  const ourStorePrice = getStorePrice(product);
+  const ourSapPrice = getSapPrice(product);
   const listedComps = getListedCompetitors(product);
   const comps = listedComps.filter((c) => c.price !== null);
 
  const allEntries = [
-    { name: "My Price", slug: "me", price: ourPrice, isMe: true },
+    { name: "My Price", slug: "me", price: ourPrice, storePrice: ourStorePrice, sapPrice: ourSapPrice, isMe: true },
     ...listedComps.map((c) => ({
       ...c,
       name: competitorMeta?.[c.slug]?.name || c.name || c.slug,
       logo: competitorMeta?.[c.slug]?.logo || "",
+      storePrice: null,
+      sapPrice: null,
       isMe: false,
     })),
   ]
@@ -689,7 +703,9 @@ function CompetitorTable({ product, tab, competitorMeta }) {
         <thead>
           <tr className="bg-slate-50 dark:bg-[#151a2a] border-b border-slate-200 dark:border-slate-700">
             <th className="text-left px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">Competitor</th>
-            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">Price</th>
+            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">Web Price</th>
+            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">{storePriceLabel}</th>
+            <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">SAP Price</th>
             <th className="text-center px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">Rank</th>
             <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">{colLabel}</th>
           </tr>
@@ -767,6 +783,12 @@ function CompetitorTable({ product, tab, competitorMeta }) {
                   ) : (
                     fmt(entry.price)
                   )}
+                </td>
+                <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">
+                  {entry.isMe ? fmt(entry.storePrice) : "—"}
+                </td>
+                <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">
+                  {entry.isMe ? fmt(entry.sapPrice) : "—"}
                 </td>
                 <td className="px-4 py-3 text-center">{entry.price === null ? "—" : <RankBadge rank={rankNum} total={allEntries.length} />}</td>
                 <td className={`px-4 py-3 text-right text-xs font-semibold ${diffColor}`}>{diffLabel}</td>
@@ -961,6 +983,13 @@ export default function SmartReports() {
   const { competitors, setCompetitors, activeStoreId, fetchMerchant } = useStore();
   const exportType = useStore((s) => s.exportType) || "A";
   const canExport  = useStore((s) => (s.user?.export_option ?? "yes") !== "no");
+
+  // Only for the SmartReports page: nandilathgmart wants "Store Price"
+  // relabeled to "MRP Price". Products page is untouched — this is scoped
+  // to CompetitorTable here only.
+  const storePriceLabel = String(activeStoreId || "").toLowerCase().includes("nandilathgmart")
+    ? "MRP Price"
+    : "Store Price";
 
   const [activeTab, setActiveTab] = useState(location.state?.tab || "Easy Gain");
   const [selectedEan, setSelectedEan] = useState(null);
@@ -1288,7 +1317,7 @@ export default function SmartReports() {
 
                   {activeTab !== "Non Competitors" && getListedCompetitors(selectedProduct).length > 0 && (
                     <div className="overflow-x-auto rounded-xl">
-                      <CompetitorTable product={selectedProduct} tab={activeTab} competitorMeta={competitorMeta} />
+                      <CompetitorTable product={selectedProduct} tab={activeTab} competitorMeta={competitorMeta} storePriceLabel={storePriceLabel} />
                     </div>
                   )}
 

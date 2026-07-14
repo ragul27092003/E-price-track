@@ -411,6 +411,7 @@ export default function Dashboard() {
           icon={CheckSquare} color="text-primary" bg="bg-primary/10"
           loading={statsLoading}
         />
+        <a href="/products" rel="noopener noreferrer">
         <KpiCard
           label="Completed Products"
           value={stats?.varCompletedProductCount ?? '--'}
@@ -418,6 +419,7 @@ export default function Dashboard() {
           icon={CheckCircle2} color="text-foreground" bg="bg-foreground/10"
           loading={statsLoading}
         />
+        </a>
         <KpiCard
           label="Pending Products"
           value={stats?.varPendingProductCount ?? '--'}
