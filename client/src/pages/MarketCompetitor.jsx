@@ -515,6 +515,9 @@ function CompetitorTab({ data, isActive, onClick, liveCount }) {
           {productCount === "loading" ? "…" : Number(productCount).toLocaleString("en-IN")}
         </span>
       )}
+      {data.isRunning && (
+        <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" title="Sync in progress" />
+      )}
       {isOffline ? (
         <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[9px] font-black uppercase text-gray-500">Offline</span>
       ) : (

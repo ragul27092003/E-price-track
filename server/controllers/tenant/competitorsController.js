@@ -11,6 +11,105 @@ const SLUG_TO_COLLECTION = {
   vijaysales:       'ept_product_details_new_vijaysales',
 };
 
+// ─── helper: parse cron timestamps stored as "YYYY-MM-DD HH:MM:SSam/pm" (IST) ─
+// Example from ean_cron_time_management: "2025-04-10 10:56:03am"
+// These strings are wall-clock IST (Asia/Kolkata) with no timezone marker, so
+// we anchor them to +05:30 explicitly rather than letting the server's local
+// timezone silently shift them (this was the source of the "timing" bug).
+function parseCronTimestamp(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  // am/pm suffix is OPTIONAL — some docs write start_time as plain 24hr
+  // ("2026-07-13 12:16:01") while end_time carries an am/pm marker
+  // ("2026-07-13 12:30:58pm"). Requiring am/pm on every doc silently
+  // dropped any run whose start_time lacked it (parseCronTimestamp
+  // returned null → getCronStatusMap's `if (!startDate) return;` skipped
+  // the whole run → UI fell back to an older, stale completed run's
+  // end_time instead of showing the real latest sync).
+  const m = raw.trim().match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2}):(\d{2})\s*(am|pm)?$/i);
+  if (!m) return null;
+  let [, y, mo, d, h, mi, s, ap] = m;
+  h = parseInt(h, 10);
+  if (ap) {
+    const isPM = ap.toLowerCase() === 'pm';
+    if (isPM && h !== 12) h += 12;
+    if (!isPM && h === 12) h = 0;
+  }
+  // no am/pm marker → treat as already 24hr, use hour as-is
+  const iso = `${y}-${mo}-${d}T${String(h).padStart(2, '0')}:${mi}:${s}+05:30`;
+  const date = new Date(iso);
+  return isNaN(date) ? null : date;
+}
+
+// Formats a Date into the same "YYYY-MM-DD HH:MM:SS" (UTC) shape used by
+// modified_date elsewhere, so the existing frontend formatSync() keeps working.
+function toStoredTimeString(date) {
+  return date.toISOString().replace('T', ' ').substring(0, 19);
+}
+
+// A "running" run whose start_time is older than this is almost certainly a
+// crashed/stuck cron that never wrote end_time — not an active sync. Treat it
+// as not-running so old leftover docs don't permanently show "Running".
+const STALE_RUN_HOURS = 24;
+
+// ─── helper: latest cron run status per competitor slug ───────────────────────
+// Reads ean_cron_time_management (per-tenant collection). Each doc:
+//   { cron_competitor_name: 'amazon', start_time: '...am/pm', end_time: '' | '...am/pm', total_count, ... }
+// end_time === '' means that run is still in progress ("Running") — unless it's stale (see above).
+// Returns a map: slug -> { isRunning, lastSync (stored-time-string|null), totalCount }
+async function getCronStatusMap(db) {
+  const statusMap = {};
+  try {
+    const docs = await db.collection('ept_cron_time_management').find({}).toArray();
+
+    const bySlug = {};
+    docs.forEach((doc) => {
+      const slug = (doc.cron_competitor_name || '').toLowerCase().trim();
+      if (!slug) return;
+      const startDate = parseCronTimestamp(doc.start_time);
+      if (!startDate) return;
+      (bySlug[slug] = bySlug[slug] || []).push({ ...doc, _startDate: startDate });
+    });
+
+    const now = Date.now();
+
+    Object.keys(bySlug).forEach((slug) => {
+      const runs = bySlug[slug].sort((a, b) => b._startDate - a._startDate);
+      const latest = runs[0];
+      const latestIsOpen = !latest.end_time || latest.end_time === '';
+      const hoursSinceStart = (now - latest._startDate.getTime()) / (1000 * 60 * 60);
+      const isRunning = latestIsOpen && hoursSinceStart <= STALE_RUN_HOURS;
+
+      // Most recent COMPLETED run (could be `latest` itself, or an earlier one
+      // if the latest run is still in progress) — used for "Last Sync".
+      let lastSync = null;
+      for (const run of runs) {
+        if (run.end_time && run.end_time !== '') {
+          const endDate = parseCronTimestamp(run.end_time);
+          if (endDate) {
+            lastSync = toStoredTimeString(endDate);
+            break;
+          }
+        }
+      }
+
+      // total_count is set on the run doc itself (target product count for that
+      // competitor), so it's available even while the run is still in progress.
+      // Fall back to the last completed run's total_count if the latest run
+      // doesn't have one for some reason.
+      let totalCount = (typeof latest.total_count === 'number') ? latest.total_count : null;
+      if (totalCount === null) {
+        const withCount = runs.find((r) => typeof r.total_count === 'number');
+        totalCount = withCount ? withCount.total_count : null;
+      }
+
+      statusMap[slug] = { isRunning, lastSync, totalCount };
+    });
+  } catch (e) {
+    console.warn('Could not read from ept_cron_time_management:', e.message);
+  }
+  return statusMap;
+}
+
 // ─── helper: parse price (mirrors toPrice in productsController) ──────────────
 function toPrice(raw) {
   if (raw === null || raw === undefined || raw === 'No Result' || raw === 'no result' || raw === '') return null;
@@ -186,6 +285,11 @@ exports.getAll = async (req, res) => {
       console.warn('Could not read from ept_dashbaord_statics:', e.message);
     }
 
+    // 4a. Live cron status per competitor (from ean_cron_time_management) —
+    //     tells us if a scrape is currently RUNNING and, if not, when it last
+    //     actually finished (end_time), fixing the stale Last Sync problem.
+    const cronStatusMap = await getCronStatusMap(db);
+
     // 4. Our own product prices → { product_code: price } (for avgPriceDelta)
     const ourProducts = await db.collection('ept_product_details_new').find({
       status: 'active',
@@ -215,11 +319,24 @@ exports.getAll = async (req, res) => {
 
       // Use the static pre-calculated collection count to ensure it reflects 809
       const normalizedSlug = slug.toLowerCase().trim();
-      const productsTracked = staticCountsMap[normalizedSlug] !== undefined 
+      const staticCount = staticCountsMap[normalizedSlug] !== undefined 
         ? staticCountsMap[normalizedSlug] 
         : 0;
 
       const avgPriceDelta = await computeAvgPriceDelta(db, slug, ourPriceMap);
+
+      // Cron status: if the latest run for this competitor has no end_time
+      // yet (and it's recent, not a stale/crashed leftover), it's still
+      // fetching — show a running indicator instead of a stale "Last Sync"
+      // date. Tracked count comes straight from the cron doc's total_count,
+      // which is far more reliable than the precomputed static collection
+      // (which was returning 0 for some competitors).
+      const cronStatus = cronStatusMap[normalizedSlug] || null;
+      const isRunning     = !!(cronStatus && cronStatus.isRunning);
+      const lastSync       = (cronStatus && cronStatus.lastSync) || c.modified_date || 'Never';
+      const productsTracked = (cronStatus && typeof cronStatus.totalCount === 'number')
+        ? cronStatus.totalCount
+        : staticCount;
 
       return {
         id:              c._id,
@@ -232,8 +349,9 @@ exports.getAll = async (req, res) => {
         mappingType,
         isActive:        c.competitor_status === 'enable',
         avgPriceDelta,
-        productsTracked,  // ← Now matches your Dashboard Overview list exactly!
-        lastSync:        c.modified_date || 'Never',
+        productsTracked,  // ← from ean_cron_time_management.total_count (falls back to static count)
+        isRunning,        // ← true while the scrape cron for this competitor is genuinely in progress
+        lastSync,
         slug,
       };
     }));

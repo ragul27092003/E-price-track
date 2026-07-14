@@ -262,7 +262,13 @@ const CompetitorRow = ({ data, onToggleSync, isSuperAdmin, isRestrictedUser, onL
           ) : (
             <span className="text-gray-400 dark:text-slate-500 font-bold text-sm">○ Offline</span>
           )}
-          <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">{formatSync(data.lastSync)}</p>
+          {data.isRunning ? (
+            <p className="flex items-center gap-1 text-[11px] text-blue-600 font-semibold mt-0.5">
+              <AutorenewIcon style={{ fontSize: 12 }} className="animate-spin" /> Running...
+            </p>
+          ) : (
+            <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">{formatSync(data.lastSync)}</p>
+          )}
         </div>
       </div>
 

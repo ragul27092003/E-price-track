@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate , NavLink} from "react-router-dom";
+
 import {
   Calendar, Package, CheckSquare, CheckCircle2, Clock, Bell,
   TrendingUp, Users, BarChart3, BarChart, Info,
@@ -411,15 +412,15 @@ export default function Dashboard() {
           icon={CheckSquare} color="text-primary" bg="bg-primary/10"
           loading={statsLoading}
         />
-        <a href="/products" rel="noopener noreferrer">
-        <KpiCard
-          label="Completed Products"
-          value={stats?.varCompletedProductCount ?? '--'}
-          subtext="Analytics for completed products"
-          icon={CheckCircle2} color="text-foreground" bg="bg-foreground/10"
+        <NavLink to="/products">
+          <KpiCard
+            label="Completed Products"
+            value={stats?.varCompletedProductCount ?? '--'}
+            subtext="Analytics for completed products"
+            icon={CheckCircle2} color="text-foreground" bg="bg-foreground/10"
           loading={statsLoading}
         />
-        </a>
+        </NavLink>
         <KpiCard
           label="Pending Products"
           value={stats?.varPendingProductCount ?? '--'}
