@@ -482,9 +482,10 @@ const Competitors = () => {
     }
   };
 
-  const filtered = (competitors || []).filter((c) =>
-    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+ const filtered = (competitors || [])
+  .filter((c) => (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
+  .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
   const eanList    = filtered.filter((c) => c.mappingType === 'EAN');
   const nonEanList = filtered.filter((c) => c.mappingType === 'NON_EAN');
 

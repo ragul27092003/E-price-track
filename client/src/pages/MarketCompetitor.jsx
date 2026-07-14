@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { fetchCompetitors } from '../services/competitorsService';
 import { fetchProducts, fetchProductsMeta, exportProductsCSV } from '../services/productsService';
@@ -79,29 +79,6 @@ function slugColor(slug = "") {
   let h = 0;
   for (let i = 0; i < slug.length; i++) h = (h * 31 + slug.charCodeAt(i)) & 0xffff;
   return BRAND_COLORS[h % BRAND_COLORS.length];
-}
-
-function normalizeCompetitorKey(value = "") {
-  return String(value).toLowerCase().trim().replace(/\s+/g, "_");
-}
-
-function findCompetitorByParam(competitors, param) {
-  if (!param || !competitors?.length) return null;
-  const key = normalizeCompetitorKey(param);
-  return competitors.find((c) =>
-    normalizeCompetitorKey(c.slug) === key ||
-    normalizeCompetitorKey(c.name) === key
-  ) || null;
-}
-
-function orderCompetitors(competitors) {
-  const eanSorted = competitors
-    .filter((c) => c.mappingType === 'EAN')
-    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  const nonEanSorted = competitors
-    .filter((c) => c.mappingType === 'NON_EAN')
-    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  return [...eanSorted, ...nonEanSorted];
 }
 
 // ─── Export Function ──────────────────────────────────────────────────────────
@@ -283,25 +260,22 @@ function MarketGapCell({ product, competitorMeta }) {
   return (<div className="flex flex-col gap-1"><span className="inline-flex text-[11px] font-bold text-emerald-600 bg-emerald-50 rounded-full px-2.5 py-1 w-fit">↓ {fmtAmt(-gap)} cheaper</span><span className="text-[10px] text-slate-400 mt-0.5">{fmtAmt(lowest.price)} ({compName}) vs {fmtAmt(ourPrice)} mine</span></div>);
 }
 
-function CompetitorPrices({ product, competitorMeta }) {
+function CompetitorPrices({ product, competitorMeta, selectedSlug }) {
   const navigate = useNavigate();
-  const listed = (product.competitor_prices || []).filter(c => c.is_listed);
+  
+  // ✅ selected competitor-ஓட entry மட்டும் எடு
+  const listed = (product.competitor_prices || []).filter(
+    c => c.is_listed && c.slug === selectedSlug
+  );
+
   if (listed.length === 0) {
     const { low, avg, high } = marketStats(product);
     return <MarketCap low={low} avg={avg} high={high} />;
   }
-  const sorted = [...listed].sort((a, b) => {
-    const aOos = isCompetitorOos(a);
-    const bOos = isCompetitorOos(b);
-    if (!aOos && bOos) return -1;
-    if (aOos && !bOos) return 1;
-    if (!aOos && !bOos) return a.price - b.price;
-    return 0;
-  });
 
   return (
     <div className="flex items-center gap-6 flex-wrap">
-      {sorted.map((c) => {
+      {listed.map((c) => {
         const meta = competitorMeta?.[c.slug] || {};
         const isOos = isCompetitorOos(c);
         return (
@@ -358,16 +332,26 @@ function ProductCell({ product }) {
       )}
       <div>
         {linkUrl ? (
-          <a href={linkUrl} target="_blank" rel="noopener noreferrer" title="Open product page" className="inline-flex items-center gap-1 font-bold text-slate-800 dark:text-white text-[13px] hover:text-black dark:hover:text-black">
-            {product.product_name || "Unnamed Product"}
-            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" className="shrink-0 opacity-60">
+          <a
+            href={linkUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={product.product_name || "Unnamed Product"}
+            className="inline-flex items-start gap-1 font-bold text-slate-800 dark:text-white text-[13px] hover:text-black dark:hover:text-black"
+          >
+            <span className="line-clamp-2 max-w-[220px]">
+              {product.product_name || "Unnamed Product"}
+            </span>
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5" className="shrink-0 opacity-60 mt-0.5">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
               <path d="M15 3h6v6" />
               <path d="M10 14 21 3" />
             </svg>
           </a>
         ) : (
-          <p className="font-bold text-slate-800 dark:text-white text-[13px]">{product.product_name || "Unnamed Product"}</p>
+          <p className="font-bold text-slate-800 dark:text-white text-[13px] line-clamp-2 max-w-[220px]" title={product.product_name || "Unnamed Product"}>
+            {product.product_name || "Unnamed Product"}
+          </p>
         )}
         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
           {product.product_brand && <span>{product.product_brand} · </span>}
@@ -505,6 +489,8 @@ function FilterSelect({ label, options, value, onChange }) {
 // ─── Competitor Tab Bar ────────────────────────────────────────────────────────
 function CompetitorTab({ data, isActive, onClick, liveCount }) {
   const isOffline = !data.isActive;
+  const isProcessing = data.syncStatus === 'processing';
+  const isDisabled = isOffline || isProcessing;
   const isNegDelta = String(data.avgPriceDelta).includes('-');
   // Falls back across common field name variants until the backend's actual key is confirmed.
   // liveCount (from the products API, only known for the active tab) always wins when present.
@@ -542,9 +528,6 @@ function CompetitorTab({ data, isActive, onClick, liveCount }) {
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 const MarketCompetitor = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const competitorParam = searchParams.get('competitor') || '';
-
   const competitors = useStore((s) => s.competitors);
   const setCompetitors = useStore((s) => s.setCompetitors);
   const competitorsLoading = useStore((s) => s.competitorsLoading);
@@ -597,40 +580,21 @@ const MarketCompetitor = () => {
     fetchProductsMeta().then(setProductsMeta).catch(() => {});
   }, [activeStoreId]);
 
-  // Auto-select competitor from URL param or fall back to the first active tab
+  // Auto-select the first active competitor once the list loads
   useEffect(() => {
-    if (competitors.length === 0) return;
+  if (!selectedCompetitor && competitors.length > 0) {
+      const eanSorted = competitors
+        .filter((c) => c.mappingType === 'EAN')
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      const nonEanSorted = competitors
+        .filter((c) => c.mappingType === 'NON_EAN')
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-    const fromUrl = competitorParam ? findCompetitorByParam(competitors, competitorParam) : null;
-    if (fromUrl?.isActive) {
-      setSelectedCompetitor((prev) => (prev?.slug === fromUrl.slug ? prev : fromUrl));
-      return;
+      const orderedList = [...eanSorted, ...nonEanSorted];
+      const firstActive = orderedList.find((c) => c.isActive);
+      if (firstActive) setSelectedCompetitor(firstActive);
     }
-
-    setSelectedCompetitor((prev) => {
-      if (prev) return prev;
-      const firstActive = orderCompetitors(competitors).find((c) => c.isActive);
-      return firstActive || null;
-    });
-  }, [competitors, competitorParam]);
-
-  const lastCompetitorParamRef = useRef(null);
-
-  // Reset filters when arriving from dashboard (or any external URL change)
-  useEffect(() => {
-    if (!competitorParam || competitors.length === 0) return;
-    if (lastCompetitorParamRef.current === competitorParam) return;
-    lastCompetitorParamRef.current = competitorParam;
-
-    const fromUrl = findCompetitorByParam(competitors, competitorParam);
-    if (!fromUrl?.isActive) return;
-    setSearch("");
-    setBrandFilter("");
-    setCatFilter("");
-    setRankFilter("");
-    setItemGroupFilter("");
-    setCurrentPage(1);
-  }, [competitorParam, competitors]);
+  }, [competitors]);
 
   const loadCompetitorProducts = async (competitor, page = 1) => {
     setProductsLoading(true);
@@ -676,7 +640,6 @@ const MarketCompetitor = () => {
     setTotalItems(0);
     setTotalPages(1);
     setSelectedCompetitor(competitor);
-    setSearchParams({ competitor: competitor.slug });
   };
 
   const handlePageChange = (page) => setCurrentPage(page);
@@ -857,7 +820,7 @@ const MarketCompetitor = () => {
                             <td className="px-5 py-4"><PriceCell product={p} /></td>
                             <td className="px-5 py-4"><RankBadge product={p} /></td>
                             <td className="px-5 py-4"><PriceGapBadge value={priceGap(p)} ean={p.product_ean_id} /></td>
-                            <td className="px-5 py-4"><CompetitorPrices product={p} competitorMeta={competitorMeta} /></td>
+                            <td className="px-5 py-4"><CompetitorPrices product={p} competitorMeta={competitorMeta} selectedSlug={selectedCompetitor?.slug} /></td>
                             <td className="px-5 py-4"><MarketGapCell product={p} competitorMeta={competitorMeta} /></td>
                           </tr>
                         ))
