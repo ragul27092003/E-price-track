@@ -29,6 +29,10 @@ export const uploadStoreLogo = (file) => {
 export const updateLogo = (logoUrl) =>
   API.put('/settings/logo', { logoUrl }).then((r) => r.data);
 
+// Persist the store's brand primary color (hex, e.g. "#1864ab")
+export const updateColor = (primaryColor) =>
+  API.put('/settings/color', { primaryColor }).then((r) => r.data);
+
 export const fetchUsers = () =>
   API.get('/settings/users').then((r) => r.data);
 

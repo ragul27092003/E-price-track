@@ -6,6 +6,7 @@ export const createSettingsSlice = (set) => ({
   settingsLoading: false,
   settingsError:   null,
   storeLogoMap:    {},     // { [storeId]: base64DataUrl } — logo per store
+  primaryColorMap: {},     // { [storeId]: '#rrggbb' } — brand color per store
 
   // ── Actions ────────────────────────────────────────────────────────
   setProfile:         (profile)         => set({ profile }),
@@ -17,6 +18,11 @@ export const createSettingsSlice = (set) => ({
   setStoreLogo: (storeId, logoUrl) =>
     set((state) => ({
       storeLogoMap: { ...state.storeLogoMap, [storeId]: logoUrl },
+    })),
+
+  setStoreColor: (storeId, primaryColor) =>
+    set((state) => ({
+      primaryColorMap: { ...state.primaryColorMap, [storeId]: primaryColor },
     })),
 
   addStoreUser: (user) =>

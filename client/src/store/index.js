@@ -43,8 +43,9 @@ export const useStore = create(
         // Notifications — persisted so unread badge survives refresh
         notifications:   state.notifications,
         unreadCount:     state.unreadCount,
-        // Branding — persisted so store logos survive refresh
+        // Branding — persisted so store logos and colors survive refresh
         storeLogoMap:    state.storeLogoMap,
+        primaryColorMap: state.primaryColorMap,
       }),
     }
   )
@@ -60,3 +61,11 @@ export const selectCanExport     = (s) => (s.user?.export_option ?? 'yes') !== '
 export const selectCanEdit       = (s) => s.user?.user_type === 'super_admin';
 export const selectCurrentStoreId = (s) =>
   s.user?.user_type === 'super_admin' ? s.activeStoreId : s.user?.cmpid;
+
+// Current store's brand primary color, with a sane fallback for stores
+// that haven't set one yet. Used by Settings and AppSidebar so both
+// read the exact same value.
+export const selectPrimaryColor = (s) => {
+  const storeId = selectCurrentStoreId(s);
+  return s.primaryColorMap?.[storeId] || '#1864ab';
+};

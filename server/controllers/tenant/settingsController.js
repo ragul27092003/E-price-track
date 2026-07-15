@@ -20,31 +20,34 @@ exports.getProfile = async (req, res) => {
 
       if (tenantId) {
         const storeUser = await User.findOne({ cmpid: tenantId, user_type: 'store_admin' });
-        const company   = await Company.findOne({ companyId: tenantId }).select('logoUrl companyName');
+        const company   = await Company.findOne({ companyId: tenantId }).select('logoUrl companyName primaryColor');
         if (storeUser) return res.json({
           ...storeUser.toObject(),
           email_address: superAdmin?.email_address || '',
           logoUrl:       company?.logoUrl           || '',
           companyName:   company?.companyName        || tenantId,
+          primaryColor:  company?.primaryColor        || '#1864ab',
         });
       }
 
       const admin   = await User.findOne({ user_id });
-      const company = await Company.findOne({ companyId: admin?.cmpid }).select('logoUrl companyName');
+      const company = await Company.findOne({ companyId: admin?.cmpid }).select('logoUrl companyName primaryColor');
       return res.json({
         ...admin?.toObject(),
-        logoUrl:     company?.logoUrl     || '',
-        companyName: company?.companyName || admin?.cmpid || '',
+        logoUrl:      company?.logoUrl      || '',
+        companyName:  company?.companyName  || admin?.cmpid || '',
+        primaryColor: company?.primaryColor || '#1864ab',
       });
     }
 
     const user = await User.findOne({ user_id });
     if (!user) return res.status(404).json({ message: 'User not found' });
-    const company = await Company.findOne({ companyId: user.cmpid }).select('logoUrl companyName');
+    const company = await Company.findOne({ companyId: user.cmpid }).select('logoUrl companyName primaryColor');
     res.json({
       ...user.toObject(),
-      logoUrl:     company?.logoUrl     || '',
-      companyName: company?.companyName || user.cmpid || '',
+      logoUrl:      company?.logoUrl      || '',
+      companyName:  company?.companyName  || user.cmpid || '',
+      primaryColor: company?.primaryColor || '#1864ab',
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -97,6 +100,33 @@ exports.updateLogo = async (req, res) => {
     );
 
     res.json({ message: 'Logo updated successfully', logoUrl: logoUrl || '' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ─── PUT /api/settings/color  (brand primary color, persisted per company) ───
+exports.updateColor = async (req, res) => {
+  try {
+    const { primaryColor } = req.body;
+
+    if (!primaryColor || !/^#[0-9A-Fa-f]{6}$/.test(primaryColor)) {
+      return res.status(400).json({ message: 'A valid hex color is required (e.g. #1864ab)' });
+    }
+
+    const cmpid = req.user.user_type === 'super_admin'
+      ? req.headers['x-tenant-id']
+      : req.user.cmpid;
+
+    if (!cmpid) return res.status(400).json({ message: 'No store selected' });
+
+    await Company.findOneAndUpdate(
+      { companyId: cmpid },
+      { $set: { primaryColor } },
+      { upsert: true }
+    );
+
+    res.json({ message: 'Color updated successfully', primaryColor });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -271,9 +301,6 @@ exports.removeUser = async (req, res) => {
   }
 };
 
-// ─── GET /api/settings/users-log ─────────────────────────────────────────────
-// FIX: was querying the old 'eprice_main_admin_db' which no longer exists.
-// Now reads from plm_admin_manage_info via mongoose.connection.db (MONGO_URI).
 // ─── GET /api/settings/log-users ─────────────────────────────────────────────
 // Returns the tenant's users (store_admin + user) for the "Manage Log History"
 // filter dropdown — id/name/email only.

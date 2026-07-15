@@ -7,6 +7,7 @@ import {
 import { fetchCompetitors } from "../services/competitorsService";
 import Swal from "sweetalert2";
 import MappingPagination from "../components/MappingPagination";
+import { useStore } from "../store";
 
 const TABS = ["Pending Products Mapping", "Fullsite Re-Mapping"];
 
@@ -16,6 +17,8 @@ const tabCounts = {
 };
 
 const ProductMapping = () => {
+  const activeStoreId = useStore((s) => s.activeStoreId);
+
   const [data, setData] = useState([]);
   const [filterdata, setFilterdata] = useState({
     brands: [],
@@ -26,7 +29,7 @@ const ProductMapping = () => {
   const [competitors, setCompetitors] = useState([]);
   const [activeTab, setActiveTab] = useState("Pending Products Mapping");
   const [page, setPage] = useState(1);
-  const [limit] = useState(15);
+  const [limit] = useState(2);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -84,7 +87,6 @@ const ProductMapping = () => {
       setData(result.data || []);
       setTotal(result.total || 0);
       setTotalPages(result.totalPages || 1);
-    
 
     } catch (err) {
       console.log(err);
@@ -93,16 +95,25 @@ const ProductMapping = () => {
     }
   };
 
+  // Competitors + filter metadata (brands/categories/ranks/item groups) are
+  // per-tenant. Refetch whenever the super admin switches to a different
+  // store — same as Products.jsx does.
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, [activeStoreId]);
+
+  // Reset back to page 1 whenever the store changes, so we don't end up
+  // requesting a page number that doesn't exist for the new store's data.
+  useEffect(() => {
+    setPage(1);
+  }, [activeStoreId]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       loadProducts(page, search, brandsearch, itemgroupsearch, categorysearch);
     }, 500);
     return () => clearTimeout(timer);
-  }, [page, search, brandsearch, itemgroupsearch, categorysearch]);
+  }, [page, search, brandsearch, itemgroupsearch, categorysearch, activeStoreId]);
 
   const handleInputChange = (slug, field, value) => {
     setMappingData((prev) => ({
@@ -156,7 +167,6 @@ const ProductMapping = () => {
       };
 
       const result = await saveProductMapping(payload);
-     
 
       if (result.success) {
         Swal.fire({
@@ -191,8 +201,6 @@ const ProductMapping = () => {
       });
     }
   };
-
- 
 
   return (
     <div>

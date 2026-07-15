@@ -13,13 +13,14 @@ import API from '../hooks/useApi';
 
 const ManageFeedSetup = () => {
   const activeStoreId = useStore((s) => s.activeStoreId);
-  const isRestrictedUser = useStore((s) => s.user?.user_type === 'user');
+  const userType = useStore((s) => s.user?.user_type);
+  const isRestrictedUser = userType === 'user' || userType === 'store_admin';
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [logsLoading, setLogsLoading] = useState(true);
   const [activityLogs, setActivityLogs] = useState([]);
   const [snack, setSnack] = useState({ open: false, msg: '', severity: 'success' });
-  const isSuperAdmin = useStore((s) => s.user?.user_type === 'super_admin');
+  const isSuperAdmin = userType === 'super_admin';
 
   const [formData, setFormData] = useState({
     store_name: '',
@@ -336,11 +337,17 @@ const ManageFeedSetup = () => {
                   name="feed_url"
                   value={formData.feed_url}
                   onChange={handleChange}
+                  disabled={isRestrictedUser}
+                  readOnly={isRestrictedUser}
                   onCopy={(e) => { if (isRestrictedUser) e.preventDefault(); }}
                   onCut={(e) => { if (isRestrictedUser) e.preventDefault(); }}
                   onContextMenu={(e) => { if (isRestrictedUser) e.preventDefault(); }}
                   style={isRestrictedUser ? { userSelect: 'none', WebkitUserSelect: 'none' } : undefined}
-                  className="bg-white dark:bg-[#1e2535] text-gray-800 dark:text-slate-200 placeholder:text-gray-400 dark:placeholder:text-slate-500 w-full border border-gray-300 dark:border-slate-700 rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600"
+                  className={`w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600 placeholder:text-gray-400 dark:placeholder:text-slate-500 ${
+                    isRestrictedUser
+                      ? 'bg-gray-100 dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-400 dark:text-slate-500 cursor-not-allowed'
+                      : 'bg-white dark:bg-[#1e2535] text-gray-800 dark:text-slate-200 border-gray-300 dark:border-slate-700'
+                  }`}
                 />
               </div>
             </div>

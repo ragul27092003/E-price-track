@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useStore } from "@/store";
+import { useStore, selectCurrentStoreId } from "@/store";
 import { toast } from "sonner";
 import {
   fetchProfile,
@@ -15,6 +15,7 @@ import {
   updatePassword,
   uploadStoreLogo,
   updateLogo,
+  updateColor,
   fetchUsers,
   addUser,
   removeUser,
@@ -55,13 +56,14 @@ function Avatar({ size = "lg", primaryColor, companyName = "", photoUrl = null }
 
 
 
-function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) {
+function MyAccountTab({ primaryColor, onColorChange, photoUrl, setPhotoUrl }) {
   const user = useStore((s) => s.user);
   const profile = useStore((s) => s.profile);
   const setProfile = useStore((s) => s.setProfile);
   const activeStoreId = useStore((s) => s.activeStoreId);
   const storeLogoMap = useStore((s) => s.storeLogoMap);
   const setStoreLogo = useStore((s) => s.setStoreLogo);
+  const setStoreColor = useStore((s) => s.setStoreColor);
 
   const [email_address, setEmailAddress] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -98,6 +100,8 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
         setPhotoUrl(dbLogo);
         if (dbLogo) setStoreLogo(currentStoreKey, dbLogo);
         else setStoreLogo(currentStoreKey, null);
+        // Sync the saved brand color into the store so Settings + Sidebar agree
+        setStoreColor(currentStoreKey, data.primaryColor || "#1864ab");
       } catch (err) {
         console.error("Failed to load profile:", err);
       }
@@ -246,20 +250,22 @@ function MyAccountTab({ primaryColor, setPrimaryColor, photoUrl, setPhotoUrl }) 
             </div>
           </div>
 
-          <div className="sm:ml-auto">
-            <label className="text-xs font-bold text-gray-600 dark:text-slate-400 block mb-1.5">Primary Brand Color</label>
-            <div className="relative flex items-center gap-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md px-3 py-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700/60 w-fit">
-              <input
-                type="color"
-                value={primaryColor}
-                onChange={(e) => setPrimaryColor(e.target.value)}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-              <div className="w-5 h-5 rounded-sm shadow-inner" style={{ backgroundColor: primaryColor }} />
-              <span className="text-sm text-gray-700 dark:text-slate-300 mx-1">{primaryColor}</span>
-              <ChevronDown className="w-4 h-4 text-gray-400 dark:text-slate-500" />
+          {!isUser && (
+            <div className="sm:ml-auto">
+              <label className="text-xs font-bold text-gray-600 dark:text-slate-400 block mb-1.5">Primary Brand Color</label>
+              <div className="relative flex items-center gap-2 border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-md px-3 py-1.5 cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700/60 w-fit">
+                <input
+                  type="color"
+                  value={primaryColor}
+                  onChange={(e) => onColorChange(e.target.value)}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <div className="w-5 h-5 rounded-sm shadow-inner" style={{ backgroundColor: primaryColor }} />
+                <span className="text-sm text-gray-700 dark:text-slate-300 mx-1">{primaryColor}</span>
+                <ChevronDown className="w-4 h-4 text-gray-400 dark:text-slate-500" />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -955,8 +961,22 @@ function UsersLogTab() {
 export default function Settings() {
   const user = useStore((s) => s.user);
   const [activeTab, setActiveTab] = useState("account");
-  const [primaryColor, setPrimaryColor] = useState("#1864ab");
   const [photoUrl, setPhotoUrl] = useState(null);
+
+  const storeId = useStore(selectCurrentStoreId);
+  const setStoreColor = useStore((s) => s.setStoreColor);
+  const primaryColor = useStore((s) => s.primaryColorMap?.[storeId] || "#1864ab");
+
+  // Update instantly in UI (store) + persist to backend so it survives refresh
+  // and the sidebar (which reads the same store value) updates immediately.
+  const handleColorChange = async (newColor) => {
+    setStoreColor(storeId, newColor);
+    try {
+      await updateColor(newColor);
+    } catch {
+      toast.error("Failed to save color");
+    }
+  };
 
   const visibleTabs = TABS.filter((tab) => {
     if (tab.id === "users" || tab.id === "log")
@@ -1005,7 +1025,7 @@ export default function Settings() {
               <MyAccountTab
                 key="account"
                 primaryColor={primaryColor}
-                setPrimaryColor={setPrimaryColor}
+                onColorChange={handleColorChange}
                 photoUrl={photoUrl}
                 setPhotoUrl={setPhotoUrl}
               />

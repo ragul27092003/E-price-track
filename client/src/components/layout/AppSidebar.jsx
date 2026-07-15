@@ -12,7 +12,7 @@ import {
   Share2Icon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useStore, selectIsSuperAdmin } from "../../store";
+import { useStore, selectIsSuperAdmin, selectPrimaryColor } from "../../store";
 
 const navItems = [
   { title: "Dashboard",         icon: LayoutDashboard, path: "/" },
@@ -30,6 +30,7 @@ const navItems = [
 export function AppSidebar() {
   const location = useLocation();
   const isSuperAdmin = useStore(selectIsSuperAdmin);
+  const primaryColor = useStore(selectPrimaryColor);
 
   const visibleNavItems = navItems.filter((item) => !item.superAdminOnly || isSuperAdmin);
 
@@ -44,18 +45,23 @@ export function AppSidebar() {
                 to={item.path}
                 className={cn(
                   "flex items-center justify-center rounded-lg p-2.5 transition-all duration-150",
-                  isActive
-                    ? "bg-[#2B86C5] text-white"
-                    : "text-sidebar-foreground hover:bg-accent hover:text-foreground"
+                  !isActive && "text-sidebar-foreground hover:bg-accent hover:text-foreground"
                 )}
+                style={isActive ? { backgroundColor: primaryColor, color: '#fff' } : undefined}
               >
                 <item.icon className="h-5 w-5 shrink-0" />
               </NavLink>
 
               <div className="invisible group-hover:visible absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50">
                 <div className="relative flex items-center">
-                  <div className="w-0 h-0 border-y-[6px] border-y-transparent border-r-[6px] border-r-[#2B86C5]" />
-                  <div className="whitespace-nowrap rounded-md bg-[#2B86C5] px-3 py-1.5 text-sm font-medium text-white shadow-lg">
+                  <div
+                    className="w-0 h-0 border-y-[6px] border-y-transparent border-r-[6px]"
+                    style={{ borderRightColor: primaryColor }}
+                  />
+                  <div
+                    className="whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium text-white shadow-lg"
+                    style={{ backgroundColor: primaryColor }}
+                  >
                     {item.title}
                   </div>
                 </div>

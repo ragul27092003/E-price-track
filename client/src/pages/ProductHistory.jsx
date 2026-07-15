@@ -356,6 +356,8 @@ export default function ProductHistory() {
   const [loading,       setLoading]       = useState(false);
   const [searchQuery,   setSearchQuery]   = useState("");
   const [userSearched,  setUserSearched]  = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [visibleSlugs,  setVisibleSlugs]  = useState(new Set());
   const [imgErrors,     setImgErrors]     = useState({});
@@ -365,6 +367,45 @@ const { ean: eanFromUrl } = useParams();
 const rangeFromUrl = searchParams.get("range") || "30";
  
 const [daysRange,     setDaysRange]     = useState(Number(rangeFromUrl));
+const [eanProduct,    setEanProduct]    = useState(null);
+const [eanLoading,    setEanLoading]    = useState(false);
+ 
+  // If we navigated here with an explicit EAN that isn't in the already-cached
+  // storeProducts page (limit=15), fetch it directly from the backend — the
+  // same way search does — instead of silently falling back to the smart
+  // default product.
+  useEffect(() => {
+    if (!eanFromUrl) {
+      setEanProduct(null);
+      return;
+    }
+    const alreadyLoaded = storeProducts.find(
+      (p) => String(p.product_ean_id) === String(eanFromUrl) || String(p.product_code) === String(eanFromUrl)
+    );
+    if (alreadyLoaded) {
+      setEanProduct(null); // storeProducts already has it, no need for a separate fetch
+      return;
+    }
+    let cancelled = false;
+    setEanLoading(true);
+    fetchProducts({ search: eanFromUrl, limit: 1 })
+      .then((d) => {
+        if (cancelled) return;
+        const arr = Array.isArray(d) ? d : (d?.products ?? d?.data ?? d?.items ?? []);
+        const match = arr.find(
+          (p) => String(p.product_ean_id) === String(eanFromUrl) || String(p.product_code) === String(eanFromUrl)
+        ) || arr[0] || null;
+        setEanProduct(match);
+      })
+      .catch((e) => {
+        console.error("ProductHistory EAN fetch error:", e);
+        if (!cancelled) setEanProduct(null);
+      })
+      .finally(() => {
+        if (!cancelled) setEanLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [eanFromUrl, storeProducts]);
  
   useEffect(() => {
     const load = async () => {
@@ -391,16 +432,18 @@ const [daysRange,     setDaysRange]     = useState(Number(rangeFromUrl));
     load();
   }, [activeStoreId]);
  
+  // NOTE: storeProducts is just whatever page of products happens to already
+  // be loaded in the shared store (limit=15 by default) — filtering that
+  // client-side means a product outside the first page (matched by name,
+  // brand, EAN, OR product code) will never show up here, even though the
+  // Products page finds it fine because it searches the backend. So once the
+  // user searches, we use the backend results (searchResults) instead, which
+  // already matches on product_name, product_brand, product_ean_id AND
+  // product_code (see productsController.getAll).
   const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return storeProducts;
-    const q = searchQuery.toLowerCase();
-    return storeProducts.filter(
-      (p) =>
-        p.product_name?.toLowerCase().includes(q) ||
-        p.product_brand?.toLowerCase().includes(q) ||
-        String(p.product_ean_id || "").includes(q)
-    );
-  }, [storeProducts, searchQuery]);
+    if (!userSearched || !searchQuery.trim()) return storeProducts;
+    return searchResults;
+  }, [storeProducts, searchResults, userSearched, searchQuery]);
  
   const selectedProduct = useMemo(() => {
     if (userSearched) {
@@ -410,11 +453,18 @@ const [daysRange,     setDaysRange]     = useState(Number(rangeFromUrl));
     // should override the smart default. A stale lastViewedEan from a previous
     // visit should NOT stop us from computing the 4-7-competitor default.
     if (eanFromUrl) {
-      const found = storeProducts.find((p) => String(p.product_ean_id) === String(eanFromUrl));
+      const found = storeProducts.find(
+        (p) => String(p.product_ean_id) === String(eanFromUrl) || String(p.product_code) === String(eanFromUrl)
+      );
       if (found) return found;
+      // Not in the cached page — use the product fetched directly by EAN, if ready.
+      if (eanProduct) return eanProduct;
+      // Still fetching it — don't fall back to the default picker and flash the
+      // wrong product; wait (selectedProduct stays null until eanLoading resolves).
+      if (eanLoading) return null;
     }
     return pickDefaultProduct(storeProducts);
-  }, [userSearched, filteredProducts, selectedIndex, eanFromUrl, storeProducts]);
+  }, [userSearched, filteredProducts, selectedIndex, eanFromUrl, storeProducts, eanProduct, eanLoading]);
  
   useEffect(() => {
     if (selectedProduct?.product_ean_id) {
@@ -472,17 +522,38 @@ useEffect(() => {
  
   const handleSearchChange = (e) => {
     setSearchQuery(e.target.value);
-    setUserSearched(true);
   };
  
-  const handleSearchSubmit = () => {
-    setUserSearched(true);
+  const handleSearchSubmit = async () => {
+    const q = searchQuery.trim();
     setSelectedIndex(0);
+
+    if (!q) {
+      setUserSearched(false);
+      setSearchResults([]);
+      return;
+    }
+
+    setUserSearched(true);
+    setSearchLoading(true);
+    try {
+      // Same backend search used by the Products page — matches on
+      // product_name, product_brand, product_ean_id, AND product_code.
+      const d = await fetchProducts({ search: q, limit: 50 });
+      const arr = Array.isArray(d) ? d : (d?.products ?? d?.data ?? d?.items ?? []);
+      setSearchResults(arr);
+    } catch (e) {
+      console.error("ProductHistory search error:", e);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
   };
  
   const handleClearSearch = () => {
     setSearchQuery("");
     setUserSearched(false);
+    setSearchResults([]);
     setSelectedIndex(0);
   };
  
@@ -559,12 +630,17 @@ useEffect(() => {
         </div>
  
         {/* Search Results Feedback */}
-        {userSearched && searchQuery && filteredProducts.length > 1 && (
+        {userSearched && searchQuery && searchLoading && (
+          <p className="-mt-2 text-[11px] md:text-xs text-gray-500 dark:text-gray-400">
+            Searching…
+          </p>
+        )}
+        {userSearched && searchQuery && !searchLoading && filteredProducts.length > 1 && (
           <p className="-mt-2 text-[11px] md:text-xs text-gray-500 dark:text-gray-400">
             {filteredProducts.length} products matched — showing the first result.
           </p>
         )}
-        {userSearched && searchQuery && filteredProducts.length === 0 && (
+        {userSearched && searchQuery && !searchLoading && filteredProducts.length === 0 && (
           <p className="-mt-2 text-xs text-rose-500">
             No products matched "{searchQuery}".{" "}
             <button onClick={handleClearSearch} className="underline hover:no-underline">Clear search</button>
