@@ -1,0 +1,170 @@
+/* Lovable landing design system — scoped for Tailwind v3 / shadcn HSL tokens */
+
+.landing {
+  --radius: 1rem;
+
+  /* HSL channels so Tailwind hsl(var(--*)) utilities work */
+  --background: 300 33% 98%;
+  --foreground: 280 45% 12%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 280 45% 12%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 280 45% 12%;
+
+  --primary: 25 90% 55%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 280 50% 18%;
+  --secondary-foreground: 0 0% 100%;
+
+  --muted: 300 25% 96%;
+  --muted-foreground: 280 15% 45%;
+
+  --accent: 40 85% 55%;
+  --accent-foreground: 280 45% 12%;
+
+  --success: 160 55% 45%;
+  --success-foreground: 0 0% 100%;
+
+  --destructive: 15 80% 50%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 280 15% 90%;
+  --input: 280 15% 90%;
+  --ring: 25 90% 55%;
+
+  --gradient-hero:
+    radial-gradient(1200px 600px at 20% 10%, oklch(0.66 0.22 35 / 0.35), transparent 60%),
+    radial-gradient(900px 500px at 80% 20%, oklch(0.32 0.15 300 / 0.45), transparent 60%),
+    radial-gradient(700px 400px at 50% 90%, oklch(0.72 0.2 50 / 0.25), transparent 60%);
+  --gradient-primary: linear-gradient(135deg, oklch(0.66 0.22 35), oklch(0.72 0.2 50));
+  --gradient-dark: linear-gradient(160deg, oklch(0.18 0.09 300), oklch(0.28 0.13 300));
+
+  --shadow-glow: 0 20px 60px -20px oklch(0.66 0.22 35 / 0.5);
+  --shadow-elegant: 0 30px 80px -30px oklch(0.18 0.08 300 / 0.3);
+  --shadow-soft: 0 8px 30px -10px oklch(0.18 0.08 300 / 0.12);
+
+  --grid-color: oklch(0.24 0.11 300 / 0.06);
+
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+.landing h1,
+.landing h2,
+.landing h3 {
+  letter-spacing: -0.03em;
+}
+
+.landing .grid-bg {
+  background-image:
+    linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+}
+
+.landing .glass {
+  background: color-mix(in oklab, white 65%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid color-mix(in oklab, white 60%, transparent);
+  box-shadow: var(--shadow-soft);
+}
+
+.landing .glass-dark {
+  background: color-mix(in oklab, oklch(0.22 0.04 265) 55%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid oklch(1 0 0 / 0.08);
+}
+
+.landing .text-gradient {
+  background: linear-gradient(135deg, oklch(0.24 0.11 300), oklch(0.66 0.22 35) 60%, oklch(0.72 0.2 50));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.landing .gradient-border {
+  position: relative;
+  background-clip: padding-box;
+  border: 1px solid transparent;
+}
+
+@keyframes landing-float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+
+@keyframes landing-float-y-slow {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  50% {
+    transform: translateY(-22px) rotate(1deg);
+  }
+}
+
+@keyframes landing-marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes landing-spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes landing-gradient-shift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.landing .animate-float {
+  animation: landing-float-y 6s ease-in-out infinite;
+}
+
+.landing .animate-float-slow {
+  animation: landing-float-y-slow 9s ease-in-out infinite;
+}
+
+.landing .animate-marquee {
+  animation: landing-marquee 40s linear infinite;
+}
+
+.landing .animate-spin-slow {
+  animation: landing-spin-slow 40s linear infinite;
+}
+
+.landing .animate-spin-reverse {
+  animation: landing-spin-slow 55s linear infinite reverse;
+}
+
+.landing .animate-gradient {
+  background-size: 200% 200%;
+  animation: landing-gradient-shift 10s ease infinite;
+}
+
+.landing .bg-gradient-primary {
+  background-image: var(--gradient-primary);
+}
