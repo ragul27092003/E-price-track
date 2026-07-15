@@ -22,10 +22,6 @@ import MarketCompetitor from "./pages/MarketCompetitor";
 import ProductMapping from "./pages/ProductMapping";
 import PendingSignups from "./pages/PendingSignups";
 import Home from "./pages/Home";
-import Features from "./pages/Features";
-import Pricing from "./pages/Pricing";
-import About from "./pages/About";
-import Contact from "./pages/Contact";
 import { ROUTES } from "./utilis/urls";
 
 const queryClient = new QueryClient();
