@@ -20,6 +20,12 @@ import Notifications from "./pages/Notifications";
 import SmartReports from "./pages/SmartReports";
 import MarketCompetitor from "./pages/MarketCompetitor";
 import ProductMapping from "./pages/ProductMapping";
+import PendingSignups from "./pages/PendingSignups";
+import Home from "./pages/Home";
+import Features from "./pages/Features";
+import Pricing from "./pages/Pricing";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
 import { ROUTES } from "./utilis/urls";
 
 const queryClient = new QueryClient();
@@ -29,13 +35,14 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter basename="/eprice/admin">
         <AuthProvider>
           <Routes>
             {/* Public */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/" element={<Home />} />
 
             {/* Protected — both roles use the same dashboard layout */}
             <Route element={
@@ -43,7 +50,7 @@ const App = () => (
                 <DashboardLayout />
               </ProtectedRoute>
             }>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/product-history" element={<ProductHistory />} />
               <Route path={ROUTES.productHistory} element={<ProductHistory />} />
               <Route path="/notifications" element={<Notifications />}/>
@@ -54,6 +61,7 @@ const App = () => (
               <Route path="/market" element={<MarketCompetitor />} />
               <Route path="/product-mapping" element={<ProductMapping />} />
               <Route path="/smart-reports" element={<SmartReports />} />
+              <Route path="/pending-signups" element={<PendingSignups />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

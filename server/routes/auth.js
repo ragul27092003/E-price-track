@@ -12,7 +12,7 @@ const {
   getMerchant,
   forgotPassword,
   verifyOtp,
-  resetPassword,
+  resetPassword,provisionTenantDb,getPendingSignups,getActivatedCompanies
 } = require('../controllers/authController');
 
 router.post('/login',            login);
@@ -25,5 +25,7 @@ router.post('/verify-otp',       verifyOtp);
 router.post('/reset-password',   resetPassword);
 router.get('/all-stores',        auth, roleCheck('super_admin'), getAllStores);
 router.get('/merchant/:companyId', auth, getMerchant);
-
+// ✅ புது routes — Tenant Provisioning
+router.get('/admin/pending-signups',              auth, roleCheck('super_admin'), getPendingSignups);
+router.post('/admin/provision-tenant/:companyId', auth, roleCheck('super_admin'), provisionTenantDb);
 module.exports = router;

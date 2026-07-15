@@ -9,8 +9,10 @@ import {
   LucideHistory,
   BarChartBigIcon,
   ComponentIcon,
-  Share2Icon
+  Share2Icon,
+  UserCheck
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { useStore, selectIsSuperAdmin, selectPrimaryColor } from "../../store";
 
@@ -32,7 +34,19 @@ export function AppSidebar() {
   const isSuperAdmin = useStore(selectIsSuperAdmin);
   const primaryColor = useStore(selectPrimaryColor);
 
-  const visibleNavItems = navItems.filter((item) => !item.superAdminOnly || isSuperAdmin);
+  let items = [...navItems];
+
+  if (isSuperAdmin) {
+    items.push({
+      title: "Pending Signups",
+      icon: UserCheck,
+      path: "/pending-signups",
+    });
+  }
+
+  const visibleNavItems = items.filter(
+    (item) => !item.superAdminOnly || isSuperAdmin
+  );
 
   return (
     <aside className="flex flex-col border-r border-sidebar-border bg-sidebar shrink-0 w-[70px] h-screen">

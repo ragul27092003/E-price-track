@@ -1,5 +1,5 @@
 import { Moon, Sun, LogOut, ChevronDown } from "lucide-react";
-import logo from "../../services/assets/logo.png";
+import logo from "../../services/assets/main-logo.png";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -134,7 +134,7 @@ export function AppHeader() {
 
   return (
     <header className="flex items-center h-16 pl-1 pr-9 border-b border-border bg-card shrink-0">
-      <img src={logo} alt="Logo" className="h-20 w-auto object-contain" />
+      <img src={logo} alt="Logo" className="h-8 w-auto object-contain" />
 
       <div className="ml-auto flex items-center gap-2">
 

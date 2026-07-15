@@ -11,7 +11,9 @@ const companySchema = new mongoose.Schema({
   companyUrl:   { type: String, default: '' },
   logoUrl:      { type: String, default: '' },
   primaryColor: { type: String, default: '#1864ab' },
-  status:       { type: String, enum: ['active', 'inactive'], default: 'active' },
+  status: { type: String, enum: ['pending_provision', 'active', 'inactive'], default: 'pending_provision' },
+  provisionedAt: { type: Date, default: null },
+  provisionedBy: { type: String, default: null },
 }, { timestamps: true, collection: 'companies' });
 
 companySchema.pre('save', async function () {
