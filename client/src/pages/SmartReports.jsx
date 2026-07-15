@@ -696,6 +696,8 @@ function CompetitorTable({ product, tab, competitorMeta }) {
 
   const rank1Price = allEntries.find((entry) => entry.price !== null)?.price ?? null;
   const colLabel = tab === "Negative Trend" ? "Higher By" : tab === "Positive Trend" ? "Higher By" : tab === "Neutral Trend" ? "Price Status" : "Cheaper By";
+  // Our own product page — same field ProductCell (Products.jsx) links out to.
+  const ourProductUrl = product.product_url || null;
 
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
@@ -706,6 +708,7 @@ function CompetitorTable({ product, tab, competitorMeta }) {
             <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">Web Price</th>
             <th className="text-center px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">Rank</th>
             <th className="text-right px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">{colLabel}</th>
+            <th className="text-center px-4 py-2.5 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wide">Product Link</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -743,24 +746,13 @@ function CompetitorTable({ product, tab, competitorMeta }) {
                         <div className="flex h-6 w-6 items-center justify-center rounded bg-[#2B86C5] text-[8px] font-bold text-white uppercase shrink-0">ME</div>
                         <span className="text-slate-800 dark:text-white">{entry.name}</span>
                       </>
-                    ) : entry.url ? (
-                      <a
-                        href={entry.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={`Open ${entry.name}`}
-                        className="inline-flex items-center gap-2 text-slate-800 dark:text-white hover:text-[#1e6191] dark:hover:text-blue-400 transition-colors"
-                      >
-                        <CompetitorLogo name={entry.name} slug={entry.slug} logo={entry.logo} />
-                        <span>{entry.name}</span>
-                      </a>
                     ) : (
                       <>
                         <CompetitorLogo name={entry.name} slug={entry.slug} logo={entry.logo} />
                         <span className="text-slate-800 dark:text-white">{entry.name}</span>
+                        {rankNum === 1 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 rounded-full px-1.5 py-0.5">Rank 1</span>}
                       </>
                     )}
-                    {rankNum === 1 && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400 rounded-full px-1.5 py-0.5">Rank 1</span>}
                   </div>
                 </td>
                 <td className="px-4 py-3 text-right font-bold text-slate-800 dark:text-white">
@@ -784,6 +776,51 @@ function CompetitorTable({ product, tab, competitorMeta }) {
                 </td>
                 <td className="px-4 py-3 text-center">{entry.price === null ? "—" : <RankBadge rank={rankNum} total={allEntries.length} />}</td>
                 <td className={`px-4 py-3 text-right text-xs font-semibold ${diffColor}`}>{diffLabel}</td>
+                <td className="px-4 py-3 text-center">
+                  {entry.isMe ? (
+                    ourProductUrl ? (
+                      <a
+                        href={ourProductUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Open our store product page"
+                        className="group inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 hover:shadow-sm transition-all"
+                      >
+                        <svg
+                          viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5"
+                          className="shrink-0 transition-transform group-hover:scale-110"
+                        >
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                          <path d="M15 3h6v6" />
+                          <path d="M10 14 21 3" />
+                        </svg>
+                        Store Link
+                      </a>
+                    ) : (
+                      <span className="text-[11px] text-slate-300 dark:text-slate-600">—</span>
+                    )
+                  ) : entry.url ? (
+                    <a
+                      href={entry.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Open ${entry.name} product page`}
+                      className="group inline-flex items-center gap-1 rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[10px] font-bold text-sky-600 hover:bg-sky-500 hover:text-white hover:border-sky-500 hover:shadow-sm transition-all"
+                    >
+                      <svg
+                        viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="2.5"
+                        className="shrink-0 transition-transform group-hover:scale-110"
+                      >
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                        <path d="M15 3h6v6" />
+                        <path d="M10 14 21 3" />
+                      </svg>
+                      Visit
+                    </a>
+                  ) : (
+                    <span className="text-[11px] text-slate-300 dark:text-slate-600">—</span>
+                  )}
+                </td>
               </tr>
             );
           })}
