@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../store';
 import { fetchCompetitors } from '../services/competitorsService';
 import { fetchProducts, fetchProductsMeta, exportProductsCSV } from '../services/productsService';
@@ -531,6 +531,7 @@ function CompetitorTab({ data, isActive, onClick, liveCount }) {
 
 // ─── MAIN ─────────────────────────────────────────────────────────────────────
 const MarketCompetitor = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const competitors = useStore((s) => s.competitors);
   const setCompetitors = useStore((s) => s.setCompetitors);
   const competitorsLoading = useStore((s) => s.competitorsLoading);
@@ -583,9 +584,20 @@ const MarketCompetitor = () => {
     fetchProductsMeta().then(setProductsMeta).catch(() => {});
   }, [activeStoreId]);
 
-  // Auto-select the first active competitor once the list loads
+  // Select the competitor requested via ?competitor= slug, falling back to the
+  // first active competitor once the list loads.
   useEffect(() => {
   if (!selectedCompetitor && competitors.length > 0) {
+      const requestedSlug = searchParams.get('competitor');
+      const requested = requestedSlug
+        ? competitors.find((c) => c.slug === requestedSlug)
+        : null;
+
+      if (requested) {
+        setSelectedCompetitor(requested);
+        return;
+      }
+
       const eanSorted = competitors
         .filter((c) => c.mappingType === 'EAN')
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -597,7 +609,7 @@ const MarketCompetitor = () => {
       const firstActive = orderedList.find((c) => c.isActive);
       if (firstActive) setSelectedCompetitor(firstActive);
     }
-  }, [competitors]);
+  }, [competitors, searchParams]);
 
   const loadCompetitorProducts = async (competitor, page = 1) => {
     setProductsLoading(true);
@@ -643,6 +655,7 @@ const MarketCompetitor = () => {
     setTotalItems(0);
     setTotalPages(1);
     setSelectedCompetitor(competitor);
+    setSearchParams({ competitor: competitor.slug }, { replace: true });
   };
 
   const handlePageChange = (page) => setCurrentPage(page);

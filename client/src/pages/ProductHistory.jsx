@@ -24,9 +24,6 @@ function getCompetitorCount(product) {
 }
  
 function pickDefaultProduct(products) {
-  console.log("🔍 pickDefaultProduct called with", products?.length, "products");
-  console.log("🔍 counts:", products?.map(p => ({ name: p.product_name, count: getCompetitorCount(p) })));
-
   if (!products || !products.length) return null;
 
  
@@ -353,7 +350,7 @@ export default function ProductHistory() {
   const lastViewedEan      = useStore((s) => s.lastViewedEan);
   const setLastViewedEan   = useStore((s) => s.setLastViewedEan);
  
-  const [loading,       setLoading]       = useState(false);
+  const [loading,       setLoading]       = useState(true);
   const [searchQuery,   setSearchQuery]   = useState("");
   const [userSearched,  setUserSearched]  = useState(false);
   const [searchResults, setSearchResults] = useState([]);
@@ -369,18 +366,29 @@ const rangeFromUrl = searchParams.get("range") || "30";
 const [daysRange,     setDaysRange]     = useState(Number(rangeFromUrl));
 const [eanProduct,    setEanProduct]    = useState(null);
 const [eanLoading,    setEanLoading]    = useState(false);
+
+// Which EAN should actually drive the selected product: an explicit EAN in
+// the URL always wins; otherwise fall back to the last product the user was
+// looking at (persisted in the store, so it survives sidebar navigation that
+// remounts this component and resets all local state).
+const effectiveEan = eanFromUrl || lastViewedEan || null;
  
-  // If we navigated here with an explicit EAN that isn't in the already-cached
-  // storeProducts page (limit=15), fetch it directly from the backend — the
-  // same way search does — instead of silently falling back to the smart
-  // default product.
+  // If we navigated here with an EAN (explicit in the URL, or carried over as
+  // lastViewedEan) that isn't in the already-cached storeProducts page
+  // (limit=15), fetch it directly from the backend — the same way search
+  // does — instead of silently falling back to the smart default product.
   useEffect(() => {
-    if (!eanFromUrl) {
+    if (!effectiveEan) {
       setEanProduct(null);
       return;
     }
+    // Wait for the main product-list load to finish before deciding whether we
+    // need a separate request — on first mount effectiveEan is often already
+    // satisfied by that list, so firing this in parallel every refresh was a
+    // guaranteed-redundant network call.
+    if (loading) return;
     const alreadyLoaded = storeProducts.find(
-      (p) => String(p.product_ean_id) === String(eanFromUrl) || String(p.product_code) === String(eanFromUrl)
+      (p) => String(p.product_ean_id) === String(effectiveEan) || String(p.product_code) === String(effectiveEan)
     );
     if (alreadyLoaded) {
       setEanProduct(null); // storeProducts already has it, no need for a separate fetch
@@ -388,12 +396,12 @@ const [eanLoading,    setEanLoading]    = useState(false);
     }
     let cancelled = false;
     setEanLoading(true);
-    fetchProducts({ search: eanFromUrl, limit: 1 })
+    fetchProducts({ search: effectiveEan, limit: 1 })
       .then((d) => {
         if (cancelled) return;
         const arr = Array.isArray(d) ? d : (d?.products ?? d?.data ?? d?.items ?? []);
         const match = arr.find(
-          (p) => String(p.product_ean_id) === String(eanFromUrl) || String(p.product_code) === String(eanFromUrl)
+          (p) => String(p.product_ean_id) === String(effectiveEan) || String(p.product_code) === String(effectiveEan)
         ) || arr[0] || null;
         setEanProduct(match);
       })
@@ -405,7 +413,7 @@ const [eanLoading,    setEanLoading]    = useState(false);
         if (!cancelled) setEanLoading(false);
       });
     return () => { cancelled = true; };
-  }, [eanFromUrl, storeProducts]);
+  }, [effectiveEan, storeProducts, loading]);
  
   useEffect(() => {
     const load = async () => {
@@ -449,12 +457,12 @@ const [eanLoading,    setEanLoading]    = useState(false);
     if (userSearched) {
       return filteredProducts[selectedIndex] ?? filteredProducts[0] ?? null;
     }
-    // Only an explicit EAN in the URL (e.g. navigated here from another page/link)
-    // should override the smart default. A stale lastViewedEan from a previous
-    // visit should NOT stop us from computing the 4-7-competitor default.
-    if (eanFromUrl) {
+    // An explicit EAN in the URL, or the last product the user viewed
+    // (persisted in the store), takes priority over the smart default —
+    // only use pickDefaultProduct when we truly have nothing to go on.
+    if (effectiveEan) {
       const found = storeProducts.find(
-        (p) => String(p.product_ean_id) === String(eanFromUrl) || String(p.product_code) === String(eanFromUrl)
+        (p) => String(p.product_ean_id) === String(effectiveEan) || String(p.product_code) === String(effectiveEan)
       );
       if (found) return found;
       // Not in the cached page — use the product fetched directly by EAN, if ready.
@@ -464,7 +472,7 @@ const [eanLoading,    setEanLoading]    = useState(false);
       if (eanLoading) return null;
     }
     return pickDefaultProduct(storeProducts);
-  }, [userSearched, filteredProducts, selectedIndex, eanFromUrl, storeProducts, eanProduct, eanLoading]);
+  }, [userSearched, filteredProducts, selectedIndex, effectiveEan, storeProducts, eanProduct, eanLoading]);
  
   useEffect(() => {
     if (selectedProduct?.product_ean_id) {
@@ -482,7 +490,10 @@ useEffect(() => {
     setDaysRange(Number(rangeFromUrl));
   }
 }, [searchParams]);
-  const onlineCompetitors = storeCompetitors.filter((c) => c.isActive !== false);
+  const onlineCompetitors = useMemo(
+    () => storeCompetitors.filter((c) => c.isActive !== false),
+    [storeCompetitors]
+  );
  
   const activeHistory = useMemo(() => {
     const full = selectedProduct?.price_history_30days || [];
