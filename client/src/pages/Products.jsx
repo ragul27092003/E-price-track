@@ -2,10 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { buildProductHistoryUrl } from "../utilis/urls";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useStore } from "../store";
-import { fetchProducts, fetchProductsMeta, configureProduct, removeProductConfiguration,exportProductsCSV } from "../services/productsService";
+import { fetchProducts, fetchProductsMeta, configureProduct, removeProductConfiguration,exportProductsCSV, saveWebPriceData } from "../services/productsService";
 import { fetchCompetitors } from "../services/competitorsService";
 import API from "../hooks/useApi";
 import { Rss, Globe } from "lucide-react";
+import Swal from "sweetalert2";
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function parsePrice(raw) {
@@ -671,6 +673,10 @@ function webPriceColorClass(rank) {
 
 function PriceCell({ product }) {
   const activeShopName = useStore((s) => s.activeShopName) || "";
+  const canPriceChange = useStore(
+    (s) =>
+      (s.user?.webprice_access ?? "yes") === "yes"
+  );
   const web = parsePrice(product.product_price);
   const store = parsePrice(product.product_store_price);
   const sap = parsePrice(product.product_sap_price);
@@ -679,6 +685,7 @@ function PriceCell({ product }) {
 
   const isNandilathgmart = activeShopName.toLowerCase() === "nandilathgmart";
   const isWebScrape = product.is_website_scrape_price === "yes";
+  const isManualPrice = product.manual_price_update === "added";
 
   return (
     <div className="flex flex-col gap-1.5 min-w-[110px]">
@@ -707,6 +714,43 @@ function PriceCell({ product }) {
         <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">SAP</span>
         <span className="text-[12px] font-bold text-slate-700 dark:text-slate-300">{fmt(sap)}</span>
       </div>
+
+      <div className="flex justify-end">
+        
+        { canPriceChange && (
+          isManualPrice? (
+
+            <button
+              type="button"
+              onClick={() => HandleWebPriceChange(product)}
+              className="w-full mt-2 rounded-xl border border-red-200
+                        bg-red-50 px-3 py-2
+                        text-xs font-semibold text-red-700
+                        hover:bg-red-100 hover:border-red-300
+                        transition-all duration-200"
+            >
+                🗑️Remove Web Price 
+            </button>
+
+            ) : (
+
+            <button
+              type="button"
+              onClick={() => HandleWebPriceChange(product)}
+              className="w-full mt-2 rounded-xl border border-sky-200
+                        bg-sky-50 px-3 py-2
+                        text-xs font-semibold text-sky-700
+                        hover:bg-sky-100 hover:border-sky-300
+                        transition-all duration-200"
+            >
+                  🌐Change Web Price
+            </button>
+
+          ))}
+        
+        
+      </div>
+
     </div>
   );
 }
@@ -921,6 +965,164 @@ function SortIcon({ active, direction }) {
   );
 }
 
+
+const HandleWebPriceChange = async (product) => {
+
+  const isManualAdded = product.manual_price_update === "added";
+
+  const { value: newPrice } = await Swal.fire({
+
+    title: isManualAdded
+    ? "Release Web Price"
+    : `Current Web Price is : ₹${product.product_price}`,
+
+    html: isManualAdded
+    ? `
+      <div style="text-align:left;font-size:16px;line-height:1.6;">
+        <p style="margin-bottom:12px;font-weight:600;">
+          Are you sure you want to release the web price?
+        </p>
+
+        <div style="
+          background:#FEF2F2;
+          color:#B91C1C;
+          border:1px solid #FCA5A5;
+          padding:12px;
+          border-radius:8px;
+          font-size:14px;
+        ">
+          <strong>Note:</strong> If you release the web price for this product,
+          the store price will automatically update.
+        </div>
+      </div>
+    `
+    : `
+      <div style="font-size:18px;margin-bottom:15px;">
+        Enter your Updated Web Price:
+      </div>
+
+      <input
+        id="swal-input-price"
+        class="swal2-input"
+        type="number"
+        placeholder="Enter new web price"
+      />
+    `,
+
+    showCancelButton: true,
+    confirmButtonText: isManualAdded ? "Release Price" : "Update Price",
+    cancelButtonText: "Cancel",
+    focusConfirm: false,
+    preConfirm: () => {
+
+      const price = isManualAdded
+      ?Number(product.product_store_price) 
+      :Number(document.getElementById("swal-input-price").value);
+
+      if (!price && !isManualAdded) {
+        Swal.showValidationMessage("Please enter a web price");
+        return false;
+      }
+
+      return price;
+    },
+  });
+
+  
+  if(newPrice !== undefined && newPrice !== false){
+
+    const data = {
+      item_code: product.product_code,
+      product_price: isManualAdded
+        ? Number(product.product_store_price) 
+        : Number(newPrice),                   
+      is_manual_price: isManualAdded ? 0 : 1,
+    };
+
+    const wepPriceApiUrl = import.meta.env.VITE_SATHYA_WEBPRICE_API_URL;
+
+    try {
+
+      const response = await fetch(
+        wepPriceApiUrl,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(data),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.status === "sucess") {
+
+      const auth = JSON.parse(localStorage.getItem("eprice-store"));
+      const priceChangerId = auth?.state?.user?.user_id;
+      const payload = {
+        user_id: priceChangerId,
+        product_ean_id: product.product_ean_id,
+        product_code: product.product_code,
+        product_price: product.product_price,
+        update_price: isManualAdded
+          ? Number(product.product_store_price)
+          : Number(newPrice),
+        is_manual_price: isManualAdded ? 0 : 1,
+      };
+      await saveWebPriceData(payload);
+
+        Swal.fire({
+          icon: "success",
+          title: "Success",
+          text: isManualAdded
+          ? "Web price released successfully."
+          : "Web price updated successfully.",
+        }).then(() => {
+          window.location.reload();
+        });
+
+      } else if (result.status === "api_failed") {
+
+        Swal.fire({
+          icon: "error",
+          title: "API Failed",
+          text: result.msg
+        }).then(() => {
+          window.location.reload();
+        });
+
+      } else {
+        
+          Swal.fire({
+          icon: "error",
+          title: "API Failed",
+          text: result.msg || (
+            isManualAdded
+              ? "Unable to remove web price."
+              : "Unable to update web price."
+          )
+        }).then(() => {
+          window.location.reload();
+        });
+      }
+
+    } catch (error) {
+
+      console.error(error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Something went wrong. Please try again.",
+      }).then(() => {
+        window.location.reload();
+      });
+    }
+
+  }
+  
+};
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function Products() {
@@ -945,6 +1147,7 @@ export default function Products() {
   const currentUserId  = useStore((s) => s.user?.user_id);
   const exportType     = useStore((s) => s.exportType) || "A";
   const canExport      = useStore((s) => (s.user?.export_option ?? "yes") !== "no");
+  
 
   const competitorMeta = {};
   competitors.forEach((c) => {

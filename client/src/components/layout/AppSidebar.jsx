@@ -9,8 +9,7 @@ import {
   LucideHistory,
   BarChartBigIcon,
   ComponentIcon,
-  Share2Icon,
-  UserCheck
+  Share2Icon
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -34,24 +33,24 @@ export function AppSidebar() {
   const isSuperAdmin = useStore(selectIsSuperAdmin);
   const primaryColor = useStore(selectPrimaryColor);
 
-  let items = [...navItems];
+  // let items = [...navItems];
 
-  if (isSuperAdmin) {
-    items.push({
-      title: "Pending Signups",
-      icon: UserCheck,
-      path: "/pending-signups",
-    });
-  }
+  // if (isSuperAdmin) {
+  //   items.push({
+  //     title: "Pending Signups",
+  //     icon: UserCheck,
+  //     path: "/pending-signups",
+  //   });
+  // }
 
-  const visibleNavItems = items.filter(
-    (item) => !item.superAdminOnly || isSuperAdmin
-  );
+  // const visibleNavItems = items.filter(
+  //   (item) => !item.superAdminOnly || isSuperAdmin
+  // );
 
   return (
     <aside className="flex flex-col border-r border-sidebar-border bg-sidebar shrink-0 w-[70px] h-screen">
       <nav className="flex-1 py-4 px-2 space-y-2">
-        {visibleNavItems.map((item) => {
+        {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           return (
             <div key={item.path} className="relative group flex justify-center">

@@ -34,9 +34,11 @@ export const createAuthSlice = (set, get) => ({
 
     const exportType   = data.export_type   ?? 'A';
     const showLsp      = data.show_lsp      ?? false;
+    const webPriceAccess = data.webprice_access ?? 'no';
     const exportOption = data.export_option ?? 'yes';
     localStorage.setItem('exportType', exportType);
     localStorage.setItem('showLsp',    String(showLsp));
+    localStorage.setItem('webPriceAccess',  webPriceAccess);
 
     set({
       token: data.token,
@@ -45,6 +47,7 @@ export const createAuthSlice = (set, get) => ({
       exportType,
       showLsp,
       exportOption,
+      webPriceAccess,
       user: {
         user_id:       decoded?.user_id,
         user_type:     decoded?.user_type,
@@ -53,6 +56,7 @@ export const createAuthSlice = (set, get) => ({
         website:       data.website       || '',
         email_address: data.email_address || '',
         export_option: data.export_option ?? 'yes',
+        webprice_access: data.webprice_access ?? 'no',
       },
     });
   },
@@ -65,7 +69,8 @@ export const createAuthSlice = (set, get) => ({
     localStorage.removeItem('activeShopName');
     localStorage.removeItem('exportType');
     localStorage.removeItem('showLsp');
-    set({ token: null, user: null, activeStoreId: null, activeShopName: null, exportType: '', showLsp: false, exportOption: 'yes' });
+    localStorage.removeItem('webPriceAccess');
+    set({ token: null, user: null, activeStoreId: null, activeShopName: null, exportType: '', showLsp: false, exportOption: 'yes', webPriceAccess : 'no' });
   },
 
   setExportType: (type) => set({ exportType: type }),

@@ -17,6 +17,7 @@ const userSchema = new mongoose.Schema({
   user_name:                { type: String, default: '' },
   email_notify:             { type: String, default: 'yes' },
   export_option:            { type: String, default: 'yes' },
+  webprice_access:          { type: String, default: 'no' },
   addedby:                  { type: String, default: '' },
   addedon:                  { type: Date, default: Date.now },
   archived:                 { type: Number, default: 0 },

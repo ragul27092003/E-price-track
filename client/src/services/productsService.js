@@ -68,3 +68,6 @@ export const fetchPendingProducts = ({
  
 export const saveProductMapping = (data) =>
   API.post('/products/pendingmapping', data).then((r) => r.data);
+
+export const saveWebPriceData = (data) =>
+  API.post('/products/webpriceupdation', data).then((r) => r.data);

@@ -571,3 +571,88 @@ exports.pendingMapping = async (req, res) => {
     });
   }
 };
+
+
+exports.webPriceUpdation = async (req, res) => {
+  
+  try {
+    const {
+      user_id,
+      product_ean_id,
+      product_code,
+      product_price,
+      update_price,
+      is_manual_price,
+    } = req.body;
+
+    const db = req.tenantDb;
+
+    const manual_price_update =
+      Number(is_manual_price) === 1 ? "added" : "removed";
+
+    // Check product exists
+    const product = await db.collection("ept_product_details_new").findOne({
+      product_ean_id,
+      product_code,
+    });
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: "Product not found.",
+      });
+    }
+
+    // Insert history
+    const insertResult = await db
+      .collection("ept_web_price_manual_update_info")
+      .insertOne({
+        product_ean_id,
+        product_code,
+        user_id,
+        is_manual_price,
+        manual_price_update,
+        product_price,
+        update_price,
+        created_date: new Date(),
+        modified_date: new Date(),
+        last_update_time: new Date(),
+        status: "active",
+      });
+
+    // Update product
+    const updateResult = await db.collection("ept_product_details_new").updateOne(
+      {
+        product_ean_id,
+        product_code,
+      },
+      {
+        $set: {
+          product_price: update_price,
+          product_sap_price: update_price,
+          manual_price_update,
+          is_manual_price,
+          manual_price_update_modified_date: new Date(),
+        },
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Web price updated successfully.",
+      inserted: insertResult.insertedId,
+      matchedCount: updateResult.matchedCount,
+      modifiedCount: updateResult.modifiedCount,
+    });
+
+  } catch (err) {
+    console.error("WEB PRICE UPDATE ERROR:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+

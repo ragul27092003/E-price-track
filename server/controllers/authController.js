@@ -108,6 +108,7 @@ exports.login = async (req, res) => {
       show_lsp:      merchant?.show_lsp    ?? false,
       //add new
       export_option: user.export_option    ?? 'yes',
+      webprice_access: user.webprice_access ?? 'no',
     });
 
     const { device, browser } = parseUA(req.headers['user-agent']);
