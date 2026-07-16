@@ -347,6 +347,15 @@ exports.getAlertProducts = async (req, res) => {
 
     const query = await buildAlertQuery(req);
     if (!query) return res.json({ data: [], total: 0, page: 1, totalPages: 0 });
+    const { search } = req.query;
+if (search) {
+  query.$or = [
+    { product_name:   { $regex: search, $options: 'i' } },
+    { product_brand:  { $regex: search, $options: 'i' } },
+    { product_ean_id: { $regex: search, $options: 'i' } },
+    { product_code:   { $regex: search, $options: 'i' } },
+  ];
+}
 
     const col      = db.collection('ept_product_details_new');
     const total    = await col.countDocuments(query);
