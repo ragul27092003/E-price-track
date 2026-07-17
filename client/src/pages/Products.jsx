@@ -817,11 +817,24 @@ function exportToCSV(products, exportType = "A", competitorMeta = {}) {
 
 // ── Competitor Price History Modal (single competitor vs our price) ────────────
 
-function CompetitorHistoryModal({ product, competitor, onClose }) {
+function CompetitorHistoryModal({ product, competitor, onClose, initialRange = 30 }) {
   const [hoverIdx, setHoverIdx] = useState(null);
+  const [range, setRange] = useState(initialRange); // 7 or 30
+  const [rangeOpen, setRangeOpen] = useState(false);
   const chartRef = useRef(null);
 
-  const history = (product?.price_history_30days || []).slice(-30);
+  // Sort chronologically (oldest → newest) before slicing, so we always grab
+  // the most recent `range` days, regardless of the order the API sends them in.
+  const rawHistory = product?.price_history_30days || [];
+  const sortedHistory = [...rawHistory].sort((a, b) => {
+    const da = new Date(a.display_date).getTime();
+    const db = new Date(b.display_date).getTime();
+    if (isNaN(da) || isNaN(db)) return 0; // leave as-is if date is unparseable
+    return da - db;
+  });
+  // Take the most recent `range` days (ascending), then reverse so "today" is
+  // shown first (leftmost) and dates get older as you move right.
+  const history = sortedHistory.slice(-range).reverse();
 
   const ourValues  = history.map((h) => parsePrice(h.product_price));
   const compValues = history.map((h) => parsePrice(h.competitors?.[competitor.slug]));
@@ -903,9 +916,49 @@ function CompetitorHistoryModal({ product, competitor, onClose }) {
               <h2 className="font-bold text-slate-800 dark:text-white text-sm mt-0.5 line-clamp-1">{product?.product_name || "Product"}</h2>
             </div>
           </div>
-          <button onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12" /></svg>
-          </button>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Range selector — 7 / 30 days */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setRangeOpen((o) => !o)}
+                className="flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151a2a] px-3 py-1.5 text-[11px] font-bold text-slate-600 dark:text-slate-300 shadow-sm hover:border-slate-300 transition-colors"
+              >
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9" /><path d="M12 6v6l4 2" /></svg>
+                {range} DAYS
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" className={`transition-transform ${rangeOpen ? "rotate-180" : ""}`}><path d="m6 9 6 6 6-6" /></svg>
+              </button>
+
+              {rangeOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setRangeOpen(false)} />
+                  <div className="absolute right-0 top-full z-40 mt-1.5 w-32 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#151a2a] shadow-lg py-1">
+                    {[7, 30].map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => { setRange(r); setRangeOpen(false); setHoverIdx(null); }}
+                        className={`flex w-full items-center justify-between px-3 py-2 text-xs font-bold transition-colors ${
+                          range === r
+                            ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
+                            : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#0b101e]"
+                        }`}
+                      >
+                        {r} Days
+                        {range === r && (
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6 9 17l-5-5" /></svg>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <button onClick={onClose} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6 6 18M6 6l12 12" /></svg>
+            </button>
+          </div>
         </div>
 
         <div className="px-6 py-5">
