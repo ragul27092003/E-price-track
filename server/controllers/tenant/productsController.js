@@ -189,7 +189,15 @@ exports.getMeta = async (req, res) => {
       d.product_category ? d.product_category.split('>')[0].trim() : ''
     ).filter(Boolean))].sort();
 
-    res.json({ brands, categories, ranks, itemGroups });
+    // 🆕 resolve effective alert user id (super_admin → tenant's store_admin id)
+    let alertUserId = req.user.user_id;
+    if (req.user.user_type === 'super_admin') {
+      const tenantCmpid = req.headers['x-tenant-id'] || req.user.cmpid;
+      const storeAdmin = await User.findOne({ cmpid: tenantCmpid, user_type: 'store_admin' }).select('user_id').lean();
+      if (storeAdmin) alertUserId = storeAdmin.user_id;
+    }
+
+    res.json({ brands, categories, ranks, itemGroups, alertUserId });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
