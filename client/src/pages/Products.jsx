@@ -832,9 +832,8 @@ function CompetitorHistoryModal({ product, competitor, onClose, initialRange = 3
     if (isNaN(da) || isNaN(db)) return 0; // leave as-is if date is unparseable
     return da - db;
   });
-  // Take the most recent `range` days (ascending), then reverse so "today" is
-  // shown first (leftmost) and dates get older as you move right.
-  const history = sortedHistory.slice(-range).reverse();
+  // Take the most recent `range` days, oldest → newest (fixed order — no toggle).
+  const history = sortedHistory.slice(-range);
 
   const ourValues  = history.map((h) => parsePrice(h.product_price));
   const compValues = history.map((h) => parsePrice(h.competitors?.[competitor.slug]));
@@ -854,7 +853,9 @@ function CompetitorHistoryModal({ product, competitor, onClose, initialRange = 3
   }
 
   const svgW = 640, svgH = 280;
-  const pad  = { top: 20, right: 16, bottom: 60, left: 60 };
+  // right padding widened (16 → 56) so the last rotated date label has room
+  // to fully render instead of getting clipped at the SVG's right edge
+  const pad  = { top: 20, right: 56, bottom: 60, left: 60 };
   const plotW = svgW - pad.left - pad.right;
   const plotH = svgH - pad.top - pad.bottom;
 
@@ -997,15 +998,11 @@ function CompetitorHistoryModal({ product, competitor, onClose, initialRange = 3
                   </g>
                 ))}
 
-                {history.map((h, i) => {
-                  const step = history.length > 20 ? Math.ceil(history.length / 10) : 1;
-                  if (i % step !== 0 && i !== history.length - 1) return null;
-                  return (
-                    <text key={i} transform={`translate(${getX(i)},${pad.top + plotH + 16}) rotate(40)`} textAnchor="start" fontSize="9" fill="#64748b" className="dark:fill-gray-400 font-semibold">
-                      {h.display_date || ""}
-                    </text>
-                  );
-                })}
+                {history.map((h, i) => (
+                  <text key={i} transform={`translate(${getX(i)},${pad.top + plotH + 14}) rotate(60)`} textAnchor="start" fontSize="7" fill="#64748b" className="dark:fill-gray-400 font-semibold">
+                    {h.display_date || ""}
+                  </text>
+                ))}
 
                 {series.map((s) => {
                   const d = buildPath(s.values);
@@ -1869,7 +1866,7 @@ export default function Products() {
 
       {configProduct && (
         <ConfigureModal
-          product={configProduct} currentUserId={alertUserId || currentUserId}
+          product={configProduct} currentUserId={currentUserId}
           onClose={() => setConfigProduct(null)} onSaved={handleConfigSaved}
         />
       )}

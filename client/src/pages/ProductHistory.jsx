@@ -99,7 +99,9 @@ function PriceChart({ history, competitors, visibleSlugs }) {
   }
  
   const svgW = 750, svgH = 290;
-  const pad  = { top: 25, right: 20, bottom: 80, left: 65 }; 
+  // right padding widened (20 → 60) so the last rotated date label has room
+  // to fully render instead of getting clipped at the SVG's right edge
+  const pad  = { top: 25, right: 60, bottom: 80, left: 65 }; 
   const plotW = svgW - pad.left - pad.right;
   const plotH = svgH - pad.top - pad.bottom;
  
@@ -497,7 +499,8 @@ useEffect(() => {
  
   const activeHistory = useMemo(() => {
     const full = selectedProduct?.price_history_30days || [];
-    return full.slice(0, daysRange); 
+    const sliced = full.slice(0, daysRange); // API sends newest → oldest
+    return [...sliced].reverse(); // always show oldest → newest
   }, [selectedProduct, daysRange]);
  
    const chartCompetitors = useMemo(() => {
