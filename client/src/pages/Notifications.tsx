@@ -204,17 +204,33 @@ function ErrorState({ message, onRetry }) {
 
 const ITEMS_PER_PAGE = 9;
 
+function getPageNumbers(currentPage: number, totalPages: number): (number | string)[] {
+  const delta = 1; // pages to show on each side of current
+  const range: (number | string)[] = [];
+  const rangeStart = Math.max(2, currentPage - delta);
+  const rangeEnd = Math.min(totalPages - 1, currentPage + delta);
+
+  range.push(1);
+  if (rangeStart > 2) range.push('...');
+  for (let i = rangeStart; i <= rangeEnd; i++) range.push(i);
+  if (rangeEnd < totalPages - 1) range.push('...');
+  if (totalPages > 1) range.push(totalPages);
+
+  return range;
+}
+
 function Pagination({ currentPage, totalPages, onPageChange }: {
   currentPage: number;
   totalPages: number;
   onPageChange: (p: number) => void;
 }) {
   if (totalPages <= 1) return null;
-  const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+  const pages = getPageNumbers(currentPage, totalPages);
+
   return (
     <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 md:px-5 py-3 mt-6 rounded-xl">
-      <p className="text-xs text-slate-500 dark:text-slate-400">Page {currentPage} of {totalPages}</p>
-      <div className="flex items-center gap-1">
+      <p className="text-xs text-slate-500 dark:text-slate-400 shrink-0">Page {currentPage} of {totalPages}</p>
+      <div className="flex items-center gap-1 flex-wrap justify-end">
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
@@ -222,19 +238,25 @@ function Pagination({ currentPage, totalPages, onPageChange }: {
         >
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m15 18-6-6 6-6" /></svg>
         </button>
-        {pages.map((p) => (
-          <button
-            key={p}
-            onClick={() => onPageChange(p)}
-            className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-semibold transition-colors ${
-              p === currentPage
-                ? "bg-[#2B86C5] text-white border border-[#2B86C5]"
-                : "border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
-            }`}
-          >
-            {p}
-          </button>
-        ))}
+
+        {pages.map((p, idx) =>
+          p === '...' ? (
+            <span key={`ellipsis-${idx}`} className="flex h-8 w-8 items-center justify-center text-xs text-slate-400">…</span>
+          ) : (
+            <button
+              key={p}
+              onClick={() => onPageChange(p as number)}
+              className={`flex h-8 w-8 items-center justify-center rounded-md text-xs font-semibold transition-colors ${
+                p === currentPage
+                  ? "bg-[#2B86C5] text-white border border-[#2B86C5]"
+                  : "border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+              }`}
+            >
+              {p}
+            </button>
+          )
+        )}
+
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
@@ -374,6 +396,12 @@ export default function Notifications() {
             />
           </div>
         </div>
+
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
 
         {/* Card grid */}
         <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">

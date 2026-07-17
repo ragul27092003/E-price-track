@@ -1869,7 +1869,7 @@ export default function Products() {
 
       {configProduct && (
         <ConfigureModal
-          product={configProduct} currentUserId={currentUserId}
+          product={configProduct} currentUserId={alertUserId || currentUserId}
           onClose={() => setConfigProduct(null)} onSaved={handleConfigSaved}
         />
       )}
