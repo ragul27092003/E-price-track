@@ -8,6 +8,7 @@ import { fetchCompetitors } from "../services/competitorsService";
 import Swal from "sweetalert2";
 import MappingPagination from "../components/MappingPagination";
 import { useStore } from "../store";
+import API from '../hooks/useApi';
 
 const TABS = ["Pending Products Mapping", "Fullsite Re-Mapping"];
 
@@ -42,12 +43,15 @@ const ProductMapping = () => {
   const [mappingData, setMappingData] = useState({});
 
   const openModal = (product) => {
+
     setSelectedProduct(product);
+    setMappingData({});
     setShowModal(true);
   };
 
   const closeModal = () => {
     setShowModal(false);
+    setMappingData({});
     setSelectedProduct(null);
   };
 
@@ -201,6 +205,7 @@ const ProductMapping = () => {
       });
     }
   };
+  
 
   return (
     <div>
@@ -459,6 +464,10 @@ const ProductMapping = () => {
                                     src={product.product_image}
                                     alt="Butterfly Outer Lid Induction Bottom Cooker (3LSTDPLUS)"
                                     className="h-10 w-10 shrink-0 rounded-lg border border-slate-100 dark:border-slate-700/50 object-contain shadow-sm bg-slate-50 dark:bg-[#151a2a]"
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.src = "/assets/no-image-rounded.png";
+                                    }}
                                   />
                                 </a>
                                 <div>
@@ -555,6 +564,10 @@ const ProductMapping = () => {
                     <img
                       src={selectedProduct?.product_image}
                       className="w-24 h-24 object-contain mx-auto border rounded-lg bg-white p-2"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = "/assets/no-image.png";
+                      }}
                     />
 
                     <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 shadow-sm">
@@ -721,10 +734,7 @@ const ProductMapping = () => {
                         <div className="col-span-12 sm:col-span-3 lg:col-span-2 flex items-center">
                           <div className="w-16 h-12 border rounded-lg bg-slate-50 flex items-center justify-center p-2">
                             <img
-                              src={
-                                "https://epricetrack.com/eprice/admin" +
-                                competitor.logo
-                              }
+                              src={`${API.defaults.baseURL.replace(/\/api\/?$/, '')}${competitor.logo}`}
                               alt={competitor.name}
                               className="max-h-10 object-contain"
                             />
