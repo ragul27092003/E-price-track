@@ -21,10 +21,10 @@ import SmartReports from "./pages/SmartReports";
 import MarketCompetitor from "./pages/MarketCompetitor";
 import ProductMapping from "./pages/ProductMapping";
 import FullsiteRemapping from "./pages/FullsiteRemapping";
-import PendingSignups from "./pages/PendingSignups";
-// import Home from "./pages/Home";
-import { ROUTES } from "./utilis/urls";
 import ProductMappingLayout from "./pages/ProductMappingLayout";
+import PendingSignups from "./pages/PendingSignups";
+//import Home from "./pages/Home";
+import { ROUTES } from "./utilis/urls";
 
 const queryClient = new QueryClient();
 
@@ -33,14 +33,14 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter basename="/eprice/admin">
         <AuthProvider>
           <Routes>
             {/* Public */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
-            {/* <Route path="/" element={<Home />} /> */}
+            
 
             {/* Protected — both roles use the same dashboard layout */}
             <Route element={
@@ -57,7 +57,7 @@ const App = () => (
               <Route path="/competitors" element={<Competitors />} />
               <Route path="/products" element={<Products />} />
               <Route path="/market" element={<MarketCompetitor />} />
-              <Route element={<ProductMappingLayout />}>
+               <Route element={<ProductMappingLayout />}>
                   <Route path="/product-mapping" element={<ProductMapping />} />
                   <Route path="/fullsite-remapping" element={<FullsiteRemapping />} />
               </Route>
