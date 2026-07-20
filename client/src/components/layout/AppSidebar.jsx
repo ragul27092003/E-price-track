@@ -24,7 +24,10 @@ const navItems = [
   { title: "Product History",   icon: LucideHistory,   path: "/product-history" },
   { title: "Market Competitor", icon: ComponentIcon,   path: "/market" },
   { title: "Smart Reports",     icon: BarChartBigIcon, path: "/smart-reports" },
-  { title: "Product Mapping",   icon: Share2Icon,      path: "/product-mapping", superAdminOnly: true },
+  { title: "Product Mapping",   icon: Share2Icon,      path: "/product-mapping", activePaths: [
+      "/product-mapping",
+      "/fullsite-remapping",
+    ],superAdminOnly: true },
   { title: "Settings",          icon: Settings,        path: "/settings" },
 ];
 
@@ -51,7 +54,13 @@ export function AppSidebar() {
     <aside className="flex flex-col border-r border-sidebar-border bg-sidebar shrink-0 w-[70px] h-screen">
       <nav className="flex-1 py-4 px-2 space-y-2">
         {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          
+          //const isActive = location.pathname === item.path;
+
+          const isActive = item.activePaths
+          ? item.activePaths.includes(location.pathname)
+          : location.pathname === item.path;
+
           return (
             <div key={item.path} className="relative group flex justify-center">
               <NavLink

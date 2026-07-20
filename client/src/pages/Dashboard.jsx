@@ -455,86 +455,101 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
         {/* 1. Brand Analytics (Wider) */}
-        <motion.div variants={itemVariants} className="lg:col-span-6 bg-card rounded-xl p-6 card-shadow border border-border flex flex-col">
-          <div className="flex items-center gap-2 mb-4">
-             <BarChart className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold text-lg text-foreground">Brand Analytics</h3>
+        
+          <motion.div variants={itemVariants} className="lg:col-span-6 bg-card rounded-xl p-0 card-shadow border border-border flex flex-col overflow-hidden">
+          <div className="bg-[#48b2ad] px-4 py-3">
+            <h3 className="text-white font-semibold text-center text-[15px]">Brand Analytics</h3>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-center gap-4 mb-6">
 
-            <div className="flex gap-3 w-full">
-              <select
-                className="flex-1 min-w-0 bg-secondary text-sm rounded-md px-3 py-2 border-none outline-none"
-                value={selectedBrand}
-                onChange={(e) => handleBrandChange(e.target.value)}
-                disabled={brandAnalyticsBrandsLoading}
-              >
-                {brandAnalyticsBrandsLoading ? (
-                  <option>Loading…</option>
-                ) : (
-                  brandAnalyticsBrands.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
+          <div className="flex flex-col h-full">
+            {/* Filters */}
+            <div className="p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <select
+                  className="w-full sm:flex-1 bg-secondary text-sm rounded-lg px-4 py-3 border border-gray-200 focus:outline-none"
+                  value={selectedBrand}
+                  onChange={(e) => handleBrandChange(e.target.value)}
+                  disabled={brandAnalyticsBrandsLoading}
+                >
+                  {brandAnalyticsBrandsLoading ? (
+                    <option>Loading...</option>
+                  ) : (
+                    brandAnalyticsBrands.map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))
+                  )}
+                </select>
+
+                <select
+                  className="w-full sm:flex-1 bg-secondary text-sm rounded-lg px-4 py-3 border border-gray-200 focus:outline-none"
+                  value={selectedCategory}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
+                  disabled={
+                    brandAnalyticsLoading ||
+                    !brandAnalyticsCategories.length
+                  }
+                >
+                  <option value="">All Category</option>
+
+                  {brandAnalyticsCategories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {fmtCategory(cat)}
                     </option>
-                  ))
-                )}
-              </select>
-
-              <select
-                className="flex-1 min-w-0 bg-secondary text-sm rounded-md px-3 py-2 border-none outline-none"
-                value={selectedCategory}
-                onChange={(e) => handleCategoryChange(e.target.value)}
-                disabled={brandAnalyticsLoading || !brandAnalyticsCategories.length}
-              >
-                <option value="">All Category</option>
-                {brandAnalyticsCategories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {fmtCategory(cat)}
-                  </option>
-                ))}
-              </select>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
-          <div className="space-y-4 flex-1 justify-center flex flex-col">
-            {brandAnalyticsLoading ? (
-              <p className="text-sm text-muted-foreground animate-pulse text-center py-6">Loading analytics…</p>
-            ) : (
-              <>
-                <StatRow
-                  label="Total Product Analyzed"
-                  value={pd?.total_product_analyzed_count ?? '--'}
-                  colorClass="bg-blue-200"
-                  percent={pd?.total_product_analyzed_process_bar ?? 100}
-                />
-                <StatRow
-                  label="Rank1 Product Count For Total Product"
-                  value={pd?.cheapest_product_count ?? '--'}
-                  colorClass="bg-purple-200"
-                  percent={pd?.cheapest_product_process_bar ?? 100}
-                />
-                <StatRow
-                  label="Higher by Average Price Difference"
-                  value={pd?.higherby_expansive_average ?? '--'}
-                  colorClass="bg-orange-200"
-                  isCurrency
-                  percent={100}
-                />
-                <StatRow
-                  label={`${activeShopName.toUpperCase()} Average Price Across the Product`}
-                  value={pd ? fmtINR(pd.product_price_average) : '--'}
-                  colorClass="bg-green-500"
-                  isCurrency
-                  percent={pd?.product_price_process_bar ?? 100}
-                />
-                <StatRow
-                  label="Competitor's Average Price Across the Product"
-                  value={pd ? fmtINR(pd.cmp_product_price_average) : '--'}
-                  colorClass="bg-blue-500"
-                  isCurrency
-                  percent={pd?.cmp_product_price_process_bar ?? 100}
-                />
-              </>
-            )}
+
+            {/* Statistics */}
+            <div className="flex-1 p-4 sm:p-6 space-y-5">
+              {brandAnalyticsLoading ? (
+                <p className="text-center py-10 text-sm text-muted-foreground animate-pulse">
+                  Loading analytics...
+                </p>
+              ) : (
+                <>
+                  <StatRow
+                    label="Total Product Analyzed"
+                    value={pd?.total_product_analyzed_count ?? "--"}
+                    colorClass="bg-blue-200"
+                    percent={pd?.total_product_analyzed_process_bar ?? 100}
+                  />
+
+                  <StatRow
+                    label="Rank1 Product Count For Total Product"
+                    value={pd?.cheapest_product_count ?? "--"}
+                    colorClass="bg-purple-200"
+                    percent={pd?.cheapest_product_process_bar ?? 100}
+                  />
+
+                  <StatRow
+                    label="Higher by Average Price Difference"
+                    value={pd?.higherby_expansive_average ?? "--"}
+                    colorClass="bg-orange-200"
+                    isCurrency
+                    percent={100}
+                  />
+
+                  <StatRow
+                    label={`${activeShopName.toUpperCase()} Average Price Across the Product`}
+                    value={pd ? fmtINR(pd.product_price_average) : "--"}
+                    colorClass="bg-green-500"
+                    isCurrency
+                    percent={pd?.product_price_process_bar ?? 100}
+                  />
+
+                  <StatRow
+                    label="Competitor's Average Price Across the Product"
+                    value={pd ? fmtINR(pd.cmp_product_price_average) : "--"}
+                    colorClass="bg-blue-500"
+                    isCurrency
+                    percent={pd?.cmp_product_price_process_bar ?? 100}
+                  />
+                </>
+              )}
+            </div>
           </div>
         </motion.div>
 
@@ -583,10 +598,15 @@ export default function Dashboard() {
         </motion.div>
 
       {/* 3. Overall Statistics Donut Chart */}
-        <motion.div variants={itemVariants} className="lg:col-span-3 bg-card rounded-xl p-6 card-shadow border border-border flex flex-col items-center justify-center">
+        {/* <motion.div variants={itemVariants} className="lg:col-span-3 bg-card rounded-xl p-6 card-shadow border border-border flex flex-col items-center justify-center">
           <div className="w-full flex items-center gap-2 mb-2">
             <BarChart3 className="h-5 w-5 text-primary" />
             <h3 className="font-semibold text-lg text-foreground">Overall Statistics</h3>
+          </div> */}
+
+          <motion.div variants={itemVariants} className="lg:col-span-3 bg-card rounded-xl p-0 card-shadow border border-border flex flex-col overflow-hidden">
+          <div className="bg-[#48b2ad] px-4 py-3">
+            <h3 className="text-white font-semibold text-center text-[15px]">Overall Statistics</h3>
           </div>
 
           <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">

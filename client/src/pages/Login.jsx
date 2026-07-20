@@ -113,9 +113,6 @@ const Login = () => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password</Label>
-                  <Link to="/forgot-password" className="text-xs text-indigo-600 hover:underline">
-                    Forgot password?
-                  </Link>
                 </div>
                 <div className="relative">
                   <Input
@@ -147,18 +144,28 @@ const Login = () => {
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="rememberMe"
-                  checked={rememberMe}
-                  onCheckedChange={handleRememberMeChange}
-                />
-                <Label
-                  htmlFor="rememberMe"
-                  className="text-sm font-normal text-slate-600 dark:text-slate-400 cursor-pointer"
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="rememberMe"
+                    checked={rememberMe}
+                    onCheckedChange={handleRememberMeChange}
+                  />
+
+                  <Label
+                    htmlFor="rememberMe"
+                    className="text-sm font-normal text-slate-600 dark:text-slate-400 cursor-pointer"
+                  >
+                    Remember me
+                  </Label>
+                </div>
+
+                <Link
+                  to="/forgot-password"
+                  className="text-sm text-indigo-600 hover:text-indigo-700 hover:underline"
                 >
-                  Remember me
-                </Label>
+                  Forgot password?
+                </Link>
               </div>
 
               {error && (

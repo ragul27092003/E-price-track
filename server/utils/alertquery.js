@@ -36,13 +36,15 @@ async function buildAlertQuery(req) {
       .lean();
     if (!storeAdmin) return null; // no matching store_admin → zero results
     return { ...baseFilter, user_alert_id: storeAdmin.user_id };
+  }else{
+    return { ...baseFilter, user_alert_id: user_id };
   }
 
   // store_admin: alerts from any user (store_admin + their 'user' accounts) in this tenant
-  const tenantUsers   = await User.find({ cmpid: tenantCmpid }).select('user_id').lean();
-  const tenantUserIds = tenantUsers.map((u) => u.user_id);
-  if (tenantUserIds.length === 0) return null;
-  return { ...baseFilter, user_alert_id: { $in: tenantUserIds } };
+  // const tenantUsers   = await User.find({ cmpid: tenantCmpid }).select('user_id').lean();
+  // const tenantUserIds = tenantUsers.map((u) => u.user_id);
+  // if (tenantUserIds.length === 0) return null;
+  // return { ...baseFilter, user_alert_id: { $in: tenantUserIds } };
 }
 
 module.exports = { buildAlertQuery };

@@ -9,13 +9,9 @@ import Swal from "sweetalert2";
 import MappingPagination from "../components/MappingPagination";
 import { useStore } from "../store";
 import API from '../hooks/useApi';
+import { NavLink } from "react-router-dom";
 
-const TABS = ["Pending Products Mapping", "Fullsite Re-Mapping"];
 
-const tabCounts = {
-  "Pending Products Mapping": 10,
-  "Fullsite Re-Mapping": 8,
-};
 
 const ProductMapping = () => {
   const activeStoreId = useStore((s) => s.activeStoreId);
@@ -28,7 +24,6 @@ const ProductMapping = () => {
     itemGroups: [],
   });
   const [competitors, setCompetitors] = useState([]);
-  const [activeTab, setActiveTab] = useState("Pending Products Mapping");
   const [page, setPage] = useState(1);
   const [limit] = useState(2);
   const [total, setTotal] = useState(0);
@@ -209,40 +204,10 @@ const ProductMapping = () => {
 
   return (
     <div>
-      {/* Tabs */}
-      <div className="mb-8 flex overflow-x-auto border-b border-slate-200">
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`pb-3 text-sm font-semibold relative flex items-center gap-2 mr-5 ${
-              activeTab === tab
-                ? "text-[#1e6191]"
-                : "text-slate-400 hover:text-slate-600"
-            }`}
-          >
-            {tab}
-
-            {/*<span
-              className={`text-[10px] rounded-full px-2 py-1 ${
-                activeTab === tab
-                  ? "bg-blue-100 text-blue-700"
-                  : "bg-slate-100 text-slate-500"
-              }`}
-            >
-              {tabCounts[tab]}
-            </span> */}
-
-            {activeTab === tab && (
-              <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#2B86C5]" />
-            )}
-          </button>
-        ))}
-      </div>
-
+     
       {/* Body */}
       <div className="p-6 bg-white rounded-lg shadow">
-        <h2 className="text-xl font-bold">{activeTab}</h2>
+        <h2 className="text-xl font-bold">Pending Products Activation</h2>
 
         <div className="mx-auto flex max-w-[1400px] flex-col gap-5 px-2 py-3">
           <div className="flex flex-wrap lg:flex-nowrap items-end gap-4">
@@ -466,7 +431,7 @@ const ProductMapping = () => {
                                     className="h-10 w-10 shrink-0 rounded-lg border border-slate-100 dark:border-slate-700/50 object-contain shadow-sm bg-slate-50 dark:bg-[#151a2a]"
                                     onError={(e) => {
                                       e.target.onerror = null;
-                                      e.target.src = "/assets/no-image-rounded.png";
+                                      e.target.src = "./assets/no-image-rounded.png";
                                     }}
                                   />
                                 </a>
@@ -566,7 +531,7 @@ const ProductMapping = () => {
                       className="w-24 h-24 object-contain mx-auto border rounded-lg bg-white p-2"
                       onError={(e) => {
                         e.target.onerror = null;
-                        e.target.src = "/assets/no-image.png";
+                        e.target.src = "./assets/no-image.png";
                       }}
                     />
 
@@ -842,6 +807,7 @@ const ProductMapping = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };
