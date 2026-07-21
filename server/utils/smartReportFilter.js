@@ -227,11 +227,38 @@ function filterProductsForTab(products, tab, search = '', context = {}) {
   return products.filter((p) => productMatchesTab(p, tab, context) && matchesSearch(p, search));
 }
 
+// Writes the per-store Easy Gain % threshold back to the shared admin
+// database — same location loadEasyGainPercentage reads from. Upserts the
+// trend_report.easy_gain.percentage field so it works even for stores that
+// never had a trend_report subdocument before.
+async function updateEasyGainPercentage(db, tenantId, percentage) {
+  const adminDb = db.client.db('plm_admin_manage_info');
+  const col = adminDb.collection('plm_admin_companies');
+
+  const result = await col.updateOne(
+    { cmpid: tenantId },
+    { $set: { 'trend_report.easy_gain.percentage': percentage } }
+  );
+
+  // No document matched cmpid exactly (case mismatch etc.) — fall back to
+  // the same case-insensitive lookup loadEasyGainPercentage uses.
+  if (result.matchedCount === 0) {
+    await col.updateOne(
+      { cmpid: { $regex: `^${escapeRegex(tenantId)}$`, $options: 'i' } },
+      { $set: { 'trend_report.easy_gain.percentage': percentage } }
+    );
+  }
+
+  return percentage;
+}
+
 module.exports = {
   VALID_TABS,
   TAB_COUNT_FIELDS,
   TAB_API_KEYS,
   loadFilterContext,
+  loadEasyGainPercentage,
+  updateEasyGainPercentage,
   productMatchesTab,
   countProductsByTab,
   matchesSearch,

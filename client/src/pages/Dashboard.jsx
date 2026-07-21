@@ -4,14 +4,14 @@ import { useNavigate , NavLink} from "react-router-dom";
 
 import {
   Calendar, Package, CheckSquare, CheckCircle2, Clock, Bell,
-  TrendingUp, Users, BarChart3, BarChart, Info,
+  TrendingUp, Users, BarChart3, BarChart, Info, Settings,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { useStore, selectCurrentStoreId } from "@/store";
 import { fetchCompetitorCountsData } from '../services/dashboardService';
-import { fetchSmartReportTabCounts } from '../services/smartReportsService';
+import { fetchSmartReportTabCounts, updateEasyGainPercentage } from '../services/smartReportsService';
 import API from "../hooks/useApi"; // Ensure this matches your API hook path
 
 // ─── animation presets ─────────────────────────────────────────────────────────
@@ -88,12 +88,24 @@ function StatRow({ label, value, colorClass, isCurrency = false, percent = 100 }
   );
 }
 
-function TrendCard({ title, count, percent, total, progressColor, btnClass, titleColor, loading, onView }) {
+function TrendCard({ title, count, percent, total, progressColor, btnClass, titleColor, loading, onView, onEdit, editTitle }) {
   const pct = parseFloat(percent) || 0;
   return (
     <div className="bg-card rounded-xl p-4 card-shadow border border-border flex flex-col">
       <div className="flex justify-between items-start mb-1">
-        <h4 className={`font-semibold text-sm leading-tight ${titleColor}`}>{title}</h4>
+        <h4 className={`font-semibold text-sm leading-tight flex items-center gap-1.5 ${titleColor}`}>
+          {title}
+          {onEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              title={editTitle || "Edit threshold"}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </h4>
         <div className="text-right ml-2">
           <p className="text-2xl font-bold text-foreground leading-none">
             {loading
@@ -169,6 +181,12 @@ export default function Dashboard() {
   const [smartTabCounts, setSmartTabCounts] = useState(null);
   const [webUpdateStatus, setWebUpdateStatus] = useState(null); // { status, var_end_time } — nandilathgmart only
   const isSuperAdmin = useStore((s) => s.user?.user_type === 'super_admin');
+  const canEditEasyGainPercentage = useStore((s) => s.user?.user_type === 'super_admin');
+  const [easyGainPercentage, setEasyGainPercentage] = useState(0);
+  const [showEasyGainModal, setShowEasyGainModal] = useState(false);
+  const [percentageInput, setPercentageInput] = useState("");
+  const [percentageError, setPercentageError] = useState("");
+  const [savingPercentage, setSavingPercentage] = useState(false);
 
   const {
     sapUpdateStatus, sapUpdateStatusLoading,
@@ -215,6 +233,7 @@ export default function Dashboard() {
       fetchSmartReportTabCounts()
         .then((data) => {
           if (data?.counts) setSmartTabCounts(data.counts);
+          if (typeof data?.easyGainPercentage === "number") setEasyGainPercentage(data.easyGainPercentage);
         })
         .catch(() => setSmartTabCounts(null));
 
@@ -294,12 +313,50 @@ export default function Dashboard() {
     navigate(`/market?competitor=${encodeURIComponent(key)}`);
   };
 
+  const openEasyGainModal = () => {
+    setPercentageInput(String(easyGainPercentage));
+    setPercentageError("");
+    setShowEasyGainModal(true);
+  };
+
+  const handleSaveEasyGainPercentage = async () => {
+    const pctVal = Number(percentageInput);
+    if (percentageInput.trim() === "" || isNaN(pctVal)) {
+      setPercentageError("Enter a valid number");
+      return;
+    }
+    if (pctVal < 0 || pctVal > 100) {
+      setPercentageError("Percentage must be between 0 and 100");
+      return;
+    }
+
+    setSavingPercentage(true);
+    setPercentageError("");
+    try {
+      await updateEasyGainPercentage(pctVal);
+      setEasyGainPercentage(pctVal);
+      setShowEasyGainModal(false);
+      // Fresh, cache-bypassing counts so the card reflects the new threshold immediately.
+      fetchSmartReportTabCounts(true)
+        .then((data) => {
+          if (data?.counts) setSmartTabCounts(data.counts);
+          if (typeof data?.easyGainPercentage === "number") setEasyGainPercentage(data.easyGainPercentage);
+        })
+        .catch(() => {});
+    } catch (err) {
+      console.error("Failed to update Easy Gain percentage:", err);
+      setPercentageError(err?.response?.data?.message || "Failed to update. Please try again.");
+    } finally {
+      setSavingPercentage(false);
+    }
+  };
+
   const total = stats?.varCompletedProductCount ?? '--';
   const totalNum = Number(total) || 0;
   const pct = (count) => (totalNum > 0 && count != null ? ((count / totalNum) * 100).toFixed(1) : null);
 
   const trendCards = [
-  { id: 'easyGain',  title: 'Easy Gain',      count: smartTabCounts?.['Easy Gain']       ?? stats?.varEasyGainCount,        percent: pct(smartTabCounts?.['Easy Gain'])       ?? stats?.varEasyGainPercent,        total, progressColor: 'bg-emerald-500', btnClass: 'bg-emerald-500 hover:bg-emerald-600', titleColor: 'text-amber-600',        onView: () => goToReport('Easy Gain')       },
+  { id: 'easyGain',  title: 'Easy Gain',      count: smartTabCounts?.['Easy Gain']       ?? stats?.varEasyGainCount,        percent: pct(smartTabCounts?.['Easy Gain'])       ?? stats?.varEasyGainPercent,        total, progressColor: 'bg-emerald-500', btnClass: 'bg-emerald-500 hover:bg-emerald-600', titleColor: 'text-amber-600',        onView: () => goToReport('Easy Gain'),      onEdit: canEditEasyGainPercentage ? openEasyGainModal : null, editTitle: `Easy Gain threshold: ${easyGainPercentage}%` },
   { id: 'clever',    title: 'Clever Move',     count: smartTabCounts?.['Clever Move']      ?? stats?.varCleverMoveCount,       percent: pct(smartTabCounts?.['Clever Move'])      ?? stats?.varCleverMovePercent,       total, progressColor: 'bg-amber-500',  btnClass: 'bg-amber-500 hover:bg-amber-600',   titleColor: 'text-amber-500',        onView: () => goToReport('Clever Move')     },
   { id: 'nonComp',   title: 'Non Competitors', count: smartTabCounts?.['Non Competitors']  ?? stats?.varNonCompetitorCount,    percent: pct(smartTabCounts?.['Non Competitors'])  ?? stats?.varNonCompetitorPercent,    total, progressColor: 'bg-rose-600',   btnClass: 'bg-rose-700 hover:bg-rose-800',    titleColor: 'text-muted-foreground', onView: () => goToReport('Non Competitors') },
   { id: 'posTrend',  title: 'Positive Trend',  count: smartTabCounts?.['Positive Trend']   ?? stats?.varPostiveTrendingCount,  percent: pct(smartTabCounts?.['Positive Trend'])   ?? stats?.varPostiveTrendingPercent,  total, progressColor: 'bg-emerald-500', btnClass: 'bg-emerald-500 hover:bg-emerald-600', titleColor: 'text-emerald-600',      onView: () => goToReport('Positive Trend')  },
@@ -350,6 +407,7 @@ export default function Dashboard() {
   }, []);
 
   return (
+    <>
     <motion.div
       variants={containerVariants}
       initial="hidden"
@@ -455,101 +513,86 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
         {/* 1. Brand Analytics (Wider) */}
-        
-          <motion.div variants={itemVariants} className="lg:col-span-6 bg-card rounded-xl p-0 card-shadow border border-border flex flex-col overflow-hidden">
-          <div className="bg-[#48b2ad] px-4 py-3">
-            <h3 className="text-white font-semibold text-center text-[15px]">Brand Analytics</h3>
+        <motion.div variants={itemVariants} className="lg:col-span-6 bg-card rounded-xl p-6 card-shadow border border-border flex flex-col">
+          <div className="flex items-center gap-2 mb-4">
+             <BarChart className="h-5 w-5 text-primary" />
+            <h3 className="font-semibold text-lg text-foreground">Brand Analytics</h3>
           </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-center gap-4 mb-6">
 
-          <div className="flex flex-col h-full">
-            {/* Filters */}
-            <div className="p-4 sm:p-5">
-              <div className="flex flex-col sm:flex-row gap-4">
-                <select
-                  className="w-full sm:flex-1 bg-secondary text-sm rounded-lg px-4 py-3 border border-gray-200 focus:outline-none"
-                  value={selectedBrand}
-                  onChange={(e) => handleBrandChange(e.target.value)}
-                  disabled={brandAnalyticsBrandsLoading}
-                >
-                  {brandAnalyticsBrandsLoading ? (
-                    <option>Loading...</option>
-                  ) : (
-                    brandAnalyticsBrands.map((b) => (
-                      <option key={b} value={b}>
-                        {b}
-                      </option>
-                    ))
-                  )}
-                </select>
-
-                <select
-                  className="w-full sm:flex-1 bg-secondary text-sm rounded-lg px-4 py-3 border border-gray-200 focus:outline-none"
-                  value={selectedCategory}
-                  onChange={(e) => handleCategoryChange(e.target.value)}
-                  disabled={
-                    brandAnalyticsLoading ||
-                    !brandAnalyticsCategories.length
-                  }
-                >
-                  <option value="">All Category</option>
-
-                  {brandAnalyticsCategories.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {fmtCategory(cat)}
+            <div className="flex gap-3 w-full">
+              <select
+                className="flex-1 min-w-0 bg-secondary text-sm rounded-md px-3 py-2 border-none outline-none"
+                value={selectedBrand}
+                onChange={(e) => handleBrandChange(e.target.value)}
+                disabled={brandAnalyticsBrandsLoading}
+              >
+                {brandAnalyticsBrandsLoading ? (
+                  <option>Loading…</option>
+                ) : (
+                  brandAnalyticsBrands.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
                     </option>
-                  ))}
-                </select>
-              </div>
+                  ))
+                )}
+              </select>
+
+              <select
+                className="flex-1 min-w-0 bg-secondary text-sm rounded-md px-3 py-2 border-none outline-none"
+                value={selectedCategory}
+                onChange={(e) => handleCategoryChange(e.target.value)}
+                disabled={brandAnalyticsLoading || !brandAnalyticsCategories.length}
+              >
+                <option value="">All Category</option>
+                {brandAnalyticsCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {fmtCategory(cat)}
+                  </option>
+                ))}
+              </select>
             </div>
-
-            {/* Statistics */}
-            <div className="flex-1 p-4 sm:p-6 space-y-5">
-              {brandAnalyticsLoading ? (
-                <p className="text-center py-10 text-sm text-muted-foreground animate-pulse">
-                  Loading analytics...
-                </p>
-              ) : (
-                <>
-                  <StatRow
-                    label="Total Product Analyzed"
-                    value={pd?.total_product_analyzed_count ?? "--"}
-                    colorClass="bg-blue-200"
-                    percent={pd?.total_product_analyzed_process_bar ?? 100}
-                  />
-
-                  <StatRow
-                    label="Rank1 Product Count For Total Product"
-                    value={pd?.cheapest_product_count ?? "--"}
-                    colorClass="bg-purple-200"
-                    percent={pd?.cheapest_product_process_bar ?? 100}
-                  />
-
-                  <StatRow
-                    label="Higher by Average Price Difference"
-                    value={pd?.higherby_expansive_average ?? "--"}
-                    colorClass="bg-orange-200"
-                    isCurrency
-                    percent={100}
-                  />
-
-                  <StatRow
-                    label={`${activeShopName.toUpperCase()} Average Price Across the Product`}
-                    value={pd ? fmtINR(pd.product_price_average) : "--"}
-                    colorClass="bg-green-500"
-                    isCurrency
-                    percent={pd?.product_price_process_bar ?? 100}
-                  />
-
-                  <StatRow
-                    label="Competitor's Average Price Across the Product"
-                    value={pd ? fmtINR(pd.cmp_product_price_average) : "--"}
-                    colorClass="bg-blue-500"
-                    isCurrency
-                    percent={pd?.cmp_product_price_process_bar ?? 100}
-                  />
-                </>
-              )}
-            </div>
+          </div>
+          <div className="space-y-4 flex-1 justify-center flex flex-col">
+            {brandAnalyticsLoading ? (
+              <p className="text-sm text-muted-foreground animate-pulse text-center py-6">Loading analytics…</p>
+            ) : (
+              <>
+                <StatRow
+                  label="Total Product Analyzed"
+                  value={pd?.total_product_analyzed_count ?? '--'}
+                  colorClass="bg-blue-200"
+                  percent={pd?.total_product_analyzed_process_bar ?? 100}
+                />
+                <StatRow
+                  label="Rank1 Product Count For Total Product"
+                  value={pd?.cheapest_product_count ?? '--'}
+                  colorClass="bg-purple-200"
+                  percent={pd?.cheapest_product_process_bar ?? 100}
+                />
+                <StatRow
+                  label="Higher by Average Price Difference"
+                  value={pd?.higherby_expansive_average ?? '--'}
+                  colorClass="bg-orange-200"
+                  isCurrency
+                  percent={100}
+                />
+                <StatRow
+                  label={`${activeShopName.toUpperCase()} Average Price Across the Product`}
+                  value={pd ? fmtINR(pd.product_price_average) : '--'}
+                  colorClass="bg-green-500"
+                  isCurrency
+                  percent={pd?.product_price_process_bar ?? 100}
+                />
+                <StatRow
+                  label="Competitor's Average Price Across the Product"
+                  value={pd ? fmtINR(pd.cmp_product_price_average) : '--'}
+                  colorClass="bg-blue-500"
+                  isCurrency
+                  percent={pd?.cmp_product_price_process_bar ?? 100}
+                />
+              </>
+            )}
           </div>
         </motion.div>
 
@@ -598,15 +641,10 @@ export default function Dashboard() {
         </motion.div>
 
       {/* 3. Overall Statistics Donut Chart */}
-        {/* <motion.div variants={itemVariants} className="lg:col-span-3 bg-card rounded-xl p-6 card-shadow border border-border flex flex-col items-center justify-center">
+        <motion.div variants={itemVariants} className="lg:col-span-3 bg-card rounded-xl p-6 card-shadow border border-border flex flex-col items-center justify-center">
           <div className="w-full flex items-center gap-2 mb-2">
             <BarChart3 className="h-5 w-5 text-primary" />
             <h3 className="font-semibold text-lg text-foreground">Overall Statistics</h3>
-          </div> */}
-
-          <motion.div variants={itemVariants} className="lg:col-span-3 bg-card rounded-xl p-0 card-shadow border border-border flex flex-col overflow-hidden">
-          <div className="bg-[#48b2ad] px-4 py-3">
-            <h3 className="text-white font-semibold text-center text-[15px]">Overall Statistics</h3>
           </div>
 
           <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">
@@ -796,6 +834,50 @@ export default function Dashboard() {
 
     </motion.div>
 
-    
+    {/* Easy Gain percentage modal */}
+    {showEasyGainModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="w-full max-w-md rounded-xl bg-card shadow-xl p-6 border border-border">
+          <h3 className="text-center text-xl font-bold text-foreground mb-5">
+            Current Percentage : {easyGainPercentage}
+          </h3>
+          <label className="block text-sm text-muted-foreground mb-2">
+            Enter your Updated Percentage Range:
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            autoFocus
+            value={percentageInput}
+            onChange={(e) => { setPercentageInput(e.target.value); setPercentageError(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSaveEasyGainPercentage(); }}
+            placeholder="Enter percentage range"
+            className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+          {percentageError && (
+            <p className="mt-2 text-xs font-medium text-red-500">{percentageError}</p>
+          )}
+          <div className="mt-6 flex justify-end gap-3">
+            <button
+              onClick={() => setShowEasyGainModal(false)}
+              disabled={savingPercentage}
+              className="rounded-lg bg-secondary px-5 py-2 text-sm font-semibold text-foreground hover:opacity-80 transition-opacity disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveEasyGainPercentage}
+              disabled={savingPercentage}
+              className="rounded-lg bg-emerald-500 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-600 transition-colors disabled:opacity-60 inline-flex items-center gap-2"
+            >
+              {savingPercentage && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white inline-block" />}
+              OK
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

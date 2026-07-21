@@ -36,25 +36,17 @@ export function AppSidebar() {
   const isSuperAdmin = useStore(selectIsSuperAdmin);
   const primaryColor = useStore(selectPrimaryColor);
 
-  // let items = [...navItems];
-
-  // if (isSuperAdmin) {
-  //   items.push({
-  //     title: "Pending Signups",
-  //     icon: UserCheck,
-  //     path: "/pending-signups",
-  //   });
-  // }
-
-  // const visibleNavItems = items.filter(
-  //   (item) => !item.superAdminOnly || isSuperAdmin
-  // );
+  // Only keep items that either have no restriction, or are marked
+  // superAdminOnly and the logged-in user IS a super admin.
+  const visibleNavItems = navItems.filter(
+    (item) => !item.superAdminOnly || isSuperAdmin
+  );
 
   return (
     <aside className="flex flex-col border-r border-sidebar-border bg-sidebar shrink-0 w-[70px] h-screen">
       <nav className="flex-1 py-4 px-2 space-y-2">
-        {navItems.map((item) => {
-          
+        {visibleNavItems.map((item) => {
+
           //const isActive = location.pathname === item.path;
 
           const isActive = item.activePaths

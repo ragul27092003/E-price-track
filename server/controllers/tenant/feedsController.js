@@ -7,16 +7,42 @@ async function getMerchant(req) {
   return await Merchant.findOne({ cmpid });
 }
 
-// ── Format raw DB date strings like "2026-04-27 07:15:06am" → "Apr 27, 2026, 07:15 AM"
+// ── Format raw DB date strings like "2026-04-27 07:15:06am" or
+// "2026-07-20 04:01:17PM" → "20 Jul 2026, 04:01 PM"
+//
+// FIX: the previous version captured the am/pm suffix with the regex but
+// then discarded it when building the ISO-ish string ("${d}T${t}"), so
+// `new Date(...)` always parsed the hour as 24-hour clock. Any PM time
+// other than 12 PM (e.g. 04:01:17PM) rendered as AM in the UI, while AM
+// times happened to look correct by coincidence. We now explicitly convert
+// the 12-hour hour + am/pm into the correct 24-hour hour ourselves instead
+// of relying on Date() to infer it.
 function formatDate(raw) {
   if (!raw) return '—';
-  // Normalize: "2026-04-27 07:15:06am" or "2026-04-27 07:18:24am"
-  const cleaned = String(raw)
-    .replace(/(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})(am|pm)?/i, (_, d, t, ampm) => {
-      return `${d}T${t}`;
-    });
-  const dt = new Date(cleaned);
+
+  const match = String(raw).match(
+    /(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})\s*(am|pm)?/i
+  );
+
+  let dt;
+  if (match) {
+    const [, y, mo, d, hRaw, mi, s, ampm] = match;
+    let h = parseInt(hRaw, 10);
+
+    if (ampm) {
+      const isPM = ampm.toLowerCase() === 'pm';
+      if (isPM && h !== 12) h += 12;   // 1 PM–11 PM → 13–23
+      if (!isPM && h === 12) h = 0;    // 12 AM (midnight) → 0
+    }
+    // No am/pm suffix present: assume the stored hour is already 24-hour.
+
+    dt = new Date(Number(y), Number(mo) - 1, Number(d), h, Number(mi), Number(s));
+  } else {
+    dt = new Date(raw);
+  }
+
   if (isNaN(dt)) return raw; // fallback to raw if unparseable
+
   return dt.toLocaleString('en-IN', {
     day:    '2-digit',
     month:  'short',
