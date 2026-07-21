@@ -4,6 +4,8 @@ const {
   VALID_TABS,
   TAB_API_KEYS,
   loadFilterContext,
+  loadEasyGainPercentage,
+  updateEasyGainPercentage,
   countProductsByTab,
   filterProductsForTab,
 } = require('../../utils/smartReportFilter');
@@ -117,7 +119,7 @@ exports.getTabCounts = async (req, res) => {
       apiCounts[TAB_API_KEYS[tab]] = counts[tab];
     }
 
-    res.json({ counts, ...apiCounts });
+    res.json({ counts, ...apiCounts, easyGainPercentage: state.context?.easyGainPercentage ?? 0 });
   } catch (err) {
     console.error('smartReportsController.getTabCounts error:', err);
     res.status(500).json({ message: err.message });
@@ -224,6 +226,44 @@ exports.exportTab = async (req, res) => {
 // Call this from wherever product data gets mutated (price edits, re-scrape,
 // tenant re-provisioning, etc.) so stale cached data doesn't linger for the
 // full TTL window.
+// GET /api/smart-reports/easy-gain-percentage
+exports.getEasyGainPercentage = async (req, res) => {
+  try {
+    const percentage = await loadEasyGainPercentage(req.tenantDb, req.tenantId);
+    res.json({ percentage });
+  } catch (err) {
+    console.error('smartReportsController.getEasyGainPercentage error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// PUT /api/smart-reports/easy-gain-percentage   { percentage: number }
+exports.updateEasyGainPercentageHandler = async (req, res) => {
+  try {
+    const raw = req.body?.percentage;
+    const percentage = Number(raw);
+
+    if (raw === undefined || raw === null || raw === '' || isNaN(percentage)) {
+      return res.status(400).json({ message: 'percentage must be a number' });
+    }
+    if (percentage < 0 || percentage > 100) {
+      return res.status(400).json({ message: 'percentage must be between 0 and 100' });
+    }
+
+    await updateEasyGainPercentage(req.tenantDb, req.tenantId, percentage);
+
+    // The tenant's cached scan bakes the old percentage into its context —
+    // drop it so the very next request (tab-counts / tab-products) re-scans
+    // and re-classifies Easy Gain with the new threshold.
+    invalidateTenantCaches(req.tenantId);
+
+    res.json({ message: 'Easy Gain percentage updated', percentage });
+  } catch (err) {
+    console.error('smartReportsController.updateEasyGainPercentageHandler error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
 exports.invalidateTenantCaches = invalidateTenantCaches;
 
 // Call this right after tenant/session resolution (e.g. login controller)
