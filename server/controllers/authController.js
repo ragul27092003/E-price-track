@@ -167,7 +167,16 @@ exports.signup = async (req, res) => {
     const exists = await User.findOne({ email_address: email });
     if (exists) return res.status(400).json({ message: 'Email already registered' });
 
-    const company = await Company.create({ companyName, companyUrl, status: 'active' });
+    // ✅ புது — Company name already exist பண்றதா check பண்ணு
+    const slugify = (name) =>
+      name.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+    const potentialId = slugify(companyName);
+    const companyExists = await Company.findOne({ companyId: potentialId });
+    if (companyExists) {
+      return res.status(400).json({ message: 'A company with this name is already registered' });
+    }
+
+    const company = await Company.create({ companyName, companyUrl });
 
     const user = await User.create({
       cmpid:         company.companyId,
@@ -193,16 +202,16 @@ exports.signup = async (req, res) => {
       addedby:   user.user_id,
     });
 
-    const tenantDb = getTenantDb(company.companyId);
-    await tenantDb.collection('settings').insertOne({
-      companyId:   company.companyId,
-      companyName,
-      companyUrl,
-      user_id:     user.user_id,
-      merchantId:  merchant._id,
-      status:      'active',
-      createdAt:   new Date(),
-    });
+    // const tenantDb = getTenantDb(company.companyId);
+    // await tenantDb.collection('settings').insertOne({
+    //   companyId:   company.companyId,
+    //   companyName,
+    //   companyUrl,
+    //   user_id:     user.user_id,
+    //   merchantId:  merchant._id,
+    //   status:      'active',
+    //   createdAt:   new Date(),
+    // });
 
     res.status(201).json({
       message:     'Store created successfully',
@@ -437,5 +446,95 @@ exports.resetPassword = async (req, res) => {
     res.json({ message: 'Password reset successfully. You can now sign in.' });
   } catch (error) {
     res.status(500).json({ message: error.message || 'Failed to reset password' });
+  }
+};
+
+exports.getPendingSignups = async (req, res) => {
+  try {
+    const pending = await Company.find({ status: 'pending_provision' })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const withEmail = await Promise.all(
+      pending.map(async (c) => {
+        const user = await User.findOne({ cmpid: c.companyId, user_type: 'store_admin' }).select('email_address');
+        return { ...c, email: user?.email_address || '' };
+      })
+    );
+
+    res.json(withEmail);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.getActivatedCompanies = async (req, res) => {
+  try {
+    const activated = await Company.find({
+      status: 'active',
+      provisionedAt: { $ne: null }
+    }).sort({ provisionedAt: -1 }).lean();
+
+    const withEmail = await Promise.all(
+      activated.map(async (c) => {
+        const user = await User.findOne({ cmpid: c.companyId, user_type: 'store_admin' }).select('email_address');
+        return { ...c, email: user?.email_address || '' };
+      })
+    );
+
+    res.json(withEmail);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.provisionTenantDb = async (req, res) => {
+  const { companyId } = req.params;
+  const adminUserId = req.user.user_id;
+
+  try {
+    const company = await Company.findOne({ companyId });
+    if (!company)
+      return res.status(404).json({ message: 'Company not found' });
+
+    if (company.status === 'active')
+      return res.status(400).json({ message: 'Already provisioned', provisionedAt: company.provisionedAt });
+
+    const user = await User.findOne({ cmpid: companyId, user_type: 'store_admin' });
+    const merchant = await Merchant.findOne({ cmpid: companyId });
+
+    if (!user || !merchant)
+      return res.status(400).json({ message: 'User or Merchant record missing — signup incomplete' });
+
+    const tenantDb = getTenantDb(companyId);
+    await tenantDb.collection('settings').insertOne({
+      companyId,
+      companyName: company.companyName,
+      companyUrl:  company.companyUrl,
+      user_id:     user.user_id,
+      merchantId:  merchant._id,
+      status:      'active',
+      createdAt:   new Date(),
+    });
+
+    company.status = 'active';
+    company.provisionedAt = new Date();
+    company.provisionedBy = adminUserId;
+    await company.save();
+
+    getAdminDb('eprice_main_admin_db').collection('plm_admin_action_logs').insertOne({
+      action:      'tenant_provisioned',
+      companyId,
+      performedBy: adminUserId,
+      log_at:      formatLogTime(new Date()),
+    }).catch(() => {});
+
+    res.json({
+      message:       'Tenant DB provisioned successfully',
+      companyId,
+      provisionedAt: company.provisionedAt,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };

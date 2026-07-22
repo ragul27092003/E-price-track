@@ -23,7 +23,7 @@ import ProductMapping from "./pages/ProductMapping";
 import FullsiteRemapping from "./pages/FullsiteRemapping";
 import ProductMappingLayout from "./pages/ProductMappingLayout";
 import PendingSignups from "./pages/PendingSignups";
-//import Home from "./pages/Home";
+import Home from "./pages/Home";
 import { ROUTES } from "./utilis/urls";
 
 const queryClient = new QueryClient();
@@ -33,22 +33,22 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter basename="/eprice/admin">
+      <BrowserRouter>
         <AuthProvider>
-          <Routes>
+          <Routes >
             {/* Public */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            
+            <Route path="/" element={<Home />} />
+            <Route path="/eprice/admin/login" element={<Login />} />
+            <Route path="/eprice/admin/signup" element={<Signup />} />
+            <Route path="/eprice/admin/forgot-password" element={<ForgotPassword />} />
 
             {/* Protected — both roles use the same dashboard layout */}
-            <Route element={
+            <Route basename="/eprice/admin" element={
               <ProtectedRoute>
                 <DashboardLayout />
               </ProtectedRoute>
             }>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/product-history" element={<ProductHistory />} />
               <Route path={ROUTES.productHistory} element={<ProductHistory />} />
               <Route path="/notifications" element={<Notifications />}/>
@@ -57,7 +57,7 @@ const App = () => (
               <Route path="/competitors" element={<Competitors />} />
               <Route path="/products" element={<Products />} />
               <Route path="/market" element={<MarketCompetitor />} />
-               <Route element={<ProductMappingLayout />}>
+              <Route element={<ProductMappingLayout />}>
                   <Route path="/product-mapping" element={<ProductMapping />} />
                   <Route path="/fullsite-remapping" element={<FullsiteRemapping />} />
               </Route>

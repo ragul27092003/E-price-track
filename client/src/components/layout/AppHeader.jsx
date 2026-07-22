@@ -124,7 +124,7 @@ export function AppHeader() {
 
   const handleLogout = () => {
     logout();
-    navigate("/login");
+    navigate("/eprice/admin/login");
   };
 
   const handleStoreSelect = (store) => {

@@ -82,7 +82,7 @@ const Login = () => {
       login(data);
       authLogin(data);
       await useStore.getState().fetchMerchant();
-      navigate('/');
+      navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
     } finally {
@@ -161,7 +161,7 @@ const Login = () => {
                 </div>
 
                 <Link
-                  to="/forgot-password"
+                  to="/eprice/admin/forgot-password"
                   className="text-sm text-indigo-600 hover:text-indigo-700 hover:underline"
                 >
                   Forgot password?
@@ -180,7 +180,7 @@ const Login = () => {
 
               <p className="text-center text-sm text-slate-500">
                 Don't have an account?{' '}
-                <Link to="/signup" className="text-indigo-600 hover:underline">Sign up</Link>
+                <Link to="/eprice/admin/signup" className="text-indigo-600 hover:underline">Sign up</Link>
               </p>
             </form>
           </CardContent>

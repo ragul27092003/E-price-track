@@ -121,7 +121,7 @@ const Signup = () => {
         email:       form.email,
         password:    form.password,
       });
-      navigate('/login?registered=1');
+      navigate('eprice/admin/login?registered=1');
     } catch (err) {
       const message = err.response?.data?.message || 'Signup failed. Please try again.';
       const field   = err.response?.data?.field;
@@ -249,7 +249,7 @@ const Signup = () => {
 
               <p className="text-center text-sm text-slate-500">
                 Already have an account?{' '}
-                <Link to="/login" className="text-indigo-600 hover:underline font-medium">Sign in</Link>
+                <Link to="/eprice/admin/login" className="text-indigo-600 hover:underline font-medium">Sign in</Link>
               </p>
             </form>
           </CardContent>

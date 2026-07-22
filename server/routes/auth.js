@@ -26,6 +26,7 @@ router.post('/reset-password',   resetPassword);
 router.get('/all-stores',        auth, roleCheck('super_admin'), getAllStores);
 router.get('/merchant/:companyId', auth, getMerchant);
 // ✅ புது routes — Tenant Provisioning
-//router.get('/admin/pending-signups',              auth, roleCheck('super_admin'), getPendingSignups);
-//router.post('/admin/provision-tenant/:companyId', auth, roleCheck('super_admin'), provisionTenantDb);
+router.get('/pending-signups',              auth, roleCheck('super_admin'), getPendingSignups);
+router.post('/provision-tenant/:companyId', auth, roleCheck('super_admin'), provisionTenantDb);
+router.get('/activated-companies', auth, roleCheck('super_admin'), getActivatedCompanies);
 module.exports = router;

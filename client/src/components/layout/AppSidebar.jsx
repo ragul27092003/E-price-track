@@ -9,7 +9,8 @@ import {
   LucideHistory,
   BarChartBigIcon,
   ComponentIcon,
-  Share2Icon
+  Share2Icon,
+  UserCheck
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ const navItems = [
       "/fullsite-remapping",
     ],superAdminOnly: true },
   { title: "Settings",          icon: Settings,        path: "/settings" },
+  { title: "Pending Signups",   icon: UserCheck,       path: "/pending-signups", superAdminOnly: true },
 ];
 
 export function AppSidebar() {

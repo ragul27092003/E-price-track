@@ -283,7 +283,7 @@ const ForgotPassword = () => {
             )}
 
             <p className="text-center text-sm text-slate-500 mt-4">
-              <Link to="/login" className="text-indigo-600 hover:underline inline-flex items-center gap-1">
+              <Link to="/eprice/admin/login" className="text-indigo-600 hover:underline inline-flex items-center gap-1">
                 <ArrowLeft className="w-3.5 h-3.5" /> Back to Sign in
               </Link>
             </p>
