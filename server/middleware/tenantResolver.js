@@ -4,9 +4,11 @@ const tenantResolver = (req, res, next) => {
   let storeId = req.headers['x-tenant-id'] || req.user?.cmpid;
   if (!storeId) return res.status(400).json({ message: 'Store ID is required' });
 
-  if (storeId == 'sathya'){
+
+  {/* if (storeId == 'sathya'){
     storeId = 'chennai';
-  }
+  } */}
+
   try {
     req.tenantDb = getTenantDb(storeId);
     req.tenantId = storeId;
