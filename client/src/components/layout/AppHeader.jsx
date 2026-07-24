@@ -165,7 +165,7 @@ export function AppHeader() {
             onClick={() => setDropdownOpen(!dropdownOpen)}
             className="flex items-center gap-1.5 hover:opacity-90 transition-opacity"
           >
-            {profilePicture ? (
+            {storeLogo ? (
               <img
                 src={storeLogo}
                 alt="Profile"
