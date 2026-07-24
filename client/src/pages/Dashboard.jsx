@@ -513,86 +513,87 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
         {/* 1. Brand Analytics (Wider) */}
-        <motion.div variants={itemVariants} className="lg:col-span-6 bg-card rounded-xl p-6 card-shadow border border-border flex flex-col">
-          <div className="flex items-center gap-2 mb-4">
-             <BarChart className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold text-lg text-foreground">Brand Analytics</h3>
+        <motion.div variants={itemVariants} className="lg:col-span-6 bg-card rounded-xl p-0 card-shadow border border-border flex flex-col overflow-hidden">
+          <div className="bg-[#48b2ad] px-4 py-3">
+            <h3 className="text-white font-semibold text-center text-[15px]">Brand Analytics</h3>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-center gap-4 mb-6">
+          <div className="p-6 flex flex-col flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-center gap-4 mb-6">
 
-            <div className="flex gap-3 w-full">
-              <select
-                className="flex-1 min-w-0 bg-secondary text-sm rounded-md px-3 py-2 border-none outline-none"
-                value={selectedBrand}
-                onChange={(e) => handleBrandChange(e.target.value)}
-                disabled={brandAnalyticsBrandsLoading}
-              >
-                {brandAnalyticsBrandsLoading ? (
-                  <option>Loading…</option>
-                ) : (
-                  brandAnalyticsBrands.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
+              <div className="flex gap-3 w-full">
+                <select
+                  className="flex-1 min-w-0 bg-secondary text-sm rounded-md px-3 py-2 border-none outline-none"
+                  value={selectedBrand}
+                  onChange={(e) => handleBrandChange(e.target.value)}
+                  disabled={brandAnalyticsBrandsLoading}
+                >
+                  {brandAnalyticsBrandsLoading ? (
+                    <option>Loading…</option>
+                  ) : (
+                    brandAnalyticsBrands.map((b) => (
+                      <option key={b} value={b}>
+                        {b}
+                      </option>
+                    ))
+                  )}
+                </select>
+
+                <select
+                  className="flex-1 min-w-0 bg-secondary text-sm rounded-md px-3 py-2 border-none outline-none"
+                  value={selectedCategory}
+                  onChange={(e) => handleCategoryChange(e.target.value)}
+                  disabled={brandAnalyticsLoading || !brandAnalyticsCategories.length}
+                >
+                  <option value="">All Category</option>
+                  {brandAnalyticsCategories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {fmtCategory(cat)}
                     </option>
-                  ))
-                )}
-              </select>
-
-              <select
-                className="flex-1 min-w-0 bg-secondary text-sm rounded-md px-3 py-2 border-none outline-none"
-                value={selectedCategory}
-                onChange={(e) => handleCategoryChange(e.target.value)}
-                disabled={brandAnalyticsLoading || !brandAnalyticsCategories.length}
-              >
-                <option value="">All Category</option>
-                {brandAnalyticsCategories.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {fmtCategory(cat)}
-                  </option>
-                ))}
-              </select>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
-          <div className="space-y-4 flex-1 justify-center flex flex-col">
-            {brandAnalyticsLoading ? (
-              <p className="text-sm text-muted-foreground animate-pulse text-center py-6">Loading analytics…</p>
-            ) : (
-              <>
-                <StatRow
-                  label="Total Product Analyzed"
-                  value={pd?.total_product_analyzed_count ?? '--'}
-                  colorClass="bg-blue-200"
-                  percent={pd?.total_product_analyzed_process_bar ?? 100}
-                />
-                <StatRow
-                  label="Rank1 Product Count For Total Product"
-                  value={pd?.cheapest_product_count ?? '--'}
-                  colorClass="bg-purple-200"
-                  percent={pd?.cheapest_product_process_bar ?? 100}
-                />
-                <StatRow
-                  label="Higher by Average Price Difference"
-                  value={pd?.higherby_expansive_average ?? '--'}
-                  colorClass="bg-orange-200"
-                  isCurrency
-                  percent={100}
-                />
-                <StatRow
-                  label={`${activeShopName.toUpperCase()} Average Price Across the Product`}
-                  value={pd ? fmtINR(pd.product_price_average) : '--'}
-                  colorClass="bg-green-500"
-                  isCurrency
-                  percent={pd?.product_price_process_bar ?? 100}
-                />
-                <StatRow
-                  label="Competitor's Average Price Across the Product"
-                  value={pd ? fmtINR(pd.cmp_product_price_average) : '--'}
-                  colorClass="bg-blue-500"
-                  isCurrency
-                  percent={pd?.cmp_product_price_process_bar ?? 100}
-                />
-              </>
-            )}
+            <div className="space-y-4 flex-1 justify-center flex flex-col">
+              {brandAnalyticsLoading ? (
+                <p className="text-sm text-muted-foreground animate-pulse text-center py-6">Loading analytics…</p>
+              ) : (
+                <>
+                  <StatRow
+                    label="Total Product Analyzed"
+                    value={pd?.total_product_analyzed_count ?? '--'}
+                    colorClass="bg-blue-200"
+                    percent={pd?.total_product_analyzed_process_bar ?? 100}
+                  />
+                  <StatRow
+                    label="Rank1 Product Count For Total Product"
+                    value={pd?.cheapest_product_count ?? '--'}
+                    colorClass="bg-purple-200"
+                    percent={pd?.cheapest_product_process_bar ?? 100}
+                  />
+                  <StatRow
+                    label="Higher by Average Price Difference"
+                    value={pd?.higherby_expansive_average ?? '--'}
+                    colorClass="bg-orange-200"
+                    isCurrency
+                    percent={100}
+                  />
+                  <StatRow
+                    label={`${activeShopName.toUpperCase()} Average Price Across the Product`}
+                    value={pd ? fmtINR(pd.product_price_average) : '--'}
+                    colorClass="bg-green-500"
+                    isCurrency
+                    percent={pd?.product_price_process_bar ?? 100}
+                  />
+                  <StatRow
+                    label="Competitor's Average Price Across the Product"
+                    value={pd ? fmtINR(pd.cmp_product_price_average) : '--'}
+                    colorClass="bg-blue-500"
+                    isCurrency
+                    percent={pd?.cmp_product_price_process_bar ?? 100}
+                  />
+                </>
+              )}
+            </div>
           </div>
         </motion.div>
 
@@ -606,27 +607,26 @@ export default function Dashboard() {
               <p className="text-sm text-muted-foreground animate-pulse p-4 text-center">Loading...</p>
             ) : compCounts.map((comp) => {
               const isDimmed = hoveredComp && hoveredComp !== comp.name;
-              
+
               return (
-                <div 
-                  key={comp.name} 
+                <div
+                  key={comp.name}
                   role="button"
                   tabIndex={0}
                   onClick={() => goToMarketCompetitor(comp)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') goToMarketCompetitor(comp); }}
                   onMouseEnter={() => setHoveredComp(comp.name)}
                   onMouseLeave={() => setHoveredComp(null)}
-                  className={`flex justify-between items-center px-3 py-3 rounded-lg cursor-pointer transition-all duration-300 ${
-                    hoveredComp === comp.name ? 'bg-secondary/80 scale-[1.02] shadow-sm' : 'hover:bg-secondary/50'
-                  } ${isDimmed ? 'opacity-30 grayscale' : 'opacity-100'}`}
+                  className={`flex justify-between items-center px-3 py-3 rounded-lg cursor-pointer transition-all duration-300 ${hoveredComp === comp.name ? 'bg-secondary/80 scale-[1.02] shadow-sm' : 'hover:bg-secondary/50'
+                    } ${isDimmed ? 'opacity-30 grayscale' : 'opacity-100'}`}
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-6 h-6 flex items-center justify-center bg-white rounded shadow-sm border border-slate-100 overflow-hidden shrink-0">
-                      <img 
-                        src={comp.logo} 
-                        alt={comp.name} 
-                        className="max-w-full max-h-full object-contain" 
-                        onError={(e) => e.target.style.display='none'} 
+                      <img
+                        src={comp.logo}
+                        alt={comp.name}
+                        className="max-w-full max-h-full object-contain"
+                        onError={(e) => e.target.style.display = 'none'}
                       />
                     </div>
                     <span className="text-sm text-foreground font-medium capitalize">{comp.name}</span>
@@ -640,71 +640,70 @@ export default function Dashboard() {
           </div>
         </motion.div>
 
-      {/* 3. Overall Statistics Donut Chart */}
-        <motion.div variants={itemVariants} className="lg:col-span-3 bg-card rounded-xl p-6 card-shadow border border-border flex flex-col items-center justify-center">
-          <div className="w-full flex items-center gap-2 mb-2">
-            <BarChart3 className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold text-lg text-foreground">Overall Statistics</h3>
+        {/* 3. Overall Statistics Donut Chart */}
+        <motion.div variants={itemVariants} className="lg:col-span-3 bg-card rounded-xl p-0 card-shadow border border-border flex flex-col items-center overflow-hidden">
+          <div className="bg-[#48b2ad] px-4 py-3 w-full">
+            <h3 className="text-white font-semibold text-center text-[15px]">Overall Statistics</h3>
           </div>
+          <div className="p-6 flex-1 w-full flex flex-col items-center justify-center">
+            <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">
+              {compCountsLoading ? (
+                <div className="text-sm text-muted-foreground animate-pulse">Loading Chart...</div>
+              ) : pieData.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No Competitor Data</div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={65}
+                      outerRadius={105}
+                      dataKey="value"
+                      stroke="none"
+                      labelLine={false}
+                      label={renderCustomizedLabel}
+                    >
+                      {pieData.map((entry, i) => {
+                        const isDimmed = hoveredComp && hoveredComp !== entry.name;
+                        return (
+                          <Cell
+                            key={i}
+                            fill={entry.color}
+                            opacity={isDimmed ? 0.25 : 1}
+                            style={{ cursor: 'pointer', transition: 'opacity 0.3s ease', outline: 'none' }}
+                            onMouseEnter={() => setHoveredComp(entry.name)}
+                            onMouseLeave={() => setHoveredComp(null)}
+                          />
+                        );
+                      })}
+                    </Pie>
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
 
-          <div className="flex-1 w-full min-h-[250px] flex items-center justify-center">
-            {compCountsLoading ? (
-              <div className="text-sm text-muted-foreground animate-pulse">Loading Chart...</div>
-            ) : pieData.length === 0 ? (
-              <div className="text-sm text-muted-foreground">No Competitor Data</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={65}
-                    outerRadius={105}
-                    dataKey="value"
-                    stroke="none"
-                    labelLine={false}
-                    label={renderCustomizedLabel}
+            {/* Interactive Bottom Legend */}
+            <div className="grid grid-cols-2 gap-x-2 gap-y-3 mt-4 w-full px-2">
+              {pieData.map((seg) => {
+                const isDimmed = hoveredComp && hoveredComp !== seg.name;
+                return (
+                  <div
+                    key={seg.name}
+                    onMouseEnter={() => setHoveredComp(seg.name)}
+                    onMouseLeave={() => setHoveredComp(null)}
+                    className={`flex items-center gap-2 cursor-pointer transition-opacity duration-300 ${isDimmed ? 'opacity-30' : 'opacity-100'
+                      }`}
                   >
-                    {pieData.map((entry, i) => {
-                      const isDimmed = hoveredComp && hoveredComp !== entry.name;
-                      return (
-                        <Cell 
-                          key={i} 
-                          fill={entry.color} 
-                          opacity={isDimmed ? 0.25 : 1}
-                          style={{ cursor: 'pointer', transition: 'opacity 0.3s ease', outline: 'none' }}
-                          onMouseEnter={() => setHoveredComp(entry.name)}
-                          onMouseLeave={() => setHoveredComp(null)}
-                        />
-                      );
-                    })}
-                  </Pie>
-                  <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-
-          {/* Interactive Bottom Legend */}
-          <div className="grid grid-cols-2 gap-x-2 gap-y-3 mt-4 w-full px-2">
-            {pieData.map((seg) => {
-              const isDimmed = hoveredComp && hoveredComp !== seg.name;
-              return (
-                <div 
-                  key={seg.name} 
-                  onMouseEnter={() => setHoveredComp(seg.name)}
-                  onMouseLeave={() => setHoveredComp(null)}
-                  className={`flex items-center gap-2 cursor-pointer transition-opacity duration-300 ${
-                    isDimmed ? 'opacity-30' : 'opacity-100'
-                  }`}
-                >
-                  <span className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }} />
-                  <span className="text-[11px] text-muted-foreground truncate capitalize">{seg.name}</span>
-                  <span className="text-[11px] font-semibold ml-auto">{seg.displayPercent}%</span>
-                </div>
-              );
-            })}
+                    <span className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: seg.color }} />
+                    <span className="text-[11px] text-muted-foreground truncate capitalize">{seg.name}</span>
+                    <span className="text-[11px] font-semibold ml-auto">{seg.displayPercent}%</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </motion.div>
 
