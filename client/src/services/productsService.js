@@ -71,3 +71,17 @@ export const saveProductMapping = (data) =>
 
 export const saveWebPriceData = (data) =>
   API.post('/products/webpriceupdation', data).then((r) => r.data);
+
+export const fetchFullsiteMappingProducts = ({
+  page = 1, limit = 1, 
+  search, competitor, mappingstatus
+} = {}) => {
+  const params = new URLSearchParams({ page, limit });
+  if (search) params.set('search', search);
+  if (competitor) params.set('competitor', competitor);
+  if (mappingstatus) params.set('mappingstatus', mappingstatus);
+  return API.get(`/products/fullsitemapping?${params}`).then((r) => r.data);
+};
+
+export const updatefullsiteProductMapping = (data) =>
+  API.post('/products/fullsitemapping/update', data).then((r) => r.data);

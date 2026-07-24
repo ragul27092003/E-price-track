@@ -2,7 +2,9 @@ const express        = require('express');
 const router         = express.Router();
 const auth           = require('../../middleware/auth');
 const tenantResolver = require('../../middleware/tenantResolver');
-const { getAll, getMeta, create, update, remove, pendingMapping,configureProduct, removeConfiguration, getAlertProducts, exportAll, webPriceUpdation, fullsiteMapping } = require('../../controllers/tenant/productsController');
+const { getAll, getMeta, create, update, remove, pendingMapping,configureProduct, removeConfiguration, getAlertProducts, exportAll, webPriceUpdation, fullsiteMapping, fullsiteMappingUpdation, completedProductsExport, importFullsiteMapping } = require('../../controllers/tenant/productsController');
+const multer = require("multer");
+const upload = multer({dest: "uploads/",});
 
 router.get('/alert',                      auth, tenantResolver, getAlertProducts);
 router.get('/meta',                       auth, tenantResolver, getMeta);
@@ -16,5 +18,10 @@ router.delete('/:id',                     auth, tenantResolver, remove);
 router.post('/pendingmapping',            auth, tenantResolver, pendingMapping);
 router.post('/webpriceupdation',          auth, tenantResolver, webPriceUpdation);
 router.get('/fullsitemapping',            auth, tenantResolver, fullsiteMapping);
+router.post('/fullsitemapping/update',    auth, tenantResolver, fullsiteMappingUpdation);
+router.get('/completedproductsexport',    auth,  tenantResolver, completedProductsExport);
+router.post('/importFullsiteMapping',     auth, tenantResolver, upload.single("file"),
+  importFullsiteMapping
+);
 
 module.exports = router;

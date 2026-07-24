@@ -2,7 +2,13 @@ const { ObjectId } = require('mongodb');
 const mongoose     = require('mongoose');
 const User         = require('../../models/User');
 const { buildAlertQuery } = require('../../utils/alertquery');
+const { compareImages } = require('../../utils/imageCompare');
+const { getPriceMatchStatus } = require("../../utils/priceCompare");
+const { getBrandMatchStatus } = require("../../utils/brandCompare");
+const { getNameMatchStatus } = require("../../utils/nameCompare");
 const crypto = require("crypto");
+const fs = require("fs");
+const csv = require("csv-parser");
 
 function toPrice(raw) {
   if (raw === null || raw === undefined || raw === 'No Result' || raw === 'no result' || raw === '') return null;
@@ -589,7 +595,6 @@ exports.pendingMapping = async (req, res) => {
   }
 };
 
-
 exports.webPriceUpdation = async (req, res) => {
   
   try {
@@ -664,6 +669,360 @@ exports.webPriceUpdation = async (req, res) => {
 
   } catch (err) {
     console.error("WEB PRICE UPDATE ERROR:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+exports.fullsiteMapping = async (req, res) => {
+
+  try {
+
+    const db = req.tenantDb;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 1;
+    const skip = (page - 1) * limit;
+
+    const { search, competitor, mappingstatus } = req.query;
+
+    const filter = {
+      status: "active",
+    };
+
+    if (search) {
+      filter.$or = [
+        { product_name: { $regex: search, $options: "i" } },
+        { product_code: { $regex: search, $options: "i" } },
+        { product_ean_id: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    if (competitor) {
+      filter.product_url_change_competitior_name = competitor;
+    }
+
+    if (mappingstatus) {
+      filter.mapping_status = mappingstatus;
+    }
+
+    const collection = db.collection("ept_full_site_mapping_data_info");
+
+    const countFilter = { ...filter };
+    delete countFilter.mapping_status;
+    const statusCounts = await collection.aggregate([
+      { $match: countFilter },
+      {
+        $group: {
+          _id: "$mapping_status",
+          count: { $sum: 1 }
+        }
+      }
+    ]).toArray();
+
+    const completedCount =
+      statusCounts.find(x => x._id === "completed")?.count || 0;
+
+    const pendingCount =
+      statusCounts.find(x => x._id === "pending")?.count || 0;
+
+    const total = await collection.countDocuments(filter);
+
+    const rows = await collection
+      .find(filter)
+      .sort({ mapping_status: -1, _id: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    
+    const products = await Promise.all(
+      rows.map(async (item, index) => {
+
+        const imageResult = await compareImages(
+          item.product_image,
+          item.product_url_change_competitior_web_image
+        );
+
+        const priceResult = await getPriceMatchStatus(
+          item.product_price,
+          item.product_url_change_competitior_web_price
+        );
+        
+        const brandResult = await getBrandMatchStatus(
+          item.product_brand,
+          item.product_url_change_competitior_web_brand
+        );
+
+        const nameResult = await getNameMatchStatus(
+          item.product_name,
+          item.product_url_change_competitior_web_name
+        );
+
+        return {
+
+          id: skip + index + 1,
+          ean: item.product_ean_id,
+          productCode: item.product_code,
+          mpn: item.product_mpn,
+          mapping_status: item.mapping_status,
+
+
+          store: {
+            name: item.product_name,
+            price: `₹ ${item.product_price}`,
+            brand: item.product_brand,
+            image: item.product_image,
+            link: item.product_url,
+          },
+
+          competitor: {
+            compname:item.product_url_change_competitior_name, 
+            name: item.product_url_change_competitior_web_name,
+            price: `₹ ${item.product_url_change_competitior_web_price}`,
+            brand: item.product_url_change_competitior_web_brand,
+            image: item.product_url_change_competitior_web_image,
+            link: item.product_url_change_competitior_web_url,
+            logo: `/assets/competitorlogos/${item.product_url_change_competitior_name}_full.png`,
+          },
+
+          status: {
+
+            image:
+              imageResult.status,
+
+            price:
+              priceResult.status,
+
+            brand:
+              brandResult.status,
+
+            name:
+              nameResult.status,
+          },
+        };
+      })
+    ); 
+    
+    return res.status(200).json({
+      success: true,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      counts: {
+        completed: completedCount,
+        pending: pendingCount,
+      },
+      data: products,
+    });
+
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+
+exports.fullsiteMappingUpdation = async (req, res) => {
+
+  try {
+
+    const db = req.tenantDb;
+    
+    const update = {};
+
+    if (req.body.mapping_status) {
+      update.mapping_status = req.body.mapping_status;
+    }
+
+    if (req.body.product_url_change_competitior_web_url) {
+      update.product_url_change_competitior_web_url =
+        req.body.product_url_change_competitior_web_url;
+    }
+
+    if (req.body.status) {
+      update.status = req.body.status;
+    }
+
+    const result = await db.collection("ept_full_site_mapping_data_info").updateOne(
+      {
+        product_ean_id: req.body.ean,
+        product_code: req.body.productCode,
+        product_url_change_competitior_name: req.body.productCompetitor, 
+      },
+      {
+        $set: update,
+      }
+    );
+
+    return res.status(200).json({
+      success: true,
+    });
+
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+
+exports.completedProductsExport = async (req, res) => {
+
+  try {
+    
+    const db = req.tenantDb;
+
+    const data = await db
+      .collection("ept_full_site_mapping_data_info")
+      .find({
+        mapping_status: "completed",
+        status: "active",
+      })
+      .project({
+        _id: 0,
+        product_ean_id: 1,
+        product_code: 1,
+        product_mpn: 1,
+        product_name: 1,
+        product_url: 1,
+        product_url_change_competitior_name: 1,
+        product_url_change_competitior_web_url: 1,
+        status: 1,
+      })
+      .toArray();
+
+    if (!data.length) {
+      return res.status(404).json({
+        success: false,
+        message: "No completed products found.",
+      });
+    }
+
+    // Remove MongoDB _id
+    const rows = data.map(({ _id, ...rest }) => rest);
+
+    // CSV Headers
+    const headers = Object.keys(rows[0]);
+
+    // Escape CSV values
+    const escapeCSV = (value) => {
+      if (value === null || value === undefined) return "";
+
+      const str = String(value);
+
+      // Escape quotes
+      const escaped = str.replace(/"/g, '""');
+
+      return `"${escaped}"`;
+    };
+
+    // Build CSV
+    let csv = headers.join(",") + "\n";
+
+    rows.forEach((row) => {
+      const values = headers.map((header) => escapeCSV(row[header]));
+      csv += values.join(",") + "\n";
+    });
+
+    // Download
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=completed_products_${Date.now()}.csv`
+    );
+
+    return res.status(200).send(csv);
+
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+exports.importFullsiteMapping = async (req, res) => {
+
+  try {
+    
+    const db = req.tenantDb;
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Please upload a CSV file.",
+      });
+    }
+
+    const rows = [];
+
+    fs.createReadStream(req.file.path)
+      .pipe(csv())
+      .on("data", (data) => rows.push(data))
+      .on("end", async () => {
+        try {
+          if (!rows.length) {
+            fs.unlinkSync(req.file.path);
+
+            return res.status(400).json({
+              success: false,
+              message: "CSV file is empty.",
+            });
+          }
+
+          const operations = rows.map((row) => ({
+            updateOne: {
+              filter: {
+                product_ean_id: row.product_ean_id,
+                product_code: row.product_code,
+                product_url_change_competitior_name:
+                  row.product_url_change_competitior_name,
+              },
+              update: {
+                $set: row,
+              },
+              upsert: true,
+            },
+          }));
+
+          const result = await db
+            .collection("ept_full_site_mapping_data_info")
+            .bulkWrite(operations);
+
+          fs.unlinkSync(req.file.path);
+
+          return res.status(200).json({
+            success: true,
+            total: rows.length,
+            inserted: result.upsertedCount,
+            updated: result.modifiedCount,
+            matched: result.matchedCount,
+          });
+        } catch (err) {
+          if (fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+          }
+
+          return res.status(500).json({
+            success: false,
+            message: err.message,
+          });
+        }
+      });
+  } catch (err) {
+    console.error(err);
 
     return res.status(500).json({
       success: false,

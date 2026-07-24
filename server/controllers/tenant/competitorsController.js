@@ -525,7 +525,7 @@ exports.assignCompetitor = async (req, res) => {
     const { slug } = req.params;
     const tenantId = req.tenantId;
     const mainDb   = mongoose.connection.db;
-
+   
     const adminComp = await mainDb.collection('plm_admin_competitor').findOne({ competitor_slug: slug });
     if (!adminComp) {
       return res.status(404).json({ message: 'Competitor not found in admin pool.' });
