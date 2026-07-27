@@ -4,6 +4,7 @@ import { fetchCompetitors } from "../services/competitorsService";
 import MappingPagination from "../components/MappingPagination";
 import API from '../hooks/useApi';
 import Swal from "sweetalert2";
+import { useStore } from "../store";
 
 
 const FullsiteRemapping = () => {
@@ -11,6 +12,7 @@ const FullsiteRemapping = () => {
   const [products, setProducts] = useState([]);
   const [competitors, setCompetitors] = useState([]);
   const [loading, setLoading] = useState(false);
+  const activeStoreId = useStore((s) => s.activeStoreId);
 
   const [page, setPage] = useState(1);
   const [limit] = useState(1);
@@ -53,6 +55,7 @@ const FullsiteRemapping = () => {
     }
   };
 
+
   const StatusIcon = ({ type }) => {
     if (type === 'match') {
       return (
@@ -67,10 +70,14 @@ const FullsiteRemapping = () => {
       </svg>
     );
   };
+  
+  useEffect(() => {
+  setPage(1);
+}, [activeStoreId]);
 
   useEffect(() => {
     loadProducts();
-  }, [page, limit, search, selectedCompetitor, mappingStatus]);
+  }, [page, limit, search, selectedCompetitor, mappingStatus,activeStoreId]);
 
 
   const productUpdation = async (product, action) => {
