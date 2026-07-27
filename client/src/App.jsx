@@ -25,6 +25,7 @@ import ProductMappingLayout from "./pages/ProductMappingLayout";
 import PendingSignups from "./pages/PendingSignups";
 import Home from "./pages/Home";
 import { ROUTES } from "./utilis/urls";
+import {ROUTE  , ADMIN_BASE} from "./utils/urls";
 
 const queryClient = new QueryClient();
 
@@ -37,32 +38,32 @@ const App = () => (
         <AuthProvider>
           <Routes >
             {/* Public */}
-            <Route path="/" element={<Home />} />
-            <Route path="/eprice/admin/login" element={<Login />} />
-            <Route path="/eprice/admin/signup" element={<Signup />} />
-            <Route path="/eprice/admin/forgot-password" element={<ForgotPassword />} />
+            <Route path={ROUTE.home} element={<Home />} />
+            <Route path={ROUTE.login} element={<Login />} />
+            <Route path={ROUTE.signup} element={<Signup />} />
+            <Route path={ROUTE.forgotPassword} element={<ForgotPassword />} />
 
             {/* Protected — both roles use the same dashboard layout */}
-            <Route basename="/eprice/admin" element={
+            <Route basename={ADMIN_BASE} element={
               <ProtectedRoute>
                 <DashboardLayout />
               </ProtectedRoute>
             }>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/product-history" element={<ProductHistory />} />
+              <Route path={ROUTE.dashboard} element={<Dashboard />} />
+              <Route path={ROUTE.productHistory} element={<ProductHistory />} />
               <Route path={ROUTES.productHistory} element={<ProductHistory />} />
-              <Route path="/notifications" element={<Notifications />}/>
-              <Route path="/manage-feed-setup" element={<ManageFeedSetup />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/competitors" element={<Competitors />} />
-              <Route path="/products" element={<Products />} />
-              <Route path="/market" element={<MarketCompetitor />} />
+              <Route path={ROUTE.notifications} element={<Notifications />}/>
+              <Route path={ROUTE.manageFeedSetup} element={<ManageFeedSetup />} />
+              <Route path={ROUTE.settings} element={<Settings />} />
+              <Route path={ROUTE.competitors} element={<Competitors />} />
+              <Route path={ROUTE.products} element={<Products />} />
+              <Route path={ROUTE.market} element={<MarketCompetitor />} />
               <Route element={<ProductMappingLayout />}>
-                  <Route path="/product-mapping" element={<ProductMapping />} />
-                  <Route path="/fullsite-remapping" element={<FullsiteRemapping />} />
+                  <Route path={ROUTE.productMapping} element={<ProductMapping />} />
+                  <Route path={ROUTE.fullsiteRemapping} element={<FullsiteRemapping />} />
               </Route>
-              <Route path="/smart-reports" element={<SmartReports />} />
-              <Route path="/pending-signups" element={<PendingSignups />} />
+              <Route path={ROUTE.smartReports} element={<SmartReports />} />
+              <Route path={ROUTE.pendingSignups} element={<PendingSignups />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

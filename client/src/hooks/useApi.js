@@ -1,4 +1,5 @@
 import axios from 'axios';
+import {ROUTE} from '../utils/urls';
 
 // Decode JWT token to extract companyId without localStorage
 function decodeToken(token) {
@@ -44,7 +45,7 @@ API.interceptors.response.use(
       if (rememberedLogin) {
         localStorage.setItem('ept_remember_login', rememberedLogin);
       }
-      window.location.href = '/login';
+      window.location.href = ROUTE.login; // Redirect to login page
     }
     return Promise.reject(error);
   }

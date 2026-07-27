@@ -9,6 +9,7 @@ import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { ROUTE } from '../utils/urls';
 
 const REMEMBER_KEY = 'ept_remember_login';
 
@@ -82,7 +83,7 @@ const Login = () => {
       login(data);
       authLogin(data);
       await useStore.getState().fetchMerchant();
-      navigate('/dashboard');
+      navigate(ROUTE.dashboard);
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
     } finally {
@@ -161,7 +162,7 @@ const Login = () => {
                 </div>
 
                 <Link
-                  to="/eprice/admin/forgot-password"
+                  to={ROUTE.forgotPassword}
                   className="text-sm text-indigo-600 hover:text-indigo-700 hover:underline"
                 >
                   Forgot password?
@@ -180,7 +181,7 @@ const Login = () => {
 
               <p className="text-center text-sm text-slate-500">
                 Don't have an account?{' '}
-                <Link to="/eprice/admin/signup" className="text-indigo-600 hover:underline">Sign up</Link>
+                <Link to={ROUTE.signup} className="text-indigo-600 hover:underline">Sign up</Link>
               </p>
             </form>
           </CardContent>

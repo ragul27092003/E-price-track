@@ -35,6 +35,7 @@ import {
 import { Link } from "react-router-dom";
 import "../styles/landing.css";
 import Logo from "/src/services/assets/main-logo.png";
+import { ROUTE } from "../utils/urls";
 
 const NAV_LINKS = [
   { label: "Product", href: "#product" },
@@ -110,7 +111,7 @@ function Nav() {
           </nav>
           <div className="flex items-center gap-2">
             <Link
-              to="eprice/admin/login"
+              to={ROUTE.login}
               className="inline-flex items-center gap-1.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-medium px-4 py-2 hover:opacity-90 transition"
             >
               Sign in <ArrowRight className="h-3.5 w-3.5" />
@@ -210,7 +211,7 @@ function Hero() {
 
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link
-              to="/login"
+              to={ROUTE.login}
               className="group inline-flex items-center gap-2 rounded-xl bg-secondary text-secondary-foreground px-6 py-3.5 text-sm font-medium shadow-[var(--shadow-elegant)] hover:translate-y-[-1px] transition-all"
             >
               Sign in
@@ -1425,13 +1426,13 @@ function FinalCTA() {
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
               <Link
-                to="/login"
+                to={ROUTE.login}
                 className="inline-flex items-center gap-2 rounded-xl bg-white text-secondary px-6 py-3.5 text-sm font-semibold hover:scale-[1.02] transition-transform"
               >
                 Sign in <ArrowUpRight className="h-4 w-4" />
               </Link>
               <Link
-                to="/login"
+                to={ROUTE.login}
                 className="inline-flex items-center gap-2 rounded-xl border border-white/20 px-6 py-3.5 text-sm font-medium hover:bg-white/10 transition"
               >
                 Talk to sales

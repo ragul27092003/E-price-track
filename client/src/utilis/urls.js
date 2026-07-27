@@ -1,9 +1,10 @@
+import {ROUTE} from '../utils/urls';
 // Centralized route builders so URL shape lives in exactly one place.
 export const ROUTES = {
-  productHistory: "/product-history/:ean",
+  productHistory: `${ROUTE.productHistory}/:ean`,
 };
 
 export function buildProductHistoryUrl(ean, range = 30) {
-  if (!ean) return "/product-history";
-  return `/product-history/${encodeURIComponent(ean)}?range=${range}`;
+  if (!ean) return ROUTE.productHistory;
+  return `${ROUTE.productHistory}/${encodeURIComponent(ean)}?range=${range}`;
 }

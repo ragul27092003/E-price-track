@@ -7,6 +7,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Rss, LogOut, Plus, Store, Loader2, Users } from 'lucide-react';
+import { ROUTE } from '../utils/urls';
 
 const AdminDashboard = () => {
   const user        = useStore((s) => s.user);
@@ -62,7 +63,7 @@ const AdminDashboard = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate(ROUTE.login);
   };
 
   return (

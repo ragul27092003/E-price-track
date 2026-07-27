@@ -13,6 +13,7 @@ import { useStore, selectCurrentStoreId } from "@/store";
 import { fetchCompetitorCountsData } from '../services/dashboardService';
 import { fetchSmartReportTabCounts, updateEasyGainPercentage } from '../services/smartReportsService';
 import API from "../hooks/useApi"; // Ensure this matches your API hook path
+import { ROUTE } from "@/utils/urls";
 
 // ─── animation presets ─────────────────────────────────────────────────────────
 const containerVariants = {
@@ -306,11 +307,11 @@ export default function Dashboard() {
   const hasLspData = lspEntries.length > 0;
   const lspDate    = stats?.lsp_hsp_date || '--';
 
-  const goToReport = (tab) => navigate('/smart-reports', { state: { tab } });
+  const goToReport = (tab) => navigate(ROUTE.smartReports, { state: { tab } });
   const goToMarketCompetitor = (comp) => {
     const key = comp.slug || comp.name;
     if (!key) return;
-    navigate(`/market?competitor=${encodeURIComponent(key)}`);
+    navigate(`${ROUTE.market}?competitor=${encodeURIComponent(key)}`);
   };
 
   const openEasyGainModal = () => {
@@ -470,7 +471,7 @@ export default function Dashboard() {
           icon={CheckSquare} color="text-primary" bg="bg-primary/10"
           loading={statsLoading}
         />
-        <NavLink to="/products">
+        <NavLink to={ROUTE.products}>
           <KpiCard
             label="Completed Products"
             value={stats?.varCompletedProductCount ?? '--'}

@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import { ROUTE } from "@/utils/urls";
 
 export default function ProductMappingLayout() {
   return (
@@ -6,7 +7,7 @@ export default function ProductMappingLayout() {
       {/* Tabs */}
       <div className="mb-8 flex overflow-x-auto border-b border-slate-200">
         <NavLink
-          to="/product-mapping"
+          to={ROUTE.productMapping}
           className={({ isActive }) =>
             `pb-3 text-sm font-semibold mr-5 ${
               isActive
@@ -19,7 +20,7 @@ export default function ProductMappingLayout() {
         </NavLink>
 
         <NavLink
-          to="/fullsite-remapping"
+          to={ROUTE.fullsiteRemapping}
           className={({ isActive }) =>
             `pb-3 text-sm font-semibold ${
               isActive

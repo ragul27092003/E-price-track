@@ -8,6 +8,7 @@ import { fetchProfile } from "@/services/settingsService";
 import { fetchAllStores } from "@/services/authService";
 import { fetchProducts } from "@/services/productsService";
 import { fetchCompetitors } from "@/services/competitorsService";
+import {ROUTE} from "../../utils/urls";
 
 export function AppHeader() {
   const user                  = useStore((s) => s.user);
@@ -35,13 +36,13 @@ export function AppHeader() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
 
-  // ── fetch profile on login / user change ──────────────────────────────────
+  // fetch profile on login / user change 
   useEffect(() => {
     if (!user?.user_id) return;
     fetchProfile().then(setProfile).catch(console.error);
   }, [user?.user_id]);
 
-  // ── fetch all stores for super_admin ──────────────────────────────────────
+  // fetch all stores for super_admin 
   useEffect(() => {
     if (!isSuperAdmin) return;
     fetchAllStores()
@@ -57,7 +58,7 @@ export function AppHeader() {
       .catch(console.error);
   }, [isSuperAdmin]);
 
-  // ── refresh all data when active store switches ───────────────────────────
+  // refresh all data when active store switches
   useEffect(() => {
     if (!activeStoreId) return;
 
@@ -82,7 +83,7 @@ export function AppHeader() {
     fetchBrandAnalyticsBrands();
   }, [activeStoreId]);
 
-  // ── dark mode ─────────────────────────────────────────────────────────────
+  
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);
@@ -124,7 +125,7 @@ export function AppHeader() {
 
   const handleLogout = () => {
     logout();
-    navigate("/eprice/admin/login");
+    navigate(ROUTE.login);
   };
 
   const handleStoreSelect = (store) => {
@@ -154,10 +155,7 @@ export function AppHeader() {
           </div>
         )}
 
-        {/* Dark mode toggle */}
-        {/* <Button variant="ghost" size="icon" onClick={toggleDarkMode} className="text-muted-foreground hover:text-foreground">
-          {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-        </Button> */}
+       
 
         {/* Avatar + dropdown */}
         <div className="ml-2 relative">

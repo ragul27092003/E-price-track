@@ -2,9 +2,11 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../store";
 import { fetchAlertProducts } from "../services/notificationsService.js";
-import { removeProductConfiguration } from "../services/productsService"; 
 import API from "../hooks/useApi";
-// ── Helpers (mirrored from Products page) ─────────────────────────────────────
+import {buildProductHistoryUrl} from "../utilis/urls";
+import { removeProductConfiguration } from "../services/productsService"; 
+
+
 
 function parsePrice(raw) {
   if (raw === null || raw === undefined || raw === "No Result" || raw === "") return null;
@@ -578,7 +580,7 @@ export default function Notifications() {
                   {/* Actions */}
                   <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-700/50 flex gap-3">
                     <button
-                      onClick={() => navigate(`/product-history?ean=${p.product_ean_id}`)}
+                      onClick={() => navigate(buildProductHistoryUrl(p.product_ean_id || p.product_code || p._id ,30))}
                       className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-300 transition-colors hover:bg-slate-50 dark:hover:bg-slate-700"
                     >
                       View Details

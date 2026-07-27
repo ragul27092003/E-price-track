@@ -15,22 +15,23 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import { useStore, selectIsSuperAdmin, selectPrimaryColor } from "../../store";
+import { ROUTE } from "@/utils/urls";
 
 const navItems = [
-  { title: "Dashboard",         icon: LayoutDashboard, path: "/" },
-  { title: "Manage Feed Setup", icon: Rss,             path: "/manage-feed-setup" },
-  { title: "Competitors",       icon: Trophy,          path: "/competitors" },
-  { title: "Products",          icon: Package,         path: "/products" },
-  { title: "Notifications",     icon: ClipboardCheck,  path: "/notifications" },
-  { title: "Product History",   icon: LucideHistory,   path: "/product-history" },
-  { title: "Market Competitor", icon: ComponentIcon,   path: "/market" },
-  { title: "Smart Reports",     icon: BarChartBigIcon, path: "/smart-reports" },
-  { title: "Product Mapping",   icon: Share2Icon,      path: "/product-mapping", activePaths: [
-      "/product-mapping",
-      "/fullsite-remapping",
+  { title: "Dashboard",         icon: LayoutDashboard, path: ROUTE.dashboard },
+  { title: "Manage Feed Setup", icon: Rss,             path: ROUTE.manageFeedSetup },
+  { title: "Competitors",       icon: Trophy,          path: ROUTE.competitors },
+  { title: "Products",          icon: Package,         path: ROUTE.products },
+  { title: "Notifications",     icon: ClipboardCheck,  path: ROUTE.notifications },
+  { title: "Product History",   icon: LucideHistory,   path: ROUTE.productHistory },
+  { title: "Market Competitor", icon: ComponentIcon,   path: ROUTE.market },
+  { title: "Smart Reports",     icon: BarChartBigIcon, path: ROUTE.smartReports },
+  { title: "Product Mapping",   icon: Share2Icon,      path: ROUTE.productMapping, activePaths: [
+      ROUTE.productMapping,
+      ROUTE.fullsiteRemapping,
     ],superAdminOnly: true },
-  { title: "Settings",          icon: Settings,        path: "/settings" },
-  { title: "Pending Signups",   icon: UserCheck,       path: "/pending-signups", superAdminOnly: true },
+  { title: "Settings",          icon: Settings,        path: ROUTE.settings },
+  { title: "Pending Signups",   icon: UserCheck,       path: ROUTE.pendingSignups, superAdminOnly: true },
 ];
 
 export function AppSidebar() {

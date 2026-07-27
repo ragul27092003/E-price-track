@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { fetchCompetitors } from '../services/competitorsService';
 import { fetchProducts, fetchProductsMeta, exportProductsCSV } from '../services/productsService';
 import API from '../hooks/useApi';
+import { buildProductHistoryUrl } from '../utilis/urls';
 
 // ─── Shared Helpers ───────────────────────────────────────────────────────────
 const resolveLogoUrl = (logo) => {
@@ -220,13 +221,13 @@ function PriceGapBadge({ value, ean }) {
       )}
       {ean && (
         <div className="flex items-center mt-0.5 bg-white dark:bg-[#151a2a] rounded-full border border-slate-200 dark:border-slate-700/60 shadow-sm overflow-hidden w-fit transition-all hover:shadow-md hover:border-slate-300">
-          <button onClick={() => navigate(`/product-history?ean=${ean}&range=7`)} className="group flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-extrabold tracking-wider text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all border-r border-slate-200 dark:border-slate-700/60">
+          <button onClick={() => navigate(buildProductHistoryUrl(ean, 7))} className="group flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-extrabold tracking-wider text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all border-r border-slate-200 dark:border-slate-700/60">
             <svg viewBox="0 0 24 24" className="w-3 h-3 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" strokeWidth="3">
               <circle cx="12" cy="12" r="9" /><path d="M12 6v6l4 2" />
             </svg>
             7 DAYS
           </button>
-          <button onClick={() => navigate(`/product-history?ean=${ean}&range=30`)} className="group flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-extrabold tracking-wider text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all">
+          <button onClick={() => navigate(buildProductHistoryUrl(ean, 30))} className="group flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-extrabold tracking-wider text-rose-500 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-all">
             <svg viewBox="0 0 24 24" className="w-3 h-3 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" strokeWidth="3">
               <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
             </svg>
