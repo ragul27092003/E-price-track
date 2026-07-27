@@ -1312,22 +1312,24 @@ const HandleWebPriceChange = async (product) => {
       );
 
       const result = await response.json();
+      const apiResult = Array.isArray(result) ? result[0] : result;
+      
+      if (apiResult?.status === "success") {
 
-      if (result.status === "sucess") {
+        const auth = JSON.parse(localStorage.getItem("eprice-store"));
+        const priceChangerId = auth?.state?.user?.user_id;
+        const payload = {
+          user_id: priceChangerId,
+          product_ean_id: product.product_ean_id,
+          product_code: product.product_code,
+          product_price: product.product_price,
+          update_price: isManualAdded
+            ? Number(product.product_store_price)
+            : Number(newPrice),
+          is_manual_price: isManualAdded ? 0 : 1,
+        };
 
-      const auth = JSON.parse(localStorage.getItem("eprice-store"));
-      const priceChangerId = auth?.state?.user?.user_id;
-      const payload = {
-        user_id: priceChangerId,
-        product_ean_id: product.product_ean_id,
-        product_code: product.product_code,
-        product_price: product.product_price,
-        update_price: isManualAdded
-          ? Number(product.product_store_price)
-          : Number(newPrice),
-        is_manual_price: isManualAdded ? 0 : 1,
-      };
-      await saveWebPriceData(payload);
+        await saveWebPriceData(payload);
 
         Swal.fire({
           icon: "success",
@@ -1339,7 +1341,7 @@ const HandleWebPriceChange = async (product) => {
           window.location.reload();
         });
 
-      } else if (result.status === "api_failed") {
+      } else if (apiResult?.status === "api_failed") {
 
         Swal.fire({
           icon: "error",
