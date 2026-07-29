@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
 import { format, startOfToday, endOfToday, subDays, startOfMonth, endOfMonth } from "date-fns";
-import {User, Mail, Lock, Eye, EyeOff, Trash2, UserPlus,X, Check, AlertCircle, Users, FileText, ChevronDown, Camera, Calendar as CalendarIcon,} from "lucide-react";
+import {User, Mail, Lock, Eye, EyeOff, Trash2, UserPlus,X, Check, AlertCircle, Users, FileText, ChevronDown, Camera, Calendar as CalendarIcon,UserRoundPlus,} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -31,7 +31,7 @@ const TABS = [
   { id: "account", label: "My Account", icon: User },
   { id: "users", label: "Manage Users", icon: Users },
   { id: "log", label: "Users Log", icon: FileText },
-  { id: "pendingsignup", label: "Pending Signup", icon: FileText },
+  { id: "pendingsignup", label: "Pending Signup", icon: UserRoundPlus },
 ];
 
 function Avatar({ size = "lg", primaryColor, companyName = "", photoUrl = null }) {
@@ -1258,8 +1258,17 @@ export default function Settings() {
   };
 
   const visibleTabs = TABS.filter((tab) => {
-    if (tab.id === "users" || tab.id === "log")
-      return user?.user_type === "store_admin" || user?.user_type === "super_admin";
+    if (tab.id === "users" || tab.id === "log") {
+      return (
+        user?.user_type === "store_admin" ||
+        user?.user_type === "super_admin"
+      );
+    }
+
+    if (tab.id === "pendingsignup") {
+      return user?.user_type === "super_admin";
+    }
+
     return true;
   });
 

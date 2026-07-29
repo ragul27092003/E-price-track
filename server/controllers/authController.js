@@ -8,6 +8,7 @@ const Access = require('../models/Access');
 const { getTenantDb, getAdminDb } = require('../config/db');
 const { sendOtpEmail } = require('../services/emailService');
 const { validatePassword, isValidEmail } = require('../utils/passwordValidation');
+const { encrypt } = require("../utils/encryption");
 
 const OTP_VALIDITY_MS = 5 * 60 * 1000;
 const MAX_OTP_ATTEMPTS = 5;
@@ -488,7 +489,9 @@ exports.getActivatedCompanies = async (req, res) => {
   }
 };
 
+
 exports.provisionTenantDb = async (req, res) => {
+
   const { companyId } = req.params;
   const adminUserId = req.user.user_id;
 
@@ -505,8 +508,9 @@ exports.provisionTenantDb = async (req, res) => {
 
     if (!user || !merchant)
       return res.status(400).json({ message: 'User or Merchant record missing — signup incomplete' });
-
+  
     const tenantDb = getTenantDb(companyId);
+
     await tenantDb.collection('settings').insertOne({
       companyId,
       companyName: company.companyName,
@@ -517,12 +521,61 @@ exports.provisionTenantDb = async (req, res) => {
       createdAt:   new Date(),
     });
 
+    const dbName = `plm_user_info_${companyId}`;
+    const dbUser = `plmuserinfo_${companyId}`;
+    const dbPassword = process.env.TENANT_DB_PASSWORD;
+    const encryptedPassword = encrypt(dbPassword);
+
+    if (!dbPassword) {
+      throw new Error("TENANT_DB_PASSWORD is missing");
+    }
+
+    try {
+
+      const client = tenantDb.getClient();
+
+      await client.db(dbName).command({
+        createUser: dbUser,
+        pwd: dbPassword,
+        roles: [
+          {
+            role: "readWrite",
+            db: `plm_user_info_${companyId}`
+          },
+          {
+            role: "dbAdmin",
+            db: `plm_user_info_${companyId}`
+          }
+        ]
+      });
+
+    } catch (err) {
+      if (!err.message.includes("already exists")) {
+        throw err;
+      }
+    }
+
+    const adminDb = getAdminDb("plm_admin_manage_info");
+
+    await adminDb.collection("plm_admin_companies_credentials").updateOne(
+      { companyId },
+      {
+        $set: {
+          companyId,
+          dbName,
+          dbUser,
+          dbPassword: encryptedPassword,
+        }
+      },
+      { upsert: true }
+    );
+
     company.status = 'active';
     company.provisionedAt = new Date();
     company.provisionedBy = adminUserId;
     await company.save();
 
-    getAdminDb('eprice_main_admin_db').collection('plm_admin_action_logs').insertOne({
+    getAdminDb('plm_admin_manage_info').collection('plm_admin_action_logs').insertOne({
       action:      'tenant_provisioned',
       companyId,
       performedBy: adminUserId,
@@ -537,4 +590,9 @@ exports.provisionTenantDb = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-};
+}; 
+
+
+
+
+
