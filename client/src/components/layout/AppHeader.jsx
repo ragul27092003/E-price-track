@@ -1,38 +1,46 @@
-import { Moon, Sun, LogOut, ChevronDown } from "lucide-react";
+import { Moon, Sun, LogOut, ChevronDown, Bell, Clock } from "lucide-react";
 import logo from "../../services/assets/main-logo.png";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { useStore, selectIsSuperAdmin } from "@/store";
+import { useStore, selectIsSuperAdmin, selectPrimaryColor } from "@/store";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetchProfile } from "@/services/settingsService";
 import { fetchAllStores } from "@/services/authService";
 import { fetchProducts } from "@/services/productsService";
 import { fetchCompetitors } from "@/services/competitorsService";
-import {ROUTE} from "../../utils/urls";
+import { ROUTE } from "../../utils/urls";
 
 export function AppHeader() {
-  const user                  = useStore((s) => s.user);
-  const profile               = useStore((s) => s.profile);
-  const setProfile            = useStore((s) => s.setProfile);
-  const logout                = useStore((s) => s.logout);
-  const switchStore           = useStore((s) => s.switchStore);
-  const activeShopName        = useStore((s) => s.activeShopName);
-  const activeStoreId         = useStore((s) => s.activeStoreId);
-  const isSuperAdmin          = useStore(selectIsSuperAdmin);
-  const setProducts           = useStore((s) => s.setProducts);
-  const setProductsLoading    = useStore((s) => s.setProductsLoading);
-  const setProductsError      = useStore((s) => s.setProductsError);
-  const setCompetitors        = useStore((s) => s.setCompetitors);
+  const user = useStore((s) => s.user);
+  const profile = useStore((s) => s.profile);
+  const setProfile = useStore((s) => s.setProfile);
+  const logout = useStore((s) => s.logout);
+  const switchStore = useStore((s) => s.switchStore);
+  const activeShopName = useStore((s) => s.activeShopName);
+  const activeStoreId = useStore((s) => s.activeStoreId);
+  const isSuperAdmin = useStore(selectIsSuperAdmin);
+  const setProducts = useStore((s) => s.setProducts);
+  const setProductsLoading = useStore((s) => s.setProductsLoading);
+  const setProductsError = useStore((s) => s.setProductsError);
+  const setCompetitors = useStore((s) => s.setCompetitors);
   const setCompetitorsLoading = useStore((s) => s.setCompetitorsLoading);
-  const setCompetitorsError   = useStore((s) => s.setCompetitorsError);
-  const storeLogoMap               = useStore((s) => s.storeLogoMap);
-  const fetchSapUpdateStatus       = useStore((s) => s.fetchSapUpdateStatus);
-  const fetchOverallStatistics     = useStore((s) => s.fetchOverallStatistics);
-  const fetchRankAnalysis          = useStore((s) => s.fetchRankAnalysis);
-  const fetchBrandAnalyticsBrands  = useStore((s) => s.fetchBrandAnalyticsBrands);
+  const setCompetitorsError = useStore((s) => s.setCompetitorsError);
+  const storeLogoMap = useStore((s) => s.storeLogoMap);
+  const fetchSapUpdateStatus = useStore((s) => s.fetchSapUpdateStatus);
+  const fetchOverallStatistics = useStore((s) => s.fetchOverallStatistics);
+  const fetchRankAnalysis = useStore((s) => s.fetchRankAnalysis);
+  const fetchBrandAnalyticsBrands = useStore((s) => s.fetchBrandAnalyticsBrands);
+  const overallStatistics = useStore((s) => s.overallStatistics);
+  const overallStatisticsLoading = useStore((s) => s.overallStatisticsLoading);
+  const primaryColor = useStore(selectPrimaryColor);
 
-  const [darkMode,     setDarkMode]     = useState(() => localStorage.getItem("darkMode") === "true");
-  const [stores,       setStores]       = useState([]);
+  const notificationCount = Number(overallStatistics?.varNotificationCounts) || 0;
+  const badgeText = notificationCount > 99 ? "99+" : notificationCount > 0 ? String(notificationCount) : null;
+  const tooltipText = `${notificationCount} Price Notifications`;
+
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");
+  const [stores, setStores] = useState([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -83,7 +91,7 @@ export function AppHeader() {
     fetchBrandAnalyticsBrands();
   }, [activeStoreId]);
 
-  
+
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);
@@ -97,11 +105,11 @@ export function AppHeader() {
   // ── derived display values ────────────────────────────────────────────────
   // user_type from JWT → req.user.user_type
   const isStoreAdmin = user?.user_type === "store_admin";
-  const isUserRole   = user?.user_type === "user";
+  const isUserRole = user?.user_type === "user";
 
   const roleLabel = isSuperAdmin ? "Super Admin"
     : isStoreAdmin ? "Store Admin"
-    : "User";
+      : "User";
 
   // Store logo: company logo from DB (logoUrl) is source of truth
   const currentStoreKey = (user?.user_type === "super_admin" ? activeStoreId : user?.cmpid) || "default";
@@ -133,11 +141,108 @@ export function AppHeader() {
     setDropdownOpen(false);
   };
 
+  // ── Monthly Payment Reminder Logic ──────────────────────────────────────────
+  const currentDay = new Date().getDate();
+  const isDayInRange = currentDay >= 1 && currentDay <= 7;
+  const daysRemaining = 7 - currentDay;
+  const daysText = daysRemaining === 1 ? "1 day" : `${daysRemaining} days`;
+
+  // Check logged-in user identity: never show for user "sathya"
+  const loggedInUserIdentifier = (
+    profile?.user_name || profile?.email_address || user?.email_address || user?.cmpid || ""
+  ).toLowerCase();
+  const isSathyaUser =
+    loggedInUserIdentifier.trim().toLowerCase() === "sathya";
+
+  // Check existing payment status if available in profile
+  const isPaymentCompleted =
+    profile?.paymentCompleted === true ||
+    profile?.isPaid === true ||
+    String(profile?.paymentStatus).toLowerCase() === "completed" ||
+    String(profile?.paymentStatus).toLowerCase() === "paid" ||
+    String(profile?.payment).toLowerCase() === "completed" ||
+    String(profile?.payment).toLowerCase() === "paid";
+
+  const showPaymentReminder = isDayInRange && !isSathyaUser && !isPaymentCompleted;
+
   return (
-    <header className="flex items-center h-16 pl-1 pr-9 border-b border-border bg-card shrink-0">
-      <img src={logo} alt="Logo" className="h-8 w-auto object-contain" />
+    <header className="flex items-center h-16 pl-10 pr-9 border-b border-border bg-card shrink-0">
+      <img src={logo} alt="Logo" className="h-6 w-auto object-contain" />
+
+      {/* Smooth Running Payment Reminder Ticker */}
+      <div
+        className={`payment-ticker-container mx-auto relative flex items-center overflow-hidden h-9 w-[260px] sm:w-[360px] md:w-[460px] lg:w-[560px] rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs font-medium shadow-sm select-none transition-opacity duration-200 ${showPaymentReminder
+          ? "opacity-100"
+          : "opacity-0 pointer-events-none"
+          }`}
+      >
+        <style>{`
+            @keyframes tickerSlide {
+  0% {
+    transform: translateX(60%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+            .payment-ticker-track {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  will-change: transform;
+  transform: translate3d(100%, 0, 0);
+  animation: tickerSlide 20s linear infinite;
+  animation-delay: -1s;
+  animation-fill-mode: both;
+}
+            .payment-ticker-container:hover .payment-ticker-track {
+              animation-play-state: paused;
+            }
+          `}</style>
+        <div className="payment-ticker-track gap-2 px-2">
+          <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <span className="leading-none">
+            <strong className="font-semibold text-amber-800 dark:text-amber-300">
+              Friendly Reminder:
+            </strong>{" "}
+            Your monthly subscription payment is due. Please complete your payment
+            within{" "}
+            <span className="font-bold underline decoration-amber-500/50 underline-offset-2">
+              {daysText}
+            </span>{" "}
+            to avoid any service interruption. Thank you for your continued support.
+          </span>
+        </div>
+      </div>
 
       <div className="ml-auto flex items-center gap-2">
+
+        {/* Bell Notification */}
+        <TooltipProvider delayDuration={150}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => navigate(ROUTE.notifications)}
+                aria-label={tooltipText}
+                className="relative p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary flex items-center justify-center shrink-0 cursor-pointer"
+              >
+                <Bell className="w-5 h-5" />
+                {!overallStatisticsLoading && badgeText && (
+                  <span
+                    style={{ backgroundColor: primaryColor }}
+                    className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 text-[10px] font-bold text-white rounded-full flex items-center justify-center shadow-sm leading-none border-2 border-card select-none"
+                  >
+                    {badgeText}
+                  </span>
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="center" className="font-medium text-xs shadow-md">
+              {tooltipText}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
         {/* Store name + logo badge */}
         {displayName && (
@@ -155,7 +260,7 @@ export function AppHeader() {
           </div>
         )}
 
-       
+
 
         {/* Avatar + dropdown */}
         <div className="ml-2 relative">
@@ -225,9 +330,8 @@ export function AppHeader() {
                           <button
                             key={store._id}
                             onClick={() => handleStoreSelect(store)}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors ${
-                              activeShopName === store.companyName ? "bg-accent font-medium" : ""
-                            }`}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors ${activeShopName === store.companyName ? "bg-accent font-medium" : ""
+                              }`}
                           >
                             {store.companyName}
                           </button>
