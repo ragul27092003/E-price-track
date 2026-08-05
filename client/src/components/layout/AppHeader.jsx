@@ -4,7 +4,12 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useStore, selectIsSuperAdmin, selectPrimaryColor } from "@/store";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { fetchProfile } from "@/services/settingsService";
 import { fetchAllStores } from "@/services/authService";
 import { fetchProducts } from "@/services/productsService";
@@ -30,27 +35,37 @@ export function AppHeader() {
   const fetchSapUpdateStatus = useStore((s) => s.fetchSapUpdateStatus);
   const fetchOverallStatistics = useStore((s) => s.fetchOverallStatistics);
   const fetchRankAnalysis = useStore((s) => s.fetchRankAnalysis);
-  const fetchBrandAnalyticsBrands = useStore((s) => s.fetchBrandAnalyticsBrands);
+  const fetchBrandAnalyticsBrands = useStore(
+    (s) => s.fetchBrandAnalyticsBrands,
+  );
   const overallStatistics = useStore((s) => s.overallStatistics);
   const overallStatisticsLoading = useStore((s) => s.overallStatisticsLoading);
   const primaryColor = useStore(selectPrimaryColor);
 
-  const notificationCount = Number(overallStatistics?.varNotificationCounts) || 0;
-  const badgeText = notificationCount > 99 ? "99+" : notificationCount > 0 ? String(notificationCount) : null;
+  const notificationCount =
+    Number(overallStatistics?.varNotificationCounts) || 0;
+  const badgeText =
+    notificationCount > 99
+      ? "99+"
+      : notificationCount > 0
+        ? String(notificationCount)
+        : null;
   const tooltipText = `${notificationCount} Price Notifications`;
 
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");
+  const [darkMode, setDarkMode] = useState(
+    () => localStorage.getItem("darkMode") === "true",
+  );
   const [stores, setStores] = useState([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
 
-  // fetch profile on login / user change 
+  // fetch profile on login / user change
   useEffect(() => {
     if (!user?.user_id) return;
     fetchProfile().then(setProfile).catch(console.error);
   }, [user?.user_id]);
 
-  // fetch all stores for super_admin 
+  // fetch all stores for super_admin
   useEffect(() => {
     if (!isSuperAdmin) return;
     fetchAllStores()
@@ -59,7 +74,7 @@ export function AppHeader() {
         setStores(active);
         if (!activeShopName && active.length > 0) {
           const defaultStore =
-            active.find((s) => s.companyId === 'sathya') || active[0];
+            active.find((s) => s.companyId === "sathya") || active[0];
           switchStore(defaultStore.companyId, defaultStore.companyName);
         }
       })
@@ -74,14 +89,18 @@ export function AppHeader() {
     setProductsError(null);
     fetchProducts()
       .then(setProducts)
-      .catch((err) => setProductsError(err.response?.data?.message || err.message))
+      .catch((err) =>
+        setProductsError(err.response?.data?.message || err.message),
+      )
       .finally(() => setProductsLoading(false));
 
     setCompetitorsLoading(true);
     setCompetitorsError(null);
     fetchCompetitors()
       .then(setCompetitors)
-      .catch((err) => setCompetitorsError(err.response?.data?.message || err.message))
+      .catch((err) =>
+        setCompetitorsError(err.response?.data?.message || err.message),
+      )
       .finally(() => setCompetitorsLoading(false));
 
     fetchProfile().then(setProfile).catch(console.error);
@@ -90,7 +109,6 @@ export function AppHeader() {
     fetchRankAnalysis();
     fetchBrandAnalyticsBrands();
   }, [activeStoreId]);
-
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", darkMode);
@@ -107,12 +125,16 @@ export function AppHeader() {
   const isStoreAdmin = user?.user_type === "store_admin";
   const isUserRole = user?.user_type === "user";
 
-  const roleLabel = isSuperAdmin ? "Super Admin"
-    : isStoreAdmin ? "Store Admin"
+  const roleLabel = isSuperAdmin
+    ? "Super Admin"
+    : isStoreAdmin
+      ? "Store Admin"
       : "User";
 
   // Store logo: company logo from DB (logoUrl) is source of truth
-  const currentStoreKey = (user?.user_type === "super_admin" ? activeStoreId : user?.cmpid) || "default";
+  const currentStoreKey =
+    (user?.user_type === "super_admin" ? activeStoreId : user?.cmpid) ||
+    "default";
   const storeLogo = profile?.logoUrl || storeLogoMap?.[currentStoreKey] || null;
 
   // Profile picture: user's own picture (profile_picture_location from plm_admin_users)
@@ -120,16 +142,24 @@ export function AppHeader() {
 
   // Display name shown in header badge and dropdown header
   const displayName = isSuperAdmin
-    ? (activeShopName || "Select Store")
-    : (profile?.companyName || profile?.website || profile?.email_address || "");
+    ? activeShopName || "Select Store"
+    : profile?.companyName || profile?.website || profile?.email_address || "";
 
   // Name shown inside dropdown for the logged-in user
-  const displayUserName = profile?.user_name || profile?.email_address || user?.email_address || "";
+  const displayUserName =
+    profile?.user_name || profile?.email_address || user?.email_address || "";
 
   // Avatar initials fallback
   const initials = displayName
-    ? displayName.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2)
-    : (profile?.email_address || user?.email_address || "U").slice(0, 2).toUpperCase();
+    ? displayName
+        .split(" ")
+        .map((w) => w[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : (profile?.email_address || user?.email_address || "U")
+        .slice(0, 2)
+        .toUpperCase();
 
   const handleLogout = () => {
     logout();
@@ -149,10 +179,13 @@ export function AppHeader() {
 
   // Check logged-in user identity: never show for user "sathya"
   const loggedInUserIdentifier = (
-    profile?.user_name || profile?.email_address || user?.email_address || user?.cmpid || ""
+    profile?.user_name ||
+    profile?.email_address ||
+    user?.email_address ||
+    user?.cmpid ||
+    ""
   ).toLowerCase();
-  const isSathyaUser =
-    loggedInUserIdentifier.trim().toLowerCase() === "sathya";
+  const isSathyaUser = loggedInUserIdentifier.trim().toLowerCase() === "sathya";
 
   // Check existing payment status if available in profile
   const isPaymentCompleted =
@@ -163,7 +196,8 @@ export function AppHeader() {
     String(profile?.payment).toLowerCase() === "completed" ||
     String(profile?.payment).toLowerCase() === "paid";
 
-  const showPaymentReminder = isDayInRange && !isSathyaUser && !isPaymentCompleted;
+  const showPaymentReminder =
+    isDayInRange && !isSathyaUser && !isPaymentCompleted;
 
   return (
     <header className="flex items-center h-16 pl-10 pr-9 border-b border-border bg-card shrink-0">
@@ -171,10 +205,9 @@ export function AppHeader() {
 
       {/* Smooth Running Payment Reminder Ticker */}
       <div
-        className={`payment-ticker-container mx-auto relative flex items-center overflow-hidden h-9 w-[260px] sm:w-[360px] md:w-[460px] lg:w-[560px] rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs font-medium shadow-sm select-none transition-opacity duration-200 ${showPaymentReminder
-          ? "opacity-100"
-          : "opacity-0 pointer-events-none"
-          }`}
+        className={`payment-ticker-container mx-auto relative flex items-center overflow-hidden h-9 w-[260px] sm:w-[360px] md:w-[460px] lg:w-[560px] rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs font-medium shadow-sm select-none transition-opacity duration-200 ${
+          showPaymentReminder ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
       >
         <style>{`
             @keyframes tickerSlide {
@@ -203,20 +236,20 @@ export function AppHeader() {
           <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
           <span className="leading-none">
             <strong className="font-semibold text-amber-800 dark:text-amber-300">
-              Friendly Reminder:
+              Payment Reminder:
             </strong>{" "}
-            Your monthly subscription payment is due. Please complete your payment
-            within{" "}
+            Your monthly subscription payment is due. Please complete your
+            payment within{" "}
             <span className="font-bold underline decoration-amber-500/50 underline-offset-2">
               {daysText}
             </span>{" "}
-            to avoid any service interruption. Thank you for your continued support.
+            to avoid any service interruption. Thank you for your continued
+            support.
           </span>
         </div>
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-
         {/* Bell Notification */}
         <TooltipProvider delayDuration={150}>
           <Tooltip>
@@ -238,7 +271,11 @@ export function AppHeader() {
                 )}
               </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" align="center" className="font-medium text-xs shadow-md">
+            <TooltipContent
+              side="bottom"
+              align="center"
+              className="font-medium text-xs shadow-md"
+            >
               {tooltipText}
             </TooltipContent>
           </Tooltip>
@@ -248,7 +285,11 @@ export function AppHeader() {
         {displayName && (
           <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-muted/60 border border-border mr-1">
             {storeLogo ? (
-              <img src={storeLogo} alt="Store" className="h-5 w-5 rounded object-contain shrink-0" />
+              <img
+                src={storeLogo}
+                alt="Store"
+                className="h-5 w-5 rounded object-contain shrink-0"
+              />
             ) : (
               <div className="h-5 w-5 rounded bg-primary flex items-center justify-center text-[9px] font-bold text-primary-foreground shrink-0">
                 {initials.slice(0, 1)}
@@ -259,8 +300,6 @@ export function AppHeader() {
             </span>
           </div>
         )}
-
-
 
         {/* Avatar + dropdown */}
         <div className="ml-2 relative">
@@ -283,9 +322,11 @@ export function AppHeader() {
 
           {dropdownOpen && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setDropdownOpen(false)}
+              />
               <div className="absolute right-0 top-full mt-2 w-60 rounded-lg border bg-card shadow-lg z-50 py-1">
-
                 {/* User info header */}
                 <div className="px-3 py-2.5 border-b">
                   <div className="flex items-center gap-2.5">
@@ -301,7 +342,9 @@ export function AppHeader() {
                         {displayName || displayUserName}
                       </p>
                       {displayUserName && displayUserName !== displayName && (
-                        <p className="text-xs text-muted-foreground truncate">{displayUserName}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {displayUserName}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -323,15 +366,20 @@ export function AppHeader() {
                       Switch Store
                     </div>
                     {stores.length === 0 ? (
-                      <p className="px-3 py-2 text-sm text-muted-foreground">No stores yet</p>
+                      <p className="px-3 py-2 text-sm text-muted-foreground">
+                        No stores yet
+                      </p>
                     ) : (
                       <div className="max-h-48 overflow-y-auto">
                         {stores.map((store) => (
                           <button
                             key={store._id}
                             onClick={() => handleStoreSelect(store)}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors ${activeShopName === store.companyName ? "bg-accent font-medium" : ""
-                              }`}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors ${
+                              activeShopName === store.companyName
+                                ? "bg-accent font-medium"
+                                : ""
+                            }`}
                           >
                             {store.companyName}
                           </button>

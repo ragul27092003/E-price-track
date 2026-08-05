@@ -286,6 +286,59 @@ const CompetitorAddCard = ({ competitor, isAssigning, onAdd }) => {
 };
 
 // ─── CompetitorRow ─────────────────────────────────────────────────────────────
+const isSyncedToday = (raw) => {
+  if (!raw || raw === "Never") return false;
+
+  const today = new Date();
+  const todayYear = today.getFullYear();
+  const todayMonth = today.getMonth();
+  const todayDate = today.getDate();
+
+  if (typeof raw === "string") {
+    const ddmmyyyyMatch = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/);
+    if (ddmmyyyyMatch) {
+      const day = parseInt(ddmmyyyyMatch[1], 10);
+      const month = parseInt(ddmmyyyyMatch[2], 10) - 1;
+      const year = parseInt(ddmmyyyyMatch[3], 10);
+      if (year === todayYear && month === todayMonth && day === todayDate) return true;
+    }
+
+    try {
+      const isoString = raw.includes("T") ? raw : raw.replace(" ", "T");
+      let d = new Date(isoString.endsWith("Z") ? isoString : isoString + "Z");
+      if (isNaN(d.getTime())) {
+        d = new Date(raw);
+      }
+      if (!isNaN(d.getTime())) {
+        const options = { timeZone: "Asia/Kolkata" };
+        if (
+          d.toLocaleDateString("en-IN", options) ===
+          today.toLocaleDateString("en-IN", options)
+        ) {
+          return true;
+        }
+        if (
+          d.getFullYear() === todayYear &&
+          d.getMonth() === todayMonth &&
+          d.getDate() === todayDate
+        ) {
+          return true;
+        }
+      }
+    } catch (e) {
+      // fallback
+    }
+  } else if (raw instanceof Date && !isNaN(raw.getTime())) {
+    return (
+      raw.getFullYear() === todayYear &&
+      raw.getMonth() === todayMonth &&
+      raw.getDate() === todayDate
+    );
+  }
+
+  return false;
+};
+
 const CompetitorRow = ({
   data,
   onToggleSync,
@@ -302,6 +355,14 @@ const CompetitorRow = ({
   useEffect(() => {
     if (data) setIsActive(data.isActive);
   }, [data?.isActive]);
+
+  const isRunning = Boolean(data?.isRunning);
+  const isSynced = isSyncedToday(data?.lastSync);
+  const isGreen = isRunning || isSynced;
+
+  const rowBgClass = isGreen
+    ? "bg-emerald-50/80 border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-800/40"
+    : "bg-rose-50/80 border-rose-200 dark:bg-rose-950/30 dark:border-rose-800/40";
 
   const handleToggle = async () => {
     if (isRestrictedUser) return;
@@ -322,39 +383,11 @@ const CompetitorRow = ({
     });
   };
 
-  const isSyncDateToday = (raw) => {
-    if (!raw || raw === "Never") return false;
-    try {
-      let date;
-      if (typeof raw === "string" && !raw.includes("T") && raw.includes(" ")) {
-        date = new Date(raw.replace(" ", "T") + "Z");
-      } else {
-        date = new Date(raw);
-      }
-      if (isNaN(date.getTime())) return false;
-      const options = { timeZone: "Asia/Kolkata" };
-      return (
-        date.toLocaleDateString("en-IN", options) ===
-        new Date().toLocaleDateString("en-IN", options)
-      );
-    } catch (e) {
-      return false;
-    }
-  };
-
-  const isRunning = Boolean(data?.isRunning);
-  const isToday = isSyncDateToday(data?.lastSync);
-  const isGreen = isRunning || isToday;
-
   const isNegDelta = String(data.avgPriceDelta || "").includes("-");
 
   return (
     <div
-      className={`flex flex-col md:flex-row md:items-center p-4 border border-slate-200 dark:border-slate-700/60 rounded-lg mb-3 ${
-        isGreen
-          ? "bg-green-50 dark:bg-green-950/20"
-          : "bg-red-50 dark:bg-red-950/20"
-      } hover:shadow-sm transition-shadow gap-3 md:gap-0`}
+      className={`flex flex-col md:flex-row md:items-center p-4 border rounded-lg mb-3 hover:shadow-sm transition-shadow gap-3 md:gap-0 ${rowBgClass}`}
     >
       <LogoCell
         data={data}
