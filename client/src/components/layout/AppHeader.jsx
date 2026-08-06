@@ -177,7 +177,16 @@ export function AppHeader() {
   const daysRemaining = 7 - currentDay;
   const daysText = daysRemaining === 1 ? "1 day" : `${daysRemaining} days`;
 
-  // Check logged-in user identity: never show for user "sathya"
+  // Check if current user or tenant belongs to Sathya: never show for Sathya tenant or any Sathya user/role
+  const activeTenantIdentifier = String(
+    currentStoreKey ||
+      activeStoreId ||
+      user?.cmpid ||
+      profile?.cmpid ||
+      profile?.companyId ||
+      "",
+  ).toLowerCase();
+
   const loggedInUserIdentifier = (
     profile?.user_name ||
     profile?.email_address ||
@@ -185,7 +194,16 @@ export function AppHeader() {
     user?.cmpid ||
     ""
   ).toLowerCase();
-  const isSathyaUser = loggedInUserIdentifier.trim().toLowerCase() === "sathya";
+
+  const isSathyaUser =
+    activeTenantIdentifier.includes("sathya") ||
+    String(profile?.companyName || "")
+      .toLowerCase()
+      .includes("sathya") ||
+    String(activeShopName || "")
+      .toLowerCase()
+      .includes("sathya") ||
+    loggedInUserIdentifier.includes("sathya");
 
   // Check existing payment status if available in profile
   const isPaymentCompleted =
@@ -200,52 +218,75 @@ export function AppHeader() {
     isDayInRange && !isSathyaUser && !isPaymentCompleted;
 
   return (
-    <header className="flex items-center h-16 pl-10 pr-9 border-b border-border bg-card shrink-0">
-      <img src={logo} alt="Logo" className="h-6 w-auto object-contain" />
+    <header className="flex items-center h-16 px-6 border-b border-border bg-card shrink-0">
+      <div className="shrink-0 flex items-center ml-4">
+        <img src={logo} alt="Logo" className="block h-6 w-auto shrink-0" />
+      </div>
 
       {/* Smooth Running Payment Reminder Ticker */}
       <div
-        className={`payment-ticker-container mx-auto relative flex items-center overflow-hidden h-9 w-[260px] sm:w-[360px] md:w-[460px] lg:w-[560px] rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs font-medium shadow-sm select-none transition-opacity duration-200 ${
+        className={`payment-ticker-container flex-1 mr-4 relative flex items-center overflow-hidden h-10 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-[13px] font-medium shadow-sm select-none transition-opacity duration-200 ${
           showPaymentReminder ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
         <style>{`
-            @keyframes tickerSlide {
-  0% {
-    transform: translateX(60%);
-  }
-  100% {
-    transform: translateX(-100%);
-  }
-}
-            .payment-ticker-track {
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-  will-change: transform;
-  transform: translate3d(100%, 0, 0);
-  animation: tickerSlide 20s linear infinite;
-  animation-delay: -1s;
-  animation-fill-mode: both;
-}
-            .payment-ticker-container:hover .payment-ticker-track {
-              animation-play-state: paused;
-            }
-          `}</style>
-        <div className="payment-ticker-track gap-2 px-2">
-          <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-          <span className="leading-none">
-            <strong className="font-semibold text-amber-800 dark:text-amber-300">
-              Payment Reminder:
-            </strong>{" "}
-            Your monthly subscription payment is due. Please complete your
-            payment within{" "}
-            <span className="font-bold underline decoration-amber-500/50 underline-offset-2">
-              {daysText}
-            </span>{" "}
-            to avoid any service interruption. Thank you for your continued
-            support.
-          </span>
+    .payment-ticker-track {
+      display: flex;
+      width: max-content;
+      animation: paymentTicker 25s linear infinite;
+      will-change: transform;
+    }
+    .payment-ticker-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+      padding-right: 100px; /* Message-ku naduvula nalla gap irukka */
+      flex-shrink: 0;
+    }
+    @keyframes paymentTicker {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+    .payment-ticker-container:hover .payment-ticker-track {
+      animation-play-state: paused;
+    }
+  `}</style>
+
+        <div className="payment-ticker-track">
+          {/* Message 1 */}
+          <div className="payment-ticker-item">
+            <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="leading-none">
+              <strong className="font-bold text-amber-800">
+                Payment Reminder:
+              </strong>{" "}
+              Your monthly subscription payment is due. Please complete your
+              payment within{" "}
+              <span className="font-bold underline decoration-amber-500/50 underline-offset-4">
+                {daysText}
+              </span>{" "}
+              to avoid any service interruption. Thank you for your continued
+              support.
+            </span>
+          </div>
+
+          {/* Message 2 (Loop-kaga duplicate) */}
+          <div className="payment-ticker-item">
+            <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+            <span className="leading-none">
+              <strong className="font-bold text-amber-800">
+                Payment Reminder:
+              </strong>{" "}
+              Your monthly subscription payment is due. Please complete your
+              payment within{" "}
+              <span className="font-bold underline decoration-amber-500/50 underline-offset-4">
+                {daysText}
+              </span>{" "}
+              to avoid any service interruption. Thank you for your continued
+              support.
+            </span>
+          </div>
         </div>
       </div>
 
