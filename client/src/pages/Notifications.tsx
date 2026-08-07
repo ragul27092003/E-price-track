@@ -5,6 +5,7 @@ import { fetchAlertProducts } from "../services/notificationsService.js";
 import API from "../hooks/useApi";
 import {buildProductHistoryUrl} from "../utilis/urls";
 import { removeProductConfiguration } from "../services/productsService"; 
+import CompetitorMeta from "../components/CompetitorMeta";
 
 
 
@@ -547,29 +548,33 @@ export default function Notifications() {
                         {activeCompetitors.map((c: any) => {
                           const meta = competitorMeta[c.slug] || { logo: "", name: "" };
                           return (
-                            <div key={c.slug} className="flex items-center justify-between">
+                            <div key={c.slug} className="flex items-center justify-between gap-2 w-full">
                               {c.url ? (
                                 <a
                                   href={c.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   title={`Open on ${c.name}`}
-                                  className="flex items-center gap-2 hover:opacity-75 transition-opacity"
+                                  className="flex items-center gap-2 shrink-0 hover:opacity-75 transition-opacity"
                                 >
                                   <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
-                                  <span className="font-bold text-slate-700 dark:text-slate-300 text-[13px]">
+                                  <span className="font-bold text-slate-700 dark:text-slate-300 text-[13px] whitespace-nowrap">
                                     ₹{c.price.toLocaleString("en-IN")}
                                   </span>
                                 </a>
                               ) : (
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 shrink-0">
                                   <CompetitorLogo name={c.name} slug={c.slug} logo={meta.logo || ""} />
-                                  <span className="font-bold text-slate-700 dark:text-slate-300 text-[13px]">
+                                  <span className="font-bold text-slate-700 dark:text-slate-300 text-[13px] whitespace-nowrap">
                                     ₹{c.price.toLocaleString("en-IN")}
                                   </span>
                                 </div>
                               )}
-                              <Sparkline data={trendFor(p, c.slug)} color="#0ea5e9" />
+                              <CompetitorMeta
+                                rating={c.rating ?? c.product_rating}
+                                reviewCount={c.reviewCount ?? c.review_count ?? c.product_review ?? c.reviews}
+                                className="ml-auto shrink-0"
+                              />
                             </div>
                           );
                         })}

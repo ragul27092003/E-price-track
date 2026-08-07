@@ -225,7 +225,7 @@ export function AppHeader() {
 
       {/* Smooth Running Payment Reminder Ticker */}
       <div
-        className={`payment-ticker-container flex-1 mr-4 relative flex items-center overflow-hidden h-10 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-[13px] font-medium shadow-sm select-none transition-opacity duration-200 ${
+        className={`payment-ticker-container flex-1 mr-4 relative flex items-center overflow-hidden h-8 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-[13px] font-medium shadow-sm select-none transition-opacity duration-200 ${
           showPaymentReminder ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
       >
@@ -261,13 +261,23 @@ export function AppHeader() {
               <strong className="font-bold text-amber-800">
                 Payment Reminder:
               </strong>{" "}
-              Your monthly subscription payment is due. Please complete your
-              payment within{" "}
-              <span className="font-bold underline decoration-amber-500/50 underline-offset-4">
-                {daysText}
-              </span>{" "}
-              to avoid any service interruption. Thank you for your continued
-              support.
+              {daysRemaining === 0 ? (
+                <>
+                  Today is the last day to complete your subscription payment to
+                  avoid any service interruption. Thank you for your continued
+                  support.
+                </>
+              ) : (
+                <>
+                  Your monthly subscription payment is due. Please complete your
+                  payment within{" "}
+                  <span className="font-bold underline decoration-amber-500/50 underline-offset-4">
+                    {daysText}
+                  </span>{" "}
+                  to avoid any service interruption. Thank you for your
+                  continued support.
+                </>
+              )}
             </span>
           </div>
 
@@ -278,13 +288,23 @@ export function AppHeader() {
               <strong className="font-bold text-amber-800">
                 Payment Reminder:
               </strong>{" "}
-              Your monthly subscription payment is due. Please complete your
-              payment within{" "}
-              <span className="font-bold underline decoration-amber-500/50 underline-offset-4">
-                {daysText}
-              </span>{" "}
-              to avoid any service interruption. Thank you for your continued
-              support.
+              {daysRemaining === 0 ? (
+                <>
+                  Today is the last day to complete your subscription payment to
+                  avoid any service interruption. Thank you for your continued
+                  support.
+                </>
+              ) : (
+                <>
+                  Your monthly subscription payment is due. Please complete your
+                  payment within{" "}
+                  <span className="font-bold underline decoration-amber-500/50 underline-offset-4">
+                    {daysText}
+                  </span>{" "}
+                  to avoid any service interruption. Thank you for your
+                  continued support.
+                </>
+              )}
             </span>
           </div>
         </div>
