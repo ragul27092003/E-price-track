@@ -70,6 +70,8 @@ async function buildCompetitorMap(db, products, onlineCompetitors) {
                 product_url:             1,
                 product_stock:           1,
                 product_image:           1,
+                product_rating:          1,
+                product_review:          1,
             }}
           )
           .toArray();
@@ -117,6 +119,8 @@ function mapCompetitorPrices(product, onlineCompetitors, competitorMap) {
       stock:     cd?.product_stock || null,
       is_listed,
       image:     cd?.product_image || null,
+      product_rating: cd?.product_rating ?? null,
+      product_review: cd?.product_review ?? null,
     };
   });
 }

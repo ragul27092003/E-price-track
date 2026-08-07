@@ -89,6 +89,8 @@ async function enrichProducts(db, products) {
                 product_url:             1,
                 product_stock:           1, // FIX: Changed from product_stock_status to match DB
                 product_image:           1,
+                product_rating:          1,
+                product_review:          1,
             }}
           )
           .toArray();
@@ -167,6 +169,8 @@ async function enrichProducts(db, products) {
         stock:     cd?.product_stock || null,
         is_listed: is_listed,
         image:     cd?.product_image || null,
+        product_rating: cd?.product_rating ?? null,
+        product_review: cd?.product_review ?? null,
       };
     });
 
