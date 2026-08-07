@@ -80,32 +80,19 @@ const CompetitorMeta = React.memo(
       }
     }
 
-    // Always fallback to 0.0 for rating and 0 for review count if data is missing or invalid
-    const displayRating = formattedRating ?? "0.0";
+    // Always fallback to N/A for rating and 0 for review count if data is missing or invalid
+    const displayRating = formattedRating ?? "N/A";
     const displayReview = formattedReview ?? "0";
 
     return (
       <div
-        className={`inline-flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 shrink-0 ${className}`}
+        className={`inline-flex items-center gap-0.5 text-xs text-slate-600 dark:text-slate-300 shrink-0 ${className}`}
       >
-        <span
-          className="
-      inline-flex items-center gap-0.5
-      leading-none
-      font-semibold text-[11px]
-      text-amber-600 dark:text-amber-400
-      bg-amber-50 dark:bg-amber-950/40
-      px-1.5 py-0.5
-      rounded
-      border border-amber-200/60 dark:border-amber-800/50
-    "
-        >
-          <Star className="h-3 w-3 fill-amber-400 text-amber-400 shrink-0 relative -top-[0.5px]" />
-
-          <span className="leading-none">{displayRating}</span>
+        <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400 shrink-0" />
+        <span className="font-semibold text-slate-700 dark:text-slate-200">
+          {displayRating}
         </span>
-
-        <span className="text-[10px] leading-none text-slate-500 dark:text-slate-400">
+        <span className="text-slate-400 dark:text-slate-500">
           ({displayReview})
         </span>
       </div>

@@ -501,7 +501,7 @@ function CompetitorPrices({ product, competitorMeta, onShowHistory }) {
         const hasPrice = c.price !== null && c.price !== undefined && c.price > 0;
 
         return (
-          <div key={c.slug} className="flex items-center justify-between gap-3 w-full min-w-0">
+          <div key={c.slug} className="flex items-center gap-2.5 w-full min-w-0">
             {/* Left section: Logo + Price/Status Badge + History Button */}
             <div className="flex items-center gap-2 min-w-0 shrink">
               {isOos ? (
@@ -620,8 +620,8 @@ function CompetitorPrices({ product, competitorMeta, onShowHistory }) {
               )}
             </div>
 
-            {/* Right section: Pinned to far right on the SAME line */}
-            <div className="flex items-center shrink-0 whitespace-nowrap ml-auto">
+            {/* Right section: Placed immediately next to price section with small spacing */}
+            <div className="flex items-center shrink-0 whitespace-nowrap">
               <CompetitorMeta
                 rating={c.product_rating ?? c.rating}
                 reviewCount={c.product_review ?? c.reviewCount ?? c.review_count}
