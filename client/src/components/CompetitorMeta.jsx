@@ -13,7 +13,7 @@ import { Star } from "lucide-react";
  * @param {string} className - Optional container CSS class overrides
  */
 const CompetitorMeta = React.memo(
-  ({ rating, reviewCount, loading = false, className = "" }) => {
+  ({ rating, reviewCount, showReviewCount = true, loading = false, className = "" }) => {
     if (rating === undefined || reviewCount === undefined) {
       return null;
     }
@@ -92,9 +92,11 @@ const CompetitorMeta = React.memo(
         <span className="font-semibold text-slate-700 dark:text-slate-200">
           {displayRating}
         </span>
-        <span className="text-slate-400 dark:text-slate-500">
-          ({displayReview})
-        </span>
+        {showReviewCount && (
+          <span className="text-slate-400 dark:text-slate-500">
+            ({displayReview})
+          </span>
+        )}
       </div>
     );
   },
