@@ -107,6 +107,11 @@ exports.getFeed = async (req, res) => {
 // ── PUT /api/feeds ────────────────────────────────────────────────────────────
 exports.saveFeed = async (req, res) => {
   try {
+    const now = new Date();
+    const formatteddate =
+      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ` +
+      `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
     const {
       store_name, feed_type, feed_url,
       schedule_info, import_time,
@@ -127,6 +132,7 @@ exports.saveFeed = async (req, res) => {
       cms_upload_type:     cms_upload_type     || 'none',
       shopify_name:        isShopify ? (shopify_name         || '') : '',
       shopify_accesstoken: isShopify ? (shopify_accesstoken  || '') : '',
+      modified_on:         formatteddate
     };
 
     await Merchant.findByIdAndUpdate(
@@ -157,11 +163,9 @@ exports.saveFeed = async (req, res) => {
 
 // ── GET /api/feeds/activity-log ───────────────────────────────────────────────
 exports.getActivityLog = async (req, res) => {
-  // console.log('🔥🔥🔥 NEW CODE RUNNING 🔥🔥🔥');
   try {
     const tenantDb = req.tenantDb;
 
-    // Feed sync records only — we only care about when the feed run started/ended
     const sapDocs = await tenantDb
       .collection('ept_sap_data_update_status')
       .find({})
@@ -170,32 +174,81 @@ exports.getActivityLog = async (req, res) => {
       .toArray();
 
     const logs = sapDocs.map((doc) => {
-      const allSuccess =
-        doc.product_update_status   === 'success' &&
-        doc.rank_update_status      === 'success' &&
-        doc.dashboard_update_status === 'success';
+      const productStatus = doc.product_update_status || 'queue';
+      const rankStatus = doc.rank_update_status || 'queue';
+      const priceNotificationStatus = doc.price_notification_update_status || 'queue';
+      const dashboardStatus = doc.dashboard_update_status || 'queue';
 
-      const failed = [];
-      if (doc.product_update_status   !== 'success') failed.push('product update');
-      if (doc.rank_update_status      !== 'success') failed.push('rank update');
-      if (doc.dashboard_update_status !== 'success') failed.push('dashboard update');
+      const allSuccess = 
+        productStatus === 'success' &&
+        rankStatus === 'success' &&
+        priceNotificationStatus === 'success' &&
+        dashboardStatus === 'success';
+
+      const anyFailed = 
+        productStatus === 'failed' ||
+        rankStatus === 'failed' ||
+        priceNotificationStatus === 'failed' ||
+        dashboardStatus === 'failed';
+
+      const anyProcessing = 
+        productStatus === 'process' ||
+        rankStatus === 'process' ||
+        priceNotificationStatus === 'process' ||
+        dashboardStatus === 'process';
+
+      let overallStatus = 'Queue';
+      if (allSuccess) overallStatus = 'Success';
+      else if (anyFailed) overallStatus = 'Failed';
+      else if (anyProcessing) overallStatus = 'Processing';
+
+      const isRunning = overallStatus === 'Queue' || overallStatus === 'Processing';
+
+      const failedSteps = [];
+      if (productStatus === 'failed') failedSteps.push('Product Update');
+      if (rankStatus === 'failed') failedSteps.push('Rank Update');
+      if (priceNotificationStatus === 'failed') failedSteps.push('Dashboard Update');
+      if (dashboardStatus === 'failed') failedSteps.push('Price Notification');
+
+      let message = '';
+      if (allSuccess) {
+        message = 'All steps completed successfully.';
+      } else if (failedSteps.length > 0) {
+        message = `Failed (${failedSteps.join(', ')})`;
+      } else if (anyProcessing) {
+        message = 'Processing...';
+      } else {
+        message = 'Queued.';
+      }
+
+      const totalSteps = 4;
+      const completedSteps = [
+        productStatus === 'success',
+        rankStatus === 'success',
+        priceNotificationStatus === 'success',
+        dashboardStatus === 'success'
+      ].filter(Boolean).length;
+      const progress = Math.round((completedSteps / totalSteps) * 100);
 
       return {
-        date:      formatDate(doc.created_date || doc.var_start_time),
-        status:    allSuccess ? 'Success' : 'Failed',
-        startedAt: formatDate(doc.var_start_time),
-        endedAt:   formatDate(doc.var_end_time),
-        message:   allSuccess
-          ? `Started: ${formatDate(doc.var_start_time)}  →  Ended: ${formatDate(doc.var_end_time)}`
-          : `Failed (${failed.join(', ')}).  Started: ${formatDate(doc.var_start_time)}  →  Ended: ${formatDate(doc.var_end_time)}`,
+        date: (doc.created_date || doc.var_start_time),
+        started_at: (doc.var_start_time), // ✅ New separate field
+        ended_at: (doc.var_end_time),     // ✅ New separate field
+        status: overallStatus,
+        isRunning: isRunning,
+        message: message,
+        progress: progress,
+        isComplete: allSuccess,
+        steps: [
+          { id: 'product', label: 'Product Update', status: productStatus, icon: 'product' },
+          { id: 'rank', label: 'Rank Update', status: rankStatus, icon: 'rank' },
+          { id: 'price_notification', label: 'Price Notification', status: priceNotificationStatus, icon: 'notification' },
+          { id: 'dashboard', label: 'Dashboard Update', status: dashboardStatus, icon: 'dashboard' }
+        ]
       };
     });
 
-    const all = logs
-      .filter((l) => l.date && l.date !== '—')
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    res.json({ logs: all });
+    res.json({ logs: logs }); 
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

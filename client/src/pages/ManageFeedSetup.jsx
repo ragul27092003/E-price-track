@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
+import Swal from 'sweetalert2';
 import {
   Storefront as StorefrontIcon,
   Language as LanguageIcon,
@@ -8,8 +9,42 @@ import {
   CheckCircle as CheckCircleIcon,
   Cancel as CancelIcon,
   Sync as SyncIcon,
+  PlayCircle as PlayCircleIcon,
+  HourglassEmpty as HourglassEmptyIcon,
 } from '@mui/icons-material';
 import API from '../hooks/useApi';
+
+// Status configuration for steps
+const STEP_STATUS = {
+  queue: {
+    color: 'bg-gray-300 dark:bg-gray-600',
+    textColor: 'text-gray-500 dark:text-gray-400',
+    borderColor: 'border-gray-300 dark:border-gray-600',
+    icon: HourglassEmptyIcon,
+    label: 'Queued'
+  },
+  process: {
+    color: 'bg-blue-500 dark:bg-blue-400',
+    textColor: 'text-blue-600 dark:text-blue-400',
+    borderColor: 'border-blue-500 dark:border-blue-400',
+    icon: PlayCircleIcon,
+    label: 'Processing'
+  },
+  success: {
+    color: 'bg-green-500 dark:bg-green-400',
+    textColor: 'text-green-600 dark:text-green-400',
+    borderColor: 'border-green-500 dark:border-green-400',
+    icon: CheckCircleIcon,
+    label: 'Completed'
+  },
+  failed: {
+    color: 'bg-red-500 dark:bg-red-400',
+    textColor: 'text-red-600 dark:text-red-400',
+    borderColor: 'border-red-500 dark:border-red-400',
+    icon: CancelIcon,
+    label: 'Failed'
+  }
+};
 
 const ManageFeedSetup = () => {
   const activeStoreId = useStore((s) => s.activeStoreId);
@@ -20,7 +55,11 @@ const ManageFeedSetup = () => {
   const [logsLoading, setLogsLoading] = useState(true);
   const [activityLogs, setActivityLogs] = useState([]);
   const [snack, setSnack] = useState({ open: false, msg: '', severity: 'success' });
+  const [isCronRunning, setIsCronRunning] = useState(false);
   const isSuperAdmin = userType === 'super_admin';
+  const intervalRef = useRef(null);
+  const livePollingRef = useRef(false);
+  const scrollPositionRef = useRef(0);
 
   const [formData, setFormData] = useState({
     store_name: '',
@@ -32,6 +71,9 @@ const ManageFeedSetup = () => {
     schedule_info: 'Daily',
     import_time: '12:00 PM',
   });
+
+  const feedcronlink = `${import.meta.env.VITE_CRON_DOMAIN}cron/cron_upload_sathya_json_products.php?cmpid=${formData.store_name}`;
+  console.log(feedcronlink);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -56,18 +98,127 @@ const ManageFeedSetup = () => {
       }
     };
     fetchConfig();
+    
     loadActivityLog();
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
   }, [activeStoreId]);
 
   const loadActivityLog = async () => {
+    // console.log("API Called", new Date().toLocaleTimeString());
     setLogsLoading(true);
     try {
       const res = await API.get('/feeds/activity-log');
-      setActivityLogs(res.data?.logs || []);
-    } catch (err) {
+      console.log('🟢 API Logs Response:', res.data);
+      const logs = res.data?.logs || [];
+      setActivityLogs(logs);
+      // Check if there's a running cron job
+      const runningLog = logs.find(log => log.isRunning === true);
+      const isRunning = !!runningLog;
+      // Check if there's a queued cron job (status is 'queue' or 'Queued')
+      const queuedLog = logs.find(log => 
+        log.status === 'queue' || 
+        log.status === 'Queued' || 
+        log.status === 'Processing' ||
+        log.isRunning === true
+      );
+      const hasQueuedCron = !!queuedLog;
+      // Update cron running state
+      setIsCronRunning(isRunning || hasQueuedCron);
+      // console.log('Is Cron Running:', isRunning || hasQueuedCron);
+      if (isRunning) {
+        if (!intervalRef.current) {
+            console.log("🟢 Live polling started");
+            intervalRef.current = setInterval(() => {
+                loadActivityLog();
+            }, 2000);
+        }
+      }
+      else{
+        if(intervalRef.current){
+            console.log("🔴 Live polling stopped");
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+      }
+    }
+    catch(err){
+      console.error('🔴 Error loading logs:', err);
       setActivityLogs([]);
     } finally {
       setLogsLoading(false);
+    }
+  };
+
+  // New function to handle refresh with SweetAlert
+  const handleRefreshWithConfirmation = () => {
+    // Check if cron is already running
+    if (isCronRunning) {
+      Swal.fire({
+        title: 'Cron Job in Progress',
+        text: 'A sync is already running. Please wait for it to complete.',
+        icon: 'info',
+        confirmButtonColor: '#0d9488',
+        confirmButtonText: 'OK'
+      });
+      return;
+    }
+
+    Swal.fire({
+      title: 'Restart Feed Sync?',
+      text: 'This will trigger a new feed synchronization. Do you want to continue?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#0d9488',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Yes, restart sync',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true
+    }).then((result) => {
+      if (result.isConfirmed) {
+        // Save current scroll position
+        scrollPositionRef.current = window.scrollY;
+        setIsCronRunning(true);
+        // Run the link in background
+        runBackgroundLink();
+        // Show loading state
+        setLogsLoading(true);
+        Swal.fire({
+          title: 'Sync Started!',
+          text: 'Feed synchronization has been triggered. The page will refresh in 2 seconds.',
+          icon: 'success',
+          timer: 2000,
+          timerProgressBar: true,
+          showConfirmButton: false
+        });
+        // Refresh the page content after 2 seconds
+        setTimeout(() => {
+          loadActivityLog().finally(() => {
+            setLogsLoading(false);
+            // Restore scroll position
+            window.scrollTo(0, scrollPositionRef.current);
+          });
+        }, 2000);
+      }
+    });
+  };
+
+  // Function to run the link in background
+  const runBackgroundLink = async () => {
+    try {
+      await fetch(feedcronlink, {
+        method: 'GET',
+        mode: 'no-cors',
+        cache: 'no-cache'
+      });
+      console.log('✅ Background link executed successfully');
+    } catch (error) {
+      console.error('❌ Failed to run background link:', error);
+      showSnack('Failed to trigger sync, but logs will be refreshed', 'error');
+      setIsCronRunning(false);
     }
   };
 
@@ -116,6 +267,47 @@ const ManageFeedSetup = () => {
       setIsSaving(false);
     }
   };
+  
+    // Get step status display (UPDATED to use !text-lg)
+    const getStepStatusDisplay = (status) => {
+      const config = STEP_STATUS[status] || STEP_STATUS.queue;
+      const Icon = config.icon;
+      return {
+        icon: <Icon className={`!text-lg ${config.textColor}`} />,
+        color: config.color,
+        textColor: config.textColor,
+        label: config.label
+      };
+    };
+  
+    // Get overall status icon
+    const getOverallStatusIcon = (status) => {
+      if (status === 'Success') {
+        return <CheckCircleIcon className="text-[#2e7d32] !text-lg" />;
+      } else if (status === 'Failed') {
+        return <CancelIcon className="text-[#d32f2f] !text-lg" />;
+      } else if (status === 'Processing') {
+        return <PlayCircleIcon className="text-[#1976d2] !text-lg animate-pulse" />;
+      } else {
+        return <HourglassEmptyIcon className="text-gray-400 !text-lg" />;
+      }
+    };
+  
+    // Get overall status color
+    const getOverallStatusColor = (status) => {
+      if (status === 'Success') return 'text-green-700';
+      if (status === 'Failed') return 'text-red-700';
+      if (status === 'Processing') return 'text-blue-700';
+      return 'text-gray-500';
+    };
+  
+    // Helper to safely display a date (MUST BE SAFE FOR EMPTY STRINGS)
+    const displayDate = (dateStr) => {
+      if (!dateStr || dateStr === '—' || dateStr === 'Invalid Date') {
+        return <span className="text-gray-400 italic">Processing</span>;
+      }
+      return dateStr;
+    };
 
   // Shared card shell so every section reads as a distinct, self-contained block
   const SectionCard = ({ children, className = '' }) => (
@@ -136,7 +328,6 @@ const ManageFeedSetup = () => {
 
   return (
     <div className="max-w-full dark:bg-[#070b16] text-gray-800 dark:text-white font-sans space-y-6">
-
       {/* Page intro — sits outside the cards, sets context for the whole page */}
       <div>
         <h2 className="text-lg font-bold">Feed Setup</h2>
@@ -407,67 +598,140 @@ const ManageFeedSetup = () => {
       </SectionCard>
 
       {/* CARD 4 — Activity Log */}
-      {isSuperAdmin && (
       <SectionCard>
         <div className="flex justify-between items-center mb-4">
           <div>
             <h3 className="text-md font-bold">Activity Log</h3>
-            <p className="text-[11px] text-gray-500 dark:text-slate-400">Last sync attempts</p>
+            <p className="text-[11px] text-gray-500 dark:text-slate-400">Last sync attempts with step details</p>
           </div>
-          <button
-            onClick={loadActivityLog}
-            disabled={logsLoading}
-            className="text-teal-600 hover:text-teal-800 text-xs font-medium flex items-center gap-1"
+          {isSuperAdmin && (<button onClick={handleRefreshWithConfirmation} disabled={logsLoading || isCronRunning} // Disable when cron is running
+            className={`text-xs font-medium flex items-center gap-1 transition-colors ${
+              isCronRunning 
+                ? 'text-gray-400 dark:text-gray-600 cursor-not-allowed' 
+                : 'text-teal-600 hover:text-teal-800'
+            }`}
           >
-            <SyncIcon fontSize="inherit" /> Refresh
-          </button>
+            <SyncIcon fontSize="inherit" className={logsLoading || isCronRunning ? 'animate-spin' : ''} /> 
+            {isCronRunning ? 'Sync in progress...' : 'Refresh'}
+          </button>)}
         </div>
 
-        <div className="overflow-x-auto overflow-y-auto max-h-[200px] border-t border-gray-100 dark:border-slate-700/60 scrollbar-hide">
+        <div className="overflow-x-auto overflow-y-auto max-h-[400px] border-t border-gray-100 dark:border-slate-700/60 scrollbar-hide">
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 bg-white dark:bg-[#0f1420] z-10">
-              <tr className="text-gray-500 dark:text-slate-400 text-xs uppercase font-bold">
-                <th className="py-3 border-b border-gray-100 dark:border-slate-700/60">Date & Time</th>
-                <th className="py-3 border-b border-gray-100 dark:border-slate-700/60">Status</th>
-                <th className="py-3 border-b border-gray-100 dark:border-slate-700/60">Message</th>
+              <tr className="text-gray-700 dark:text-slate-400 text-xs uppercase font-bold">
+                <th className="py-3 border-b border-gray-100 dark:border-slate-700/60 whitespace-nowrap w-1/4">Start Time</th>
+                <th className="py-3 border-b border-gray-100 dark:border-slate-700/60 whitespace-nowrap">Status</th>
+                <th className="py-3 border-b border-gray-100 dark:border-slate-700/60 whitespace-nowrap">Progress</th>
+                <th className="py-3 border-b border-gray-100 dark:border-slate-700/60 whitespace-nowrap">Steps</th>
+                <th className="py-3 border-b border-gray-100 dark:border-slate-700/60 whitespace-nowrap w-1/4">End Time</th>
               </tr>
             </thead>
             <tbody className="text-sm">
-              {logsLoading ? (
+              {logsLoading && activityLogs.length === 0 ? (
                 <tr>
-                  <td colSpan="3" className="py-10 text-center">
+                  <td colSpan="5" className="py-10 text-center">
                     <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-teal-600"></div>
                   </td>
                 </tr>
               ) : activityLogs.length === 0 ? (
                 <tr>
-                  <td colSpan="3" className="py-8 text-center text-gray-400 dark:text-slate-500 italic">No activity logs found</td>
+                  <td colSpan="5" className="py-8 text-center text-gray-400 dark:text-slate-500 italic">
+                    No activity logs found
+                  </td>
                 </tr>
               ) : (
-                activityLogs.map((log, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-[#151a2a] transition-colors">
-                    <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 whitespace-nowrap">{log.date}</td>
-                    <td className="py-3 border-b border-gray-50 dark:border-slate-700/40">
-                      <div className="flex items-center gap-1.5">
-                        {log.status === 'Success' ? (
-                          <CheckCircleIcon className="text-[#2e7d32] !text-lg" />
-                        ) : (
-                          <CancelIcon className="text-[#d32f2f] !text-lg" />
-                        )}
-                        <span className={`font-medium ${log.status === 'Success' ? 'text-green-700' : 'text-red-700'}`}>
-                          {log.status}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 text-gray-600 dark:text-slate-400">{log.message}</td>
-                  </tr>
-                ))
+                // We compare the 'started_at' strings directly.
+                [...activityLogs]
+                  .sort((a, b) => {
+                    // If both are '—' or Unknown, keep them in original order
+                    if (a.started_at === '—' && b.started_at === '—') return 0;
+                    // If A is unknown, push it down (B comes first)
+                    if (a.started_at === '—') return 1;
+                    // If B is unknown, push it down (A comes first)
+                    if (b.started_at === '—') return -1;
+                    // Otherwise, compare the strings (ISO format ensures correct chronological order)
+                    return b.started_at.localeCompare(a.started_at);
+                  })
+                  .map((log, idx) => {
+                    const statusColor = getOverallStatusColor(log.status);
+                    const statusIcon = getOverallStatusIcon(log.status);
+
+                    return (
+                      <React.Fragment key={idx}>
+                        <tr 
+                          className="hover:bg-slate-50 dark:hover:bg-[#151a2a] transition-colors cursor-pointer"
+                          onClick={() => toggleRow(idx)}
+                        >
+                          {/* Start & End Dates */}
+                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-gray-600 dark:text-gray-300 font-semibold whitespace-nowrap">
+                                {displayDate(log.started_at)}
+                              </span>
+                            </div>
+                          </td>
+                          
+                          {/* Status */}
+                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center">
+                            <div className="flex items-center gap-1.5 whitespace-nowrap">
+                              {statusIcon}
+                              <span className={`font-medium ${statusColor}`}>
+                                {log.status}
+                              </span>
+                            </div>
+                          </td>
+                          
+                          {/* Progress */}
+                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center">
+                            <div className="flex items-center gap-2">
+                              <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div 
+                                  className={`h-2 rounded-full transition-all duration-500 ${
+                                    log.status === 'Success' ? 'bg-green-500' : 
+                                    log.status === 'Failed' ? 'bg-red-500' : 'bg-blue-500'
+                                  }`}
+                                  style={{ width: `${log.progress || 0}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-gray-500">{log.progress || 0}%</span>
+                            </div>
+                          </td>
+                          
+                          {/* Steps */}
+                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {log.steps && log.steps.map((step, i) => {
+                                const display = getStepStatusDisplay(step.status);
+                                return (
+                                  <div key={i} className="flex items-center gap-1 bg-gray-50 border border-gray-400 dark:bg-slate-800/50 px-1.5 py-0.5 rounded-full">
+                                    {display.icon}
+                                    <span className="text-[11px] text-gray-600 dark:text-slate-400 font-medium hidden sm:inline">
+                                      {step.label.split(' ')[0]}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </td>
+                          
+                          {/* Message */}
+                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-gray-600 dark:text-gray-300 font-semibold whitespace-nowrap">
+                                {displayDate(log.ended_at)}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      </React.Fragment>
+                    );
+                  })
               )}
             </tbody>
           </table>
         </div>
       </SectionCard>
-      )}
 
       {/* Snackbar / Alert */}
       {snack.open && (

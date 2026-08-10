@@ -9,6 +9,7 @@ const feedInfoSchema = new mongoose.Schema({
   shopify_name:        { type: String, default: '' },
   shopify_accesstoken: { type: String, default: '' },
   cms_upload_type:     { type: String, enum: ['none', 'shopify', 'wordpress'], default: 'none' },
+  modified_on:         { type: String, default: ''}
 }, { _id: false });
 
 const merchantSchema = new mongoose.Schema({
