@@ -1476,7 +1476,7 @@ function SidebarProduct({ product, isSelected, onClick }) {
 
 // ─── Export Logic ───────────────────────────────────────────────────────────
 
-function exportSmartReportCSV(products, tab, competitorMeta, exportType = "A") {
+{/* function exportSmartReportCSV(products, tab, competitorMeta, exportType = "A") {
   const escape = (val) => {
     const s = String(val ?? "");
     return s.includes(",") || s.includes('"') || s.includes("\n")
@@ -1486,7 +1486,7 @@ function exportSmartReportCSV(products, tab, competitorMeta, exportType = "A") {
   const fmtNum = (v) => (v !== null && v !== undefined ? v : "");
   const isNonComp = tab === "Non Competitors";
   const gapColName = tab === "Negative Trend" ? "Higher By" : "Cheaper By";
-  const storePriceLabel = exportType === "B" ? "Mrp Price" : "Store Price";
+  const storePriceLabel = exportType === "A" ? "Mrp Price" : "Store Price";
 
   const triggerDownload = (csv) => {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -1634,6 +1634,375 @@ function exportSmartReportCSV(products, tab, competitorMeta, exportType = "A") {
   });
 
   triggerDownload([headers.map(escape).join(","), ...rows].join("\r\n"));
+} */}
+
+function exportSmartReportCSV(
+  products,
+  tab,
+  competitorMeta,
+  exportType = "A"
+) {
+  const escape = (val) => {
+    const s = String(val ?? "");
+
+    return s.includes(",") ||
+      s.includes('"') ||
+      s.includes("\n")
+      ? `"${s.replace(/"/g, '""')}"`
+      : s;
+  };
+
+  const fmtNum = (v) =>
+    v !== null && v !== undefined ? v : "";
+
+  const isNonComp = tab === "Non Competitors";
+
+  const gapColName =
+    tab === "Negative Trend"
+      ? "Higher By"
+      : "Cheaper By";
+
+  const storePriceLabel =
+    exportType === "A"
+      ? "Mrp Price"
+      : "Store Price";
+
+  const triggerDownload = (csv) => {
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8;"
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+
+    a.download =
+      `smart_report_${tab
+        .toLowerCase()
+        .replace(/\s+/g, "_")}_${new Date()
+        .toISOString()
+        .slice(0, 10)}.csv`;
+
+    document.body.appendChild(a);
+    a.click();
+
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
+  };
+
+
+  // =====================================================
+  // EXPORT TYPE C
+  // =====================================================
+
+  if (exportType === "C") {
+
+    const headers = [
+      "Product Name",
+      "Ean Number",
+      "Item Code",
+      "Ranking Position",
+      "Competing With",
+      "Price",
+      "SAP Price",
+      "STORE Price",
+      "Item Groups",
+      "Competitor Prices",
+      "Competitor Name",
+    ];
+
+    const rows = [];
+
+    products.forEach((p) => {
+
+      const competitors = (p.competitor_prices || [])
+        .filter((c) => c.is_listed);
+
+      competitors.forEach((c) => {
+
+        const competitorMetaData =
+          competitorMeta?.[c.slug] || {};
+
+        const competitorName =
+          competitorMetaData.name ||
+          c.name ||
+          c.slug ||
+          "";
+
+        const competitorPrice =
+          isCompetitorOos(c)
+            ? "Out Of Stock"
+            : (c.price ?? "");
+
+        rows.push([
+
+
+          p.product_name || "",
+          p.product_ean_id || "",
+          p.product_code || "",
+          p.rank_by || "",
+          p.user_notification_data?.Competing_with ?? "",
+          p.product_price ?? "",
+          p.product_sap_price ?? "",
+          p.product_store_price ?? "",
+
+          p.product_category
+            ? p.product_category
+                .split(">")[0]
+                .trim()
+            : "",
+
+          competitorPrice,
+
+          competitorName,
+        ]
+          .map(escape)
+          .join(","));
+      });
+    });
+
+    triggerDownload([
+      headers.map(escape).join(","),
+      ...rows,
+    ].join("\r\n"));
+
+    return;
+  }
+
+
+  // =====================================================
+  // TYPE B SLUG MAP
+  // =====================================================
+
+  let slugMap = {};
+
+  if (exportType === "B" && !isNonComp) {
+    slugMap =
+      buildProductsTypeBSlugMap(
+        products,
+        competitorMeta
+      );
+  }
+
+  const bSlugs = Object.keys(slugMap);
+
+
+  // =====================================================
+  // HEADERS
+  // =====================================================
+
+  const headers = isNonComp
+    ? [
+        "Product Name",
+        "Item Code",
+        "Price",
+        "Sap Price",
+        storePriceLabel,
+        "Brand",
+        "Item Groups",
+        "Market Low (30d)",
+        "Market Avg (30d)",
+        "Market High (30d)",
+        "Stock",
+      ]
+    : exportType === "B"
+    ? [
+        "Product Name",
+        "Item Code",
+        "Ranking Position",
+        "Price",
+        "Sap Price",
+        storePriceLabel,
+        gapColName,
+        "Competitor Name",
+        "Competitor Price",
+        "Brand",
+        "Item Groups",
+        "Stock",
+        ...bSlugs.map((s) => slugMap[s]),
+      ]
+    : [
+        "Product Name",
+        "Item Code",
+        "Ranking Position",
+        "Price",
+        "Sap Price",
+        storePriceLabel,
+        gapColName,
+        "Competitor Name",
+        "Competitor Price",
+        "Brand",
+        "Item Groups",
+        "Competitor Detail",
+        "Stock",
+      ];
+
+
+  // =====================================================
+  // ROWS
+  // =====================================================
+
+  const rows = products.map((p) => {
+
+    const ourPrice = parsePrice(
+      p.product_price
+    );
+
+    const rank = computeRank(p);
+
+    const comps = getCompPrices(p);
+
+    const rankTotal =
+      comps.length + 1;
+
+    const lowest = comps.length
+      ? comps.reduce(
+          (min, c) =>
+            c.price < min.price ? c : min
+        )
+      : null;
+
+    const lowestMeta =
+      lowest
+        ? competitorMeta?.[lowest.slug] || {}
+        : {};
+
+    const lowestName = lowest
+      ? lowestMeta.name ||
+        lowest.name ||
+        lowest.slug
+      : "";
+
+    const pGroup = p.product_category
+      ? p.product_category
+          .split(">")[0]
+          .trim()
+      : "";
+
+    const sap = fmtNum(
+      parsePrice(
+        p.product_sap_price
+      )
+    );
+
+    const store = fmtNum(
+      parsePrice(
+        p.product_store_price
+      )
+    );
+
+    let gapAmount = "";
+
+    if (
+      lowest &&
+      ourPrice !== null
+    ) {
+      gapAmount =
+        tab === "Negative Trend"
+          ? ourPrice - lowest.price
+          : lowest.price - ourPrice;
+    }
+
+    const {
+      low,
+      avg,
+      high
+    } = isNonComp
+      ? marketStats(p)
+      : {};
+
+    let row;
+
+    if (isNonComp) {
+
+      row = [
+        p.product_name || "",
+        p.product_ean_id ||
+          p.product_code ||
+          "",
+        fmtNum(ourPrice),
+        sap,
+        store,
+        p.product_brand || "",
+        pGroup,
+        fmtNum(low),
+        fmtNum(avg),
+        fmtNum(high),
+        p.product_stock ?? "",
+      ];
+
+    } else if (exportType === "B") {
+
+      const compMap =
+        buildProductsTypeBCompetitorMap(p);
+
+      row = [
+        p.product_name || "",
+        p.product_ean_id ||
+          p.product_code ||
+          "",
+
+        rank !== null
+          ? `="${rank}/${rankTotal}"`
+          : "",
+
+        fmtNum(ourPrice),
+        sap,
+        store,
+        fmtNum(gapAmount),
+        lowestName,
+        fmtNum(lowest?.price),
+        p.product_brand || "",
+        pGroup,
+        p.product_stock ?? "",
+
+        ...bSlugs.map(
+          (s) =>
+            compMap[s] ??
+            "Out Of Stock"
+        ),
+      ];
+
+    } else {
+
+      const compDetail =
+        buildProductsTypeACompetitorDetail(p);
+
+      row = [
+        p.product_name || "",
+        p.product_ean_id ||
+          p.product_code ||
+          "",
+
+        rank !== null
+          ? `="${rank}/${rankTotal}"`
+          : "",
+
+        fmtNum(ourPrice),
+        sap,
+        store,
+        fmtNum(gapAmount),
+        lowestName,
+        fmtNum(lowest?.price),
+        p.product_brand || "",
+        pGroup,
+        compDetail,
+        p.product_stock ?? "",
+      ];
+    }
+
+    return row
+      .map(escape)
+      .join(",");
+  });
+
+
+  triggerDownload([
+    headers.map(escape).join(","),
+    ...rows,
+  ].join("\r\n"));
 }
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────

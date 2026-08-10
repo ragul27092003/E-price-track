@@ -1178,7 +1178,7 @@ function exportToCSV(products, exportType = "A", competitorMeta = {}) {
       "Competing With",
       "Price",
       "SAP Price",
-      "Mrp Price",
+      "STORE Price",
       "Item Groups",
       "Competitor Prices",
       "Competitor Name",

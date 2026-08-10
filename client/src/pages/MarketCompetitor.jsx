@@ -147,6 +147,7 @@ function exportToCSV(products, exportType = "A", competitorMeta = {}) {
     const slugs = Object.keys(slugMap);
     const headers = [
       "Product Name",
+      "Ean Number",
       "Item Code",
       "Ranking Position",
       "Competing With",
@@ -165,8 +166,9 @@ function exportToCSV(products, exportType = "A", competitorMeta = {}) {
         });
       return [
         p.product_name || "",
-        p.product_code || p.product_ean_id || "",
-        p.user_notification_data?.rank_pos || p.rank_by || "",
+        p.product_ean_id || "",
+        p.product_code || "",
+        p.rank_by || "",
         p.user_notification_data?.Competing_with ?? "",
         p.product_price ?? "",
         p.product_sap_price ?? "",
@@ -181,8 +183,71 @@ function exportToCSV(products, exportType = "A", competitorMeta = {}) {
     return;
   }
 
+
+  if (exportType === "C") {
+
+    const headers = [
+      "Product Name",
+      "Ean Number",
+      "Item Code",
+      "Ranking Position",
+      "Competing With",
+      "Price",
+      "SAP Price",
+      "STORE Price",
+      "Item Groups",
+      "Competitor Prices",
+      "Competitor Name",
+    ];
+
+    const rows = [];
+
+    products.forEach((p) => {
+
+      (p.competitor_prices || [])
+        .filter((c) => c.is_listed)
+        .forEach((c) => {
+
+          const isOOS = isCompetitorOos(c);
+          const competitorPrice = isOOS
+            ? "Out Of Stock"
+            : (c.price ?? "");
+            
+          const competitorName =
+            competitorMeta?.[c.slug]?.name ||
+            c.name ||
+            c.slug ||
+            "";
+
+          rows.push([
+            p.product_name || "",
+            p.product_ean_id || "",
+            p.product_code || "",
+            p.rank_by || "",
+            p.user_notification_data?.Competing_with ?? "",
+            p.product_price ?? "",
+            p.product_sap_price ?? "",
+            p.product_store_price ?? "",
+            p.product_item_group || p.product_category || "",
+            competitorPrice,
+            competitorName,
+          ]
+            .map(escape)
+            .join(","));
+        });
+    });
+
+    triggerDownload([
+      headers.map(escape).join(","),
+      ...rows,
+    ].join("\r\n"));
+
+    return;
+  }
+
   const headers = [
     "Product Name",
+    "Ean Number",
     "Item Code",
     "Ranking Position",
     "Competing With",
@@ -204,8 +269,9 @@ function exportToCSV(products, exportType = "A", competitorMeta = {}) {
       .join(", ");
     return [
       p.product_name || "",
-      p.product_code || p.product_ean_id || "",
-      p.user_notification_data?.rank_pos || p.rank_by || "",
+      p.product_ean_id || "",
+      p.product_code || "",
+      p.rank_by || "",
       p.user_notification_data?.Competing_with ?? "",
       p.product_price ?? "",
       p.product_sap_price ?? "",
