@@ -69,18 +69,144 @@ exports.getBrandAnalytics = async (req, res) => {
 // ─── GET /api/dashboard/sap-status ───────────────────────────────────────────
 exports.getSapUpdateStatus = async (req, res) => {
   try {
-    const docs = await req.tenantDb
-      .collection('ept_sap_data_update_status')
+    const collection = req.tenantDb.collection(
+      'ept_sap_data_update_status'
+    );
+
+    // Get latest active record
+    const latestDocs = await collection
       .find({ status: 'active' })
       .sort({ _id: -1 })
       .limit(1)
       .toArray();
 
-    if (!docs.length) return res.json({ var_end_time: null });
-    res.json({ var_end_time: docs[0].var_end_time || null });
+    if (!latestDocs.length) {
+      return res.json({
+        var_end_time: null,
+        isRunning: false,
+        steps: {},
+        completedSteps: []
+      });
+    }
+
+    const latest = latestDocs[0];
+
+    // Normalize status values
+    const productStatus =
+      (latest.product_update_status || 'queue').toLowerCase();
+
+    const rankStatus =
+      (latest.rank_update_status || 'queue').toLowerCase();
+
+    const priceNotificationStatus =
+      (latest.price_notification_update_status || 'queue').toLowerCase();
+
+    const dashboardStatus =
+      (latest.dashboard_update_status || 'queue').toLowerCase();
+
+    // Check whether all steps are completed
+    const allSuccess =
+      productStatus === 'success' &&
+      rankStatus === 'success' &&
+      priceNotificationStatus === 'success' &&
+      dashboardStatus === 'success';
+
+    // Check running status
+    const isRunning =
+      productStatus === 'queue' ||
+      productStatus === 'process' ||
+      rankStatus === 'queue' ||
+      rankStatus === 'process' ||
+      priceNotificationStatus === 'queue' ||
+      priceNotificationStatus === 'process' ||
+      dashboardStatus === 'queue' ||
+      dashboardStatus === 'process';
+
+    // Steps which are already successful
+    const completedSteps = [];
+
+    if (productStatus === 'success') {
+      completedSteps.push('Product Update');
+    }
+
+    if (rankStatus === 'success') {
+      completedSteps.push('Rank Update');
+    }
+
+    if (priceNotificationStatus === 'success') {
+      completedSteps.push('Price Notification');
+    }
+
+    if (dashboardStatus === 'success') {
+      completedSteps.push('Dashboard Update');
+    }
+
+    let endTime = null;
+
+    /*
+    * If latest record is completely successful,
+    * use its own end time.
+    */
+    if (allSuccess && latest.var_end_time) {
+
+      endTime = latest.var_end_time;
+
+    } else {
+
+      /*
+      * Latest record is still running / incomplete.
+      *
+      * Find the latest previous active record
+      * which has a valid var_end_time.
+      */
+      const previousCompleted = await collection
+        .find({
+          status: 'active',
+          _id: { $lt: latest._id },
+          var_end_time: {
+            $exists: true,
+            $nin: ['', null]
+          }
+        })
+        .sort({ _id: -1 })
+        .limit(1)
+        .toArray();
+
+      if (previousCompleted.length) {
+        endTime = previousCompleted[0].var_end_time;
+      }
+    }
+
+    return res.json({
+      var_end_time: endTime,
+
+      // true if any step is queue/process
+      isRunning: isRunning,
+
+      // Latest record's current step status
+      steps: {
+        product: productStatus,
+        rank: rankStatus,
+        price_notification: priceNotificationStatus,
+        dashboard: dashboardStatus
+      },
+
+      // Steps completed successfully in latest record
+      completedSteps: completedSteps,
+
+      // Whether latest record itself is fully completed
+      isComplete: allSuccess
+    });
+
   } catch (err) {
-    console.error('dashboardController.getSapUpdateStatus error:', err);
-    res.status(500).json({ message: err.message });
+    console.error(
+      'dashboardController.getSapUpdateStatus error:',
+      err
+    );
+
+    res.status(500).json({
+      message: err.message
+    });
   }
 };
 
