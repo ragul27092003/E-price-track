@@ -170,7 +170,7 @@ exports.getActivityLog = async (req, res) => {
       .collection('ept_sap_data_update_status')
       .find({})
       .sort({ created_date: -1 })
-      .limit(20)
+      .limit(40)
       .toArray();
 
     const logs = sapDocs.map((doc) => {
