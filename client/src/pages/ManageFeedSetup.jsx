@@ -706,7 +706,7 @@ const ManageFeedSetup = () => {
                                 return (
                                   <div key={i} className="flex items-center gap-1 bg-gray-50 border border-gray-400 dark:bg-slate-800/50 px-1.5 py-0.5 rounded-full">
                                     {display.icon}
-                                    <span className="text-[11px] text-gray-600 dark:text-slate-400 font-medium hidden sm:inline">
+                                    <span className="text-[11px] text-gray-600 dark:text-slate-400 font-medium">
                                       {step.label.split(' ')[0]}
                                     </span>
                                   </div>
