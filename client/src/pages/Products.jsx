@@ -15,6 +15,7 @@ import API from "../hooks/useApi";
 import { Rss, Globe } from "lucide-react";
 import Swal from "sweetalert2";
 import CompetitorMeta from "../components/CompetitorMeta";
+import SingleProductUpdation from "../components/SingleProductUpdation";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -627,6 +628,17 @@ function CompetitorPrices({ product, competitorMeta, onShowHistory }) {
                 reviewCount={c.product_review ?? c.reviewCount ?? c.review_count}
               />
             </div>
+            
+            <div className="flex items-center shrink-0 whitespace-nowrap">
+                <SingleProductUpdation
+                   product_ean_id ={ product.product_ean_id }
+                   product_code ={ product.product_code }
+                   product_name ={ product.product_name }
+                   comp_name ={ c.name }
+                   cmpid = { localStorage.getItem("activeShopName")}
+                />
+            </div>
+
           </div>
         );
       })}
