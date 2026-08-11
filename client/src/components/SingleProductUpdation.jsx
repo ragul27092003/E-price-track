@@ -43,10 +43,11 @@ const SingleProductUpdation = ({ product_ean_id, product_code, product_name, com
 
       // Make API call to update product
       const response = await axios.get(updateUrl);
-      const updatedData = response.data;
-
+      const updatedData = response.data.data[0];
+    
       // Check the updated product status
-      if (updatedData?.product_price === "No Result" && updatedData?.product_stock === "No Result") {
+
+      {/* if (updatedData?.product_price === "No Result" && updatedData?.product_stock === "No Result") {
         // Product not available
         await Swal.fire({
           icon: 'error',
@@ -84,7 +85,126 @@ const SingleProductUpdation = ({ product_ean_id, product_code, product_name, com
           `,
           confirmButtonColor: '#3085d6'
         });
-      }
+      } */}
+
+      if (updatedData?.product_price === "No Result" && updatedData?.product_stock === "No Result") {
+  // Product not available
+  await Swal.fire({
+    icon: 'error',
+    title: '🚫 Product Not Available',
+    text: 'Product is not available on the website',
+    confirmButtonColor: '#3085d6',
+    confirmButtonText: 'Got it',
+    background: '#fff5f5',
+    heightAuto: false,
+    padding: '1.5rem'
+  });
+} else if (updatedData?.product_price === "No Result" || updatedData?.product_stock === "No Result") {
+  // Partial data available
+  await Swal.fire({
+    icon: 'warning',
+    title: '⚠️ Partial Data',
+    html: `
+      <div style="padding: 5px 0;">
+        <!-- Product Name - Compact -->
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 8px 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; color: white;">
+          <span style="font-size: 20px;">📦</span>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 11px; opacity: 0.8;">Product</div>
+            <div style="font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${product_name || 'N/A'}</div>
+          </div>
+        </div>
+        
+        <!-- Price & Stock - Compact Grid -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-height: 90px;">
+          <div style="padding: 10px; background: ${updatedData?.product_price === "No Result" ? '#fee2e2' : '#f0fdf4'}; border-radius: 8px; border-left: 3px solid ${updatedData?.product_price === "No Result" ? '#ef4444' : '#22c55e'};">
+            <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #6b7280;">
+              <span>💰</span> Price
+            </div>
+            <div style="font-size: 18px; font-weight: 700; color: ${updatedData?.product_price === "No Result" ? '#ef4444' : '#22c55e'};">
+              ${updatedData?.product_price === "No Result" ? '❌' : '₹' + updatedData?.product_price}
+            </div>
+          </div>
+          
+          <div style="padding: 10px; background: ${updatedData?.product_stock === "No Result" ? '#fee2e2' : '#f0fdf4'}; border-radius: 8px; border-left: 3px solid ${updatedData?.product_stock === "No Result" ? '#ef4444' : '#22c55e'};">
+            <div style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #6b7280;">
+              <span>📊</span> Stock
+            </div>
+            <div style="font-size: 18px; font-weight: 700; color: ${updatedData?.product_stock === "No Result" ? '#ef4444' : '#22c55e'};">
+              ${updatedData?.product_stock === "No Result" ? '❌' : updatedData?.product_stock}
+            </div>
+          </div>
+        </div>
+        
+        <!-- Updated Date - Compact -->
+        <div style="margin-top: 10px; padding: 6px 10px; background: #f3f4f6; border-radius: 6px; font-size: 12px; color: #6b7280; text-align: center;">
+          ⏱️ ${updatedData?.modified_date || 'N/A'}
+        </div>
+      </div>
+    `,
+    confirmButtonColor: '#667eea',
+    confirmButtonText: 'Update',
+    showCancelButton: true,
+    cancelButtonColor: '#d33',
+    cancelButtonText: 'Cancel',
+    heightAuto: false,
+    padding: '1.5rem'
+  });
+} else {
+  // Product updated successfully with full data
+  await Swal.fire({
+    icon: 'success',
+    title: '✅ Updated!',
+    html: `
+      <div style="padding: 5px 0;">
+        <!-- Product Header - Compact -->
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 8px 12px; background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); border-radius: 8px; color: white;">
+          <span style="font-size: 20px;">🎉</span>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 11px; opacity: 0.8;">Product Name</div>
+            <div style="font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${product_name || 'N/A'}</div>
+          </div>
+        </div>
+        
+        <!-- Price & Stock Cards - Compact -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-height: 100px;">
+          <div style="padding: 10px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 10px; border: 2px solid #22c55e; text-align: center;">
+            <div style="font-size: 11px; font-weight: 600; color: #16a34a;">💰 PRICE</div>
+            <div style="font-size: 22px; font-weight: 700; color: #16a34a;">₹${updatedData?.product_price || 'N/A'}</div>
+            <div style="font-size: 10px; color: #22c55e;">✓ Available</div>
+          </div>
+          
+          <div style="padding: 10px; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius: 10px; border: 2px solid #3b82f6; text-align: center;">
+            <div style="font-size: 11px; font-weight: 600; color: #2563eb;">📦 STOCK</div>
+            <div style="font-size: 22px; font-weight: 700; color: #2563eb;">${updatedData?.product_stock || 'N/A'}</div>
+            <div style="font-size: 10px; color: #3b82f6;">✓ In Stock</div>
+          </div>
+        </div>
+        
+        <!-- Footer Info - Compact -->
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding: 6px 10px; background: #f8fafc; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 11px;">
+          <span style="color: #475569;">🔄 Updated</span>
+          <span style="font-weight: 600; color: #0f172a;">${updatedData?.modified_date || 'N/A'}</span>
+        </div>
+        
+        <div style="margin-top: 8px; padding: 4px; background: #f0fdf4; border-radius: 4px; text-align: center; font-size: 11px; color: #166534;">
+          ✨ Synced successfully
+        </div>
+      </div>
+    `,
+    confirmButtonColor: '#22c55e',
+    confirmButtonText: '👍 Great',
+    showCancelButton: true,
+    cancelButtonColor: '#64748b',
+    cancelButtonText: 'Close',
+    heightAuto: false,
+    padding: '1.5rem',
+    width: 450
+  });
+}
+       
+
+      
 
     } catch (error) {
       console.error('Error updating product:', error);
