@@ -494,6 +494,9 @@ function CompetitorPrices({ product, competitorMeta, onShowHistory }) {
     return 0;
   });
 
+  const storedData = JSON.parse(localStorage.getItem("eprice-store"));
+  const isSuperAdmin = storedData?.state.user?.user_type === "super_admin";
+
   return (
     <div className="flex flex-col gap-2.5 w-full">
       {sorted.map((c) => {
@@ -629,15 +632,19 @@ function CompetitorPrices({ product, competitorMeta, onShowHistory }) {
               />
             </div>
             
-            <div className="flex items-center shrink-0 whitespace-nowrap">
-                <SingleProductUpdation
-                   product_ean_id ={ product.product_ean_id }
-                   product_code ={ product.product_code }
-                   product_name ={ product.product_name }
-                   comp_name ={ c.name }
-                   cmpid = { localStorage.getItem("activeShopName")}
-                />
-            </div>
+            {isSuperAdmin && (
+            
+              <div className="flex items-center shrink-0 whitespace-nowrap">
+                  <SingleProductUpdation
+                    product_ean_id ={ product.product_ean_id }
+                    product_code ={ product.product_code }
+                    product_name ={ product.product_name }
+                    comp_name ={ c.name }
+                    cmpid = { localStorage.getItem("activeShopName")}
+                  />
+              </div>
+
+            )}
 
           </div>
         );
