@@ -67,6 +67,7 @@ const ProductMapping = () => {
   };
 
   const loadProducts = async (
+    
     pageNo = 1,
     searchText = "",
     searchBrand = "",
@@ -431,7 +432,7 @@ const ProductMapping = () => {
                                     className="h-10 w-10 shrink-0 rounded-lg border border-slate-100 dark:border-slate-700/50 object-contain shadow-sm bg-slate-50 dark:bg-[#151a2a]"
                                     onError={(e) => {
                                       e.target.onerror = null;
-                                      e.target.src = "./assets/no-image-rounded.png";
+                                      e.target.src = "/assets/no-image-rounded.png";
                                     }}
                                   />
                                 </a>
@@ -531,7 +532,7 @@ const ProductMapping = () => {
                       className="w-24 h-24 object-contain mx-auto border rounded-lg bg-white p-2"
                       onError={(e) => {
                         e.target.onerror = null;
-                        e.target.src = "./assets/no-image.png";
+                        e.target.src = "/assets/no-image.png";
                       }}
                     />
 

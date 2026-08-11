@@ -29,7 +29,7 @@ const SingleProductUpdation = ({ product_ean_id, product_code, product_name, com
 
     try {
       // Construct the URL with product details
-      const updateUrl = `${import.meta.env.VITE_CRON_DOMAIN}/${comp_name}?cmpid=plm_user_info_${cmpid}&ean=${product_ean_id || ''}&itemcode=${product_code || ''}`;
+      const updateUrl = `${import.meta.env.VITE_SCRAPE_DOMAIN}/${comp_name}?cmpid=plm_user_info_${cmpid}&ean=${product_ean_id || ''}&itemcode=${product_code || ''}`;
 
       // Show loading state
       Swal.fire({

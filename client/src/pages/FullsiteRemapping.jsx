@@ -527,7 +527,7 @@ const FullsiteRemapping = () => {
                                     className="border rounded p-1 bg-white w-16 h-16 object-contain mx-auto"
                                     alt="Store"
                                     onError={(e) => {
-                                      e.target.src = "./assets/no-image.png";
+                                      e.target.src = "/assets/no-image.png";
                                     }}
                                     
                                   />

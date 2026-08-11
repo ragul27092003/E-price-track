@@ -22,7 +22,17 @@ function hammingDistance(str1, str2) {
 }
 
 async function compareImages(img1, img2) {
+
   try {
+
+    if (!img1 || !img2) {
+      return {
+        similarity: 0,
+        status: "mismatch",
+        message: "Both images are required",
+      };
+    }
+
     const hash1 = await getHash(img1);
     const hash2 = await getHash(img2);
 
