@@ -72,8 +72,7 @@ const ManageFeedSetup = () => {
     import_time: '12:00 PM',
   });
 
-  const feedcronlink = `${import.meta.env.VITE_CRON_DOMAIN}cron/cron_upload_sathya_json_products.php?cmpid=${formData.store_name}`;
-  console.log(feedcronlink);
+  const feedcronlink = `${import.meta.env.VITE_CRON_DOMAIN}/eprice/admin/cron/cron_upload_sathya_json_products.php?cmpid=${formData.store_name}`;
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -112,7 +111,6 @@ const ManageFeedSetup = () => {
     setLogsLoading(true);
     try {
       const res = await API.get('/feeds/activity-log');
-      console.log('🟢 API Logs Response:', res.data);
       const logs = res.data?.logs || [];
       setActivityLogs(logs);
       // Check if there's a running cron job
@@ -214,7 +212,6 @@ const ManageFeedSetup = () => {
         mode: 'no-cors',
         cache: 'no-cache'
       });
-      console.log('✅ Background link executed successfully');
     } catch (error) {
       console.error('❌ Failed to run background link:', error);
       showSnack('Failed to trigger sync, but logs will be refreshed', 'error');
@@ -268,46 +265,58 @@ const ManageFeedSetup = () => {
     }
   };
   
-    // Get step status display (UPDATED to use !text-lg)
-    const getStepStatusDisplay = (status) => {
-      const config = STEP_STATUS[status] || STEP_STATUS.queue;
-      const Icon = config.icon;
-      return {
-        icon: <Icon className={`!text-lg ${config.textColor}`} />,
-        color: config.color,
-        textColor: config.textColor,
-        label: config.label
-      };
+  // Get step status display (UPDATED to use !text-lg)
+  const getStepStatusDisplay = (status) => {
+    const config = STEP_STATUS[status] || STEP_STATUS.queue;
+    const Icon = config.icon;
+    return {
+      icon: <Icon className={`!text-lg ${config.textColor}`} />,
+      color: config.color,
+      textColor: config.textColor,
+      label: config.label
     };
-  
-    // Get overall status icon
-    const getOverallStatusIcon = (status) => {
-      if (status === 'Success') {
-        return <CheckCircleIcon className="text-[#2e7d32] !text-lg" />;
-      } else if (status === 'Failed') {
-        return <CancelIcon className="text-[#d32f2f] !text-lg" />;
-      } else if (status === 'Processing') {
-        return <PlayCircleIcon className="text-[#1976d2] !text-lg animate-pulse" />;
-      } else {
-        return <HourglassEmptyIcon className="text-gray-400 !text-lg" />;
-      }
-    };
-  
-    // Get overall status color
-    const getOverallStatusColor = (status) => {
-      if (status === 'Success') return 'text-green-700';
-      if (status === 'Failed') return 'text-red-700';
-      if (status === 'Processing') return 'text-blue-700';
-      return 'text-gray-500';
-    };
-  
-    // Helper to safely display a date (MUST BE SAFE FOR EMPTY STRINGS)
-    const displayDate = (dateStr) => {
-      if (!dateStr || dateStr === '—' || dateStr === 'Invalid Date') {
-        return <span className="text-gray-400 italic">Processing</span>;
-      }
-      return dateStr;
-    };
+  };
+
+  // Get overall status icon
+  const getOverallStatusIcon = (status) => {
+    if (status === 'Success') {
+      return <CheckCircleIcon className="text-[#2e7d32] !text-lg" />;
+    } else if (status === 'Failed') {
+      return <CancelIcon className="text-[#d32f2f] !text-lg" />;
+    } else if (status === 'Processing') {
+      return <PlayCircleIcon className="text-[#1976d2] !text-lg animate-pulse" />;
+    } else {
+      return <HourglassEmptyIcon className="text-gray-400 !text-lg" />;
+    }
+  };
+
+  // Get overall status color
+  const getOverallStatusColor = (status) => {
+    if (status === 'Success') return 'text-green-700';
+    if (status === 'Failed') return 'text-red-700';
+    if (status === 'Processing') return 'text-blue-700';
+    return 'text-gray-500';
+  };
+
+  // Helper to safely display a date (MUST BE SAFE FOR EMPTY STRINGS)
+  const displayDate = (dateStr) => {
+    if (!dateStr || dateStr === '—' || dateStr === 'Invalid Date') {
+      return <span className="text-gray-400 italic">Processing</span>;
+    }
+    return dateStr;
+  };
+
+  const isToday = (dateString) => {
+    if (!dateString || dateString === '—') return false;
+
+    const today = new Date();
+
+    const todayDate = `${today.getFullYear()}-${String(
+      today.getMonth() + 1
+    ).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    return dateString.startsWith(todayDate);
+  };
 
   // Shared card shell so every section reads as a distinct, self-contained block
   const SectionCard = ({ children, className = '' }) => (
@@ -617,14 +626,14 @@ const ManageFeedSetup = () => {
         </div>
 
         <div className="overflow-x-auto overflow-y-auto max-h-[400px] border-t border-gray-100 dark:border-slate-700/60 scrollbar-hide">
-          <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 bg-white dark:bg-[#0f1420] z-10">
-              <tr className="text-gray-700 dark:text-slate-400 text-xs uppercase font-bold">
-                <th className="py-3 border-b border-gray-100 dark:border-slate-700/60 whitespace-nowrap w-1/4">Start Time</th>
-                <th className="py-3 border-b border-gray-100 dark:border-slate-700/60 whitespace-nowrap">Status</th>
-                <th className="py-3 border-b border-gray-100 dark:border-slate-700/60 whitespace-nowrap">Progress</th>
-                <th className="py-3 border-b border-gray-100 dark:border-slate-700/60 whitespace-nowrap">Steps</th>
-                <th className="py-3 border-b border-gray-100 dark:border-slate-700/60 whitespace-nowrap w-1/4">End Time</th>
+          <table className="w-full table-fixed text-left border-collapse">
+            <thead className="sticky top-0 bg-teal-600 dark:bg-[#0f1420] z-10">
+              <tr className="text-white dark:text-slate-400 text-xs uppercase font-bold">
+                <th className="w-[20%] py-3 border-none whitespace-nowrap px-[10px]">Start Time</th>
+                <th className="w-[13%] py-3 border-none whitespace-nowrap px-[10px]">Status</th>
+                <th className="w-[17%] py-3 border-none whitespace-nowrap px-[10px]">Progress</th>
+                <th className="w-[34%] py-3 border-none whitespace-nowrap px-[10px]">Steps</th>
+                <th className="w-[16%] py-3 border-none whitespace-nowrap px-[10px]">End Time</th>
               </tr>
             </thead>
             <tbody className="text-sm">
@@ -659,12 +668,13 @@ const ManageFeedSetup = () => {
 
                     return (
                       <React.Fragment key={idx}>
-                        <tr 
-                          className="hover:bg-slate-50 dark:hover:bg-[#151a2a] transition-colors cursor-pointer"
-                          onClick={() => toggleRow(idx)}
-                        >
+                        <tr className={`${
+                            isToday(log.started_at)
+                              ? 'bg-teal-100/20 dark:bg-red-950/20'
+                              : 'hover:bg-slate-50 dark:hover:bg-[#151a2a]'
+                          }`}>
                           {/* Start & End Dates */}
-                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center">
+                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center px-[10px]">
                             <div className="flex flex-col gap-0.5">
                               <span className="text-gray-600 dark:text-gray-300 font-semibold whitespace-nowrap">
                                 {displayDate(log.started_at)}
@@ -673,7 +683,7 @@ const ManageFeedSetup = () => {
                           </td>
                           
                           {/* Status */}
-                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center">
+                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center px-[10px]">
                             <div className="flex items-center gap-1.5 whitespace-nowrap">
                               {statusIcon}
                               <span className={`font-medium ${statusColor}`}>
@@ -683,7 +693,7 @@ const ManageFeedSetup = () => {
                           </td>
                           
                           {/* Progress */}
-                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center">
+                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center px-[10px]">
                             <div className="flex items-center gap-2">
                               <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                 <div 
@@ -699,7 +709,7 @@ const ManageFeedSetup = () => {
                           </td>
                           
                           {/* Steps */}
-                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center">
+                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center px-[10px]">
                             <div className="flex items-center gap-2 flex-wrap">
                               {log.steps && log.steps.map((step, i) => {
                                 const display = getStepStatusDisplay(step.status);
@@ -716,7 +726,7 @@ const ManageFeedSetup = () => {
                           </td>
                           
                           {/* Message */}
-                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center">
+                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center px-[10px]">
                             <div className="flex flex-col gap-0.5">
                               <span className="text-gray-600 dark:text-gray-300 font-semibold whitespace-nowrap">
                                 {displayDate(log.ended_at)}

@@ -4,7 +4,7 @@ import { useNavigate , NavLink} from "react-router-dom";
 
 import {
   Calendar, Package, CheckSquare, CheckCircle2, Clock, Bell,
-  TrendingUp, Users, BarChart3, BarChart, Info, Settings,
+  TrendingUp, Users, BarChart3, BarChart, Info, Settings, RefreshCw,
 } from "lucide-react";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -54,20 +54,73 @@ const CHART_COLORS = [
   "#be123c", "#1d4ed8"
 ];
 
-function KpiCard({ label, value, subtext, icon: Icon, color, bg, loading }) {
-  return (
-    <motion.div variants={itemVariants} className="bg-card rounded-xl p-5 card-shadow border border-border h-full hover:border-primary/30 transition-colors">
-      <div className="flex items-center justify-between mb-3">
+function KpiCard({label,value,isrunning,sapProgress,sapstatus,subtext,icon: Icon,color,bg,loading}){
+  const progress = Math.min(Math.max(sapProgress || 0, 0), 100);
+  const cardContent = (
+    <>
+      <div className="flex items-center gap-5 mb-3">
         <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${bg}`}>
           <Icon className={`h-5 w-5 ${color}`} />
         </div>
+        {sapstatus && (
+          <div className={`h-10 w-10 rounded-lg flex items-center justify-center sap-progress-text-outer`}>
+            <span className="sap-progress-text">{progress}%</span>
+          </div>
+        )}
       </div>
-      {/* Changed from <p> to <div> to allow custom layouts */}
+
       <div className="text-2xl font-bold text-foreground">
-        {loading ? <span className="text-muted-foreground text-base animate-pulse">Loading…</span> : value}
+        {loading ? (
+          <span className="text-muted-foreground text-base animate-pulse">
+            Loading…
+          </span>
+        ) : (
+          value
+        )}
       </div>
-      <p className="text-sm font-semibold text-muted-foreground mt-1 uppercase tracking-wide">{label}</p>
-      {subtext && <p className="text-[10px] text-muted-foreground mt-2 opacity-80">{subtext}</p>}
+
+      <p className="text-sm font-semibold text-muted-foreground mt-1 uppercase tracking-wide">
+        {label}
+      </p>
+
+      {subtext && (
+        <p className="text-[10px] text-muted-foreground mt-2 opacity-80">
+          {subtext}
+        </p>
+      )}
+
+      {/* Progress percentage */}
+    </>
+  );
+
+  return (
+    <motion.div
+      variants={itemVariants}
+      className="h-full rounded-xl"
+    >
+      {isrunning === true ? (
+        <div className="sap-progress-border h-full"
+          style={{
+            background: `
+              conic-gradient(
+                from 240deg,
+                #10b981 0%,
+                #10b981 ${progress}%,
+                #e5e7eb ${progress}%,
+                #e5e7eb 100%
+              )
+            `
+          }}
+        >
+          <div className="sap-progress-border-inner p-5 card-shadow">
+            {cardContent}
+          </div>
+        </div>
+      ) : (
+        <div className="h-full rounded-xl bg-card p-5 card-shadow border border-border hover:border-primary/30 transition-colors">
+          {cardContent}
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -174,6 +227,19 @@ export default function Dashboard() {
   const [compCounts, setCompCounts] = useState([]);
   const [compCountsLoading, setCompCountsLoading] = useState(true);
 
+  //sevenddayslogs
+  const [expandedRow, setExpandedRow] = useState(null);
+  const toggleRow = (idx) => {
+    setExpandedRow(expandedRow === idx ? null : idx);
+  };
+  //sevenddayslogs
+
+  // Refresh states for each competitor
+  const [refreshingCompetitors, setRefreshingCompetitors] = useState({});
+  const [showConfirmPopup, setShowConfirmPopup] = useState(false);
+  const [pendingRefreshData, setPendingRefreshData] = useState(null);
+  const scrollPositionRef = useRef(0);
+
   const currentStoreId = useStore(selectCurrentStoreId);
   const showLsp        = useStore((s) => s.showLsp);
   const activeShopName = useStore((s) => s.activeShopName) || "Store";
@@ -202,7 +268,7 @@ export default function Dashboard() {
     fetchBrandAnalytics,
   } = useStore();
 
-   useEffect(() => {
+    useEffect(() => {
       fetchSapUpdateStatus();
       fetchOverallStatistics();
       fetchRankAnalysis();
@@ -239,19 +305,89 @@ export default function Dashboard() {
         .catch(() => setSmartTabCounts(null));
 
       // ── Competitor Activity Log ──
-      const loadActivityLog = async () => {
-        setLogsLoading(true);
-        try {
-          const res = await API.get('/feeds/competitor-activity-log');
-          setActivityLogs(res.data?.logs || []);
-        } catch (err) {
-          setActivityLogs([]);
-        } finally {
-          setLogsLoading(false);
-        }
-      };
       loadActivityLog();
     }, [currentStoreId]);
+
+  // Separate function to load activity log
+  const loadActivityLog = async () => {
+    setLogsLoading(true);
+    try {
+      const res = await API.get('/feeds/competitor-activity-log');
+      setActivityLogs(res.data?.logs || []);
+    } catch (err) {
+      setActivityLogs([]);
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  // Function to handle refresh for a specific competitor with link
+  const handleRefreshCompetitor = (competitorName, logIndex, refreshLink) => {
+    // Check if this competitor is already being refreshed or is in process
+    if (refreshingCompetitors[competitorName]) {
+      return;
+    }
+    // Check if the log status is "Process" - if yes, prevent refresh
+    const log = activityLogs[logIndex];
+    if (log && log.status === "Process") {
+      return;
+    }
+    // Show confirmation popup with the link
+    setPendingRefreshData({ competitorName, logIndex, refreshLink });
+    setShowConfirmPopup(true);
+  };
+
+  // Function to execute the refresh after confirmation
+  const executeRefresh = () => {
+    if (!pendingRefreshData) return;
+
+    const {
+      competitorName,
+      refreshLink
+    } = pendingRefreshData;
+
+    // Close popup
+    setShowConfirmPopup(false);
+
+    // Show refreshing state
+    setRefreshingCompetitors(prev => ({
+      ...prev,
+      [competitorName]: true
+    }));
+
+    // Save current scroll position
+    const scrollPosition = window.scrollY;
+
+    console.log('Competitor refresh URL:', refreshLink);
+
+    // Trigger competitor cron
+    fetch(refreshLink, {
+      method: 'GET',
+      credentials: 'include'
+    })
+      .then(response => {
+        console.log(
+          `Competitor ${competitorName} response:`,
+          response.status
+        );
+      })
+      .catch(error => {
+        console.error(
+          `Competitor ${competitorName} request error:`,
+          error
+        );
+      });
+    // Reload after exactly 2 seconds.
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+  };
+
+  // Function to cancel the refresh
+  const cancelRefresh = () => {
+    setShowConfirmPopup(false);
+    setPendingRefreshData(null);
+  };
 
   const isFirstRender = useRef(true);
   useEffect(() => {
@@ -268,12 +404,6 @@ export default function Dashboard() {
     }
   }, [brandAnalyticsBrands]);
 
-  // useEffect(() => {
-  //   if (brandAnalyticsCategories.length > 0 && !selectedCategory) {
-  //     setSelectedCategory(brandAnalyticsCategories[0]);
-  //   }
-  // }, [brandAnalyticsCategories]);
-
   const handleBrandChange = (brand) => {
     setSelectedBrand(brand);
     setSelectedCategory('');
@@ -287,6 +417,9 @@ export default function Dashboard() {
 
   // ── derived values ────────────────────────────────────────────────
   const sap = parseSapTime(sapUpdateStatus?.var_end_time);
+  const isRunning = sapUpdateStatus?.isRunning ?? false;
+  const sapProgress = sapUpdateStatus?.progress ?? 0;
+
   const stats = overallStatistics;
   const statsLoading = overallStatisticsLoading;
 
@@ -375,10 +508,10 @@ export default function Dashboard() {
   }));
 
   useEffect(() => {
-  fetchSapUpdateStatus();
-  fetchOverallStatistics();
-  fetchRankAnalysis();
-  fetchBrandAnalyticsBrands();
+    fetchSapUpdateStatus();
+    fetchOverallStatistics();
+    fetchRankAnalysis();
+    fetchBrandAnalyticsBrands();
 
     const fetchCompetitorCounts = async () => {
       try {
@@ -407,8 +540,123 @@ export default function Dashboard() {
     loadActivityLog();
   }, []);
 
+  // SAP Status Only Polling //
+  useEffect(() => {
+    if (!isRunning) {
+      return;
+    }
+
+    const interval = setInterval(() => {
+      fetchSapUpdateStatus();
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [isRunning, currentStoreId]);
+
   return (
     <>
+    <style>
+      {`
+        .sap-progress-border {
+          position: relative;
+          border-radius: 0.75rem;
+          padding: 4px;
+          overflow: hidden;
+        }
+
+        .sap-progress-border::before {
+          content: "";
+          position: absolute;
+          inset: -50%;
+          background: conic-gradient(
+            from 0deg,
+            transparent 0deg,
+            rgba(16, 185, 129, 0.12) 35deg,
+            rgba(16, 185, 129, 0.9) 70deg,
+            transparent 105deg
+          );
+
+          animation: sapBorderRotate 2.2s linear infinite;
+        }
+
+        .sap-progress-border-inner {
+          position: relative;
+          z-index: 1;
+          height: 100%;
+          border-radius: 10px;
+          background: hsl(var(--card));
+        }
+
+        .sap-progress-text-outer {
+          background-color: #10b98110;
+        }
+
+        .sap-progress-text {
+          font-size: 12px;
+          font-weight: 700;
+          color: #10b981;
+        }
+
+        @keyframes sapBorderRotate {
+          0% {
+            transform: rotate(0deg);
+          }
+
+          100% {
+            transform: rotate(360deg);
+          }
+        }
+
+        /* Refresh button animation */
+        .refresh-spin {
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+
+        /* Popup overlay */
+        .popup-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+          animation: fadeIn 0.3s ease;
+        }
+
+        .popup-content {
+          background: white;
+          border-radius: 12px;
+          padding: 24px;
+          max-width: 400px;
+          width: 90%;
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+          animation: slideUp 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `}
+    </style>
+
     <motion.div
       variants={containerVariants}
       initial="hidden"
@@ -431,9 +679,15 @@ export default function Dashboard() {
         <KpiCard
           label={`SAP : ${sap.date}`}
           value={sap.time}
+          isrunning = {isRunning}
+          sapProgress = {sapProgress}
+          sapstatus = {true}
           subtext={
             <>
-              {`${activeShopName.toUpperCase()} Price Last Updated On This App`}
+              {isRunning
+                ? `SAP Update in Progress`
+                : `${activeShopName.toUpperCase()} Price Last Updated On This App`
+              }
               {activeShopName?.toLowerCase() === 'nandilathgmart' && webUpdateStatus?.status && (
                 <span
                   className={`block mt-1 text-[14px] font-bold uppercase ${
@@ -777,7 +1031,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="overflow-x-auto overflow-y-auto max-h-[200px] border-t border-gray-100 dark:border-slate-700/60 scrollbar-hide">
+        <div className="overflow-x-auto overflow-y-auto max-h-[400px] border-t border-gray-100 dark:border-slate-700/60 scrollbar-hide">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="text-muted-foreground text-xs uppercase font-semibold">
@@ -785,46 +1039,191 @@ export default function Dashboard() {
                 <th className="py-3 border-b border-border">Competitor</th>
                 <th className="py-3 border-b border-border">Status</th>
                 <th className="py-3 border-b border-border">Message</th>
+                {isSuperAdmin && (<th className="py-3 border-b border-border text-center">Action</th>)}
               </tr>
             </thead>
             <tbody className="text-sm">
               {logsLoading ? (
                 <tr>
-                  <td colSpan="4" className="py-10 text-center">
+                  <td colSpan="5" className="py-10 text-center">
                     <span className="text-sm text-muted-foreground animate-pulse">Loading…</span>
                   </td>
                 </tr>
               ) : activityLogs.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="py-8 text-center text-muted-foreground italic">
+                  <td colSpan="5" className="py-8 text-center text-muted-foreground italic">
                     No activity logs found
                   </td>
                 </tr>
               ) : (
-                activityLogs.map((log, idx) => (
-                  <tr key={idx} className="hover:bg-secondary/50 transition-colors">
-                    <td className="py-3 border-b border-border whitespace-nowrap text-foreground">{log.date}</td>
-                    <td className="py-3 border-b border-border">
-                      <span className="flex items-center gap-2 text-xs font-medium px-2 py-1 rounded-full bg-indigo-500/10 text-indigo-600 capitalize w-fit">
-                        {log.logo ? (
-                          <img
-                            src={log.logo}
-                            alt={log.competitor}
-                            className="w-4 h-4 rounded-full object-contain bg-white shrink-0"
-                            onError={(e) => { e.target.style.display = 'none'; }}
-                          />
-                        ) : null}
-                        {log.competitor || '—'}
-                      </span>
-                    </td>
-                    <td className="py-3 border-b border-border">
-                      <span className="text-xs font-semibold px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-600">
-                        {log.status}
-                      </span>
-                    </td>
-                    <td className="py-3 border-b border-border text-muted-foreground">{log.message}</td>
-                  </tr>
-                ))
+                activityLogs.map((log, idx) => {
+                  const isRefreshing = refreshingCompetitors[log.competitor];
+                  const isProcess = log.status === "Process";
+                  const isDisabled = isRefreshing || isProcess;
+
+                  // Construct the refresh link for this competitor
+                  const refreshLink = `${import.meta.env.VITE_SCRAPE_DOMAIN}/${log.competitor}?cmpid=plm_user_info_${currentStoreId}`;
+
+                  return (
+                    <React.Fragment key={idx}>
+                      {/* Main Row */}
+                      <tr className="hover:bg-secondary/50 transition-colors cursor-pointer" onClick={() => toggleRow(idx)}>
+                        <td className="py-3 border-b border-border whitespace-nowrap text-foreground">
+                          {log.date}
+                        </td>
+
+                        <td className="py-3 border-b border-border">
+                          <span className="flex items-center gap-2 text-xs font-medium px-2 py-1 rounded-full bg-indigo-500/10 text-indigo-600 capitalize w-fit">
+                            {log.logo && (
+                              <img
+                                src={log.logo}
+                                alt={log.competitor}
+                                className="w-4 h-4 rounded-full object-contain bg-white shrink-0"
+                                onError={(e) => {
+                                  e.target.style.display = "none";
+                                }}
+                              />
+                            )}
+                            {log.competitor || "—"}
+                          </span>
+                        </td>
+
+                        <td className="py-3 border-b border-border">
+                          <span
+                            className={`inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                              log.status === "Process" ? "bg-yellow-300/20 text-yellow-600": log.status === "Failed" ? "bg-red-300/20 text-red-600" : "bg-emerald-500/10 text-emerald-600"
+                            }`}
+                          >
+                            {log.status === "Process" && (
+                              <span className="relative flex h-2.5 w-2.5">
+                                <span className="absolute inline-flex h-full w-full rounded-full bg-orange-600 opacity-75 animate-ping"></span>
+                                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-orange-600"></span>
+                              </span>
+                            )}
+
+                            {log.status === "Failed" && (
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                                className="w-4 h-4 text-red-600 animate-pulse"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.356 12.75c1.154 2-.289 4.497-2.598 4.497H4.644c-2.309 0-3.752-2.497-2.598-4.497l7.355-12.75Zm2.599 4.247a.75.75 0 0 1 .75.75v5a.75.75 0 0 1-1.5 0V8a.75.75 0 0 1 .75-.75Zm0 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            )}
+
+                            {log.status}
+                          </span>
+                        </td>
+
+                        <td className="py-3 border-b border-border text-muted-foreground">
+                          <div className="flex items-center justify-between gap-3">
+                            <span>{log.message}</span>
+
+                            <div className="text-indigo-600 hover:text-indigo-800 text-xs font-semibold whitespace-nowrap">
+                              {expandedRow === idx ? "Hide ▲" : "History ▼"}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Refresh Button Column */}
+                        {isSuperAdmin && (<td className="py-3 border-b border-border text-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent row click from triggering
+                              if (!isDisabled) {
+                                handleRefreshCompetitor(log.competitor, idx, refreshLink);
+                              }
+                            }}
+                            disabled={isDisabled}
+                            className={`p-2 rounded-lg transition-all duration-200 ${
+                              isDisabled
+                                ? 'opacity-50 cursor-not-allowed bg-gray-100'
+                                : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-600 hover:text-indigo-800 hover:scale-105'
+                            }`}
+                            title={isProcess ? 'Cannot refresh while in process' : isRefreshing ? 'Refreshing...' : 'Refresh competitor'}
+                          >
+                            <RefreshCw 
+                              className={`h-4 w-4 ${
+                                isRefreshing ? 'refresh-spin' : ''
+                              }`} 
+                            />
+                          </button>
+                        </td>)}
+                      </tr>
+
+                      {/* Expanded History */}
+                      {expandedRow === idx && (
+                        <tr>
+                          <td
+                            colSpan={5}
+                            className="bg-slate-50 border-b border-border p-4"
+                          >
+                            <div className="rounded-lg border border-slate-200 overflow-hidden">
+
+                              <div className="bg-slate-100 px-4 py-2 font-semibold text-sm">
+                                Last 7 Days History
+                              </div>
+
+                              <table className="w-full text-sm">
+                                <thead className="bg-white">
+                                  <tr>
+                                    <th className="text-left px-4 py-2">Date</th>
+                                    <th className="text-left px-4 py-2">Start Time</th>
+                                    <th className="text-left px-4 py-2">End Time</th>
+                                    <th className="text-left px-4 py-2">Total Mins</th>
+                                    <th className="text-center px-4 py-2">Updated</th>
+                                  </tr>
+                                </thead>
+
+                                <tbody>
+                                  {log.sevendayslogs?.map((history, i) => (
+                                    history.start_time !== log._rawDate && history.end_time !== log.end_time && (
+                                      <tr
+                                        key={i}
+                                        className="border-t hover:bg-slate-50"
+                                      >
+                                        <td className="px-4 py-2">
+                                          {history.date}
+                                        </td>
+
+                                        <td className="px-4 py-2">
+                                          {history.start_time}
+                                        </td>
+
+                                        <td className="px-4 py-2">
+                                          {history.end_time}
+                                        </td>
+
+                                        <td className="px-4 py-2">
+                                          {(() => {
+                                            const mins = Number(history.total_mins || 0);
+                                            const minutes = Math.floor(mins);
+                                            const seconds = ((mins - minutes) * 60).toFixed(1);
+
+                                            return `${minutes}m ${seconds}s`;
+                                          })()}
+                                        </td>
+                                        <td className="px-4 py-2 text-center font-medium text-blue-600">
+                                          {history.update_count} / {history.total_count}
+                                        </td>
+                                      </tr>
+                                    )
+                                  ))}
+                                </tbody>
+                              </table>
+
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -833,6 +1232,42 @@ export default function Dashboard() {
        )}
 
     </motion.div>
+
+    {/* Confirmation Popup */}
+    {showConfirmPopup && pendingRefreshData && (
+      <div className="popup-overlay" onClick={cancelRefresh}>
+        <div className="popup-content" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="bg-amber-100 p-2 rounded-full">
+              <RefreshCw className="h-6 w-6 text-amber-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900">Confirm Refresh</h3>
+          </div>
+          
+          <p className="text-gray-600 mb-6">
+            Are you sure you want to refresh <span className="font-semibold text-gray-800 capitalize">{pendingRefreshData.competitorName}</span>?
+            <br />
+            <span className="text-sm text-gray-500">This will trigger a background refresh and reload the page.</span>
+          </p>
+
+          <div className="flex gap-3 justify-end">
+            <button
+              onClick={cancelRefresh}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={executeRefresh}
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh Now
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Easy Gain percentage modal */}
     {showEasyGainModal && (

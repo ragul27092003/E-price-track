@@ -291,12 +291,18 @@ exports.getCompetitorActivityLog = async (req, res) => {
         const competitorKey = (doc.cron_competitor_name || '').toLowerCase().trim();
         return {
           date:       formatDate(doc.start_time),
-          status:     'Success',
+          status:     !doc.end_time ? "Process" : doc.update_count > 0 ? "Success" : "Failed",
           message:    `Scraped ${doc.cron_competitor_name || 'competitor'}: ${doc.update_count || 0} of ${doc.total_count || 0} products updated. Ended: ${formatDate(doc.end_time)}`,
           source:     'cron_scrape',
           competitor: doc.cron_competitor_name || '',
           logo:       logoMap[competitorKey] || null,   // 👈 attach logo here
           _rawDate:   doc.start_time,
+          end_time:   doc.end_time,
+          sevendayslogs: (doc.logs || []).sort((a, b) => {
+            const dateA = new Date(a.start_time.replace(/(\d{2}:\d{2}:\d{2})(AM|PM)/,"$1 $2"));
+            const dateB = new Date(b.start_time.replace(/(\d{2}:\d{2}:\d{2})(AM|PM)/,"$1 $2"));
+            return dateB - dateA;
+          })
         };
       })
       .filter((l) => l.date && l.date !== '—')
