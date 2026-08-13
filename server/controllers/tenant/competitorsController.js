@@ -78,6 +78,8 @@ async function getCronStatusMap(db) {
       const latestIsOpen = !latest.end_time || latest.end_time === '';
       const hoursSinceStart = (now - latest._startDate.getTime()) / (1000 * 60 * 60);
       const isRunning = latestIsOpen && hoursSinceStart <= STALE_RUN_HOURS;
+      const processCount = latest.process_count || 0;
+      const updateCount = latest.update_count || 0;
 
       // Most recent COMPLETED run (could be `latest` itself, or an earlier one
       // if the latest run is still in progress) — used for "Last Sync".
@@ -102,7 +104,14 @@ async function getCronStatusMap(db) {
         totalCount = withCount ? withCount.total_count : null;
       }
 
-      statusMap[slug] = { isRunning, lastSync, totalCount };
+      statusMap[slug] = { 
+        isRunning, 
+        lastSync, 
+        totalCount, 
+        processCount,
+        updateCount 
+      };
+
     });
   } catch (e) {
     console.warn('Could not read from ept_cron_time_management:', e.message);
@@ -337,6 +346,8 @@ exports.getAll = async (req, res) => {
       const productsTracked = (cronStatus && typeof cronStatus.totalCount === 'number')
         ? cronStatus.totalCount
         : staticCount;
+      const processCount = cronStatus.processCount;
+      const updateCount = cronStatus.updateCount;
 
       return {
         id:              c._id,
@@ -353,6 +364,8 @@ exports.getAll = async (req, res) => {
         isRunning,        // ← true while the scrape cron for this competitor is genuinely in progress
         lastSync,
         slug,
+        processCount,
+        updateCount
       };
     }));
 
@@ -646,5 +659,131 @@ exports.debugMapping = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+
+
+/**
+ * Fetch competitor product data from MongoDB
+ * @param {string} competitorId - The competitor identifier (amazon, flipkart, croma, etc.)
+ * @param {object} filters - Optional filters like product_ean_id, date range, etc.
+ * @param {object} pagination - Pagination options (limit, skip)
+ * @returns {Promise<object>} - Competitor data with pagination info
+ */
+
+exports.getCompetitorProducts = async (req, res) => {
+
+  try {
+
+    const db = req.tenantDb;
+    const companyId = req.tenantId;
+    
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 6;
+    const skip = (page - 1) * limit;
+
+    const {
+      competitor,
+      search,
+      status,
+    } = req.query;
+
+    if (!competitor) {
+      return res.status(400).json({
+        success: false,
+        message: "Competitor is required",
+      });
+    }
+
+    const filter = {
+      status: "active",
+      product_scrape_status: "completed",
+    };
+
+    if (search) {
+      filter.$or = [
+        { product_name: { $regex: search, $options: "i" } },
+        { [`${companyId}_product_id`]: { $regex: search, $options: "i" } },
+        { [`${companyId}_product_code`]: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    if (status) {
+      filter["pricechange.status"] = status;
+    }
+
+    const collectionName = `ept_product_details_new_${competitor}`;
+    const compcollection = db.collection(collectionName);
+    const products = await compcollection.find(filter).toArray();
+    const mainCollection = `ept_product_details_new`;
+    const productcollection = db.collection(mainCollection);
+
+    const activeProducts = [];
+
+for (const product of products) {
+  const mainProduct = await productcollection.findOne({
+    status: "active",
+    product_ean_id: product[`${companyId}_product_id`],
+    product_code: product[`${companyId}_product_code`],
+    ean_product_data_details_scrap_status: "completed",
+  });
+
+  if (!mainProduct) continue;
+
+    activeProducts.push({
+      
+        product_ean_id: mainProduct.product_ean_id,
+        product_code: mainProduct.product_code,
+        product_name: mainProduct.product_name,
+        product_price: mainProduct.product_price,
+        product_url: mainProduct.product_url,
+        product_image: mainProduct.product_image,
+        product_brand: mainProduct.product_brand,
+        product_category: mainProduct.product_category,
+        product_stock: mainProduct.product_stock,
+        rank_by: mainProduct.rank_by,
+        modified_date: mainProduct.modified_date,
+
+        competitor_data: {
+          [competitor]: {
+            price: product.product_price,
+            oldprice: product.pricechange?.oldPriceValue === 0
+            ? "Out Of Stock"
+            : product.pricechange?.oldPriceValue, 
+            status: product.pricechange?.status || "not changed",
+            changeValue:
+              product.pricechange?.decreasedValue > 0
+                ? product.pricechange.decreasedValue
+                : product.pricechange?.increasedValue || 0,
+            stock: /In stock/.test(product.product_stock) ? 1 : 0,
+            review: product.product_review,
+            rating: product.product_rating,
+            url: product.product_url,
+          },
+        },
+      });
+    }
+
+    const total = activeProducts.length;
+    const paginatedProducts = activeProducts.slice(skip, skip + limit);
+    
+    return res.json({
+      success: true,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+      data: paginatedProducts,
+    });
+
+
+  } catch (err) {
+    console.error(err);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };

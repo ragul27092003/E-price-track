@@ -7,7 +7,7 @@ const upload         = require('../../middleware/upload');
 const controller     = require('../../controllers/tenant/competitorsController');
 
 // Debug — remove after confirming it works
-const { getAll, create, toggleSync, uploadLogo, debugMapping, getAvailable, assignCompetitor, remove } = controller;
+const { getAll, create, toggleSync, uploadLogo, debugMapping, getAvailable, assignCompetitor, remove, getCompetitorProducts } = controller;
 if (!uploadLogo)  throw new Error('uploadLogo is undefined — replace competitorsController.js from the zip');
 if (!upload)      throw new Error('upload is undefined — run: npm install multer  inside server/');
 
@@ -31,5 +31,8 @@ router.delete('/:id', auth, tenantResolver, roleCheck('super_admin'), remove);
 // otherwise Express matches /amazon/logo as id=amazon and misses it
 router.patch('/:slug/logo',   auth, roleCheck('super_admin'), upload.single('logo'), uploadLogo);
 router.patch('/:id/toggle',   auth, tenantResolver, toggleSync);
+
+//get selected competitor products
+router.get('/products', auth, tenantResolver, getCompetitorProducts);
 
 module.exports = router;

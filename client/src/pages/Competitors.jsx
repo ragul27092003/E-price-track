@@ -413,7 +413,9 @@ const CompetitorRow = ({
               ○ Offline
             </span>
           )}
-          {data.isRunning ? (
+
+
+          {/* {data.isRunning ? (
             <p className="flex items-center gap-1 text-[11px] text-blue-600 font-semibold mt-0.5">
               <AutorenewIcon
                 style={{ fontSize: 12 }}
@@ -421,11 +423,62 @@ const CompetitorRow = ({
               />{" "}
               Running...
             </p>
+          )
+          
+          : (
+            <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
+              {formatSync(data.lastSync)}
+            </p>
+          )} */}
+
+
+          {data.isRunning ? (
+            <div className="flex items-center gap-3 mt-0.5">
+              {/* Progress Bar - Takes remaining space */}
+              <div className="flex-1 max-w-[80px]">
+                <div className="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden transition-all duration-300 hover:h-2">
+                  <div 
+                    className="h-full bg-gradient-to-r from-red-200 to-red-600 rounded-full transition-all duration-700 relative"
+                    style={{ width: `${Math.min((data.processCount / data.productsTracked) * 100, 100)}%` }}
+                  >
+                    {/* Glow effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-indigo-600 blur-md opacity-40 transition-opacity group-hover:opacity-70" />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Status Section - Fixed width, aligned center */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Live Dot */}
+                <div className="flex items-center gap-1.5">
+                  <div className="relative">
+                    <div className="w-2 h-2 rounded-full bg-red-400 shadow-lg shadow-green-400/50 animate-pulse" />
+                    <div className="absolute inset-0 w-2 h-2 rounded-full bg-red-400 animate-ping opacity-75" />
+                  </div>
+                  <span className="text-[10px] font-medium text-red-600 dark:text-green-400 whitespace-nowrap">
+                    {Math.round((data.processCount / data.productsTracked) * 100)}%
+                  </span>
+                </div>
+                
+                {/* Divider */}
+                {/* <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" /> */}
+                
+                {/* Counter */}
+                {/* <span className="text-[11px] font-mono font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">
+                  {data.processCount}
+                  <span className="text-[9px] text-gray-400 mx-0.5">/</span>
+                  {data.productsTracked}
+                </span> */}
+                
+              </div>
+            </div>
           ) : (
             <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
               {formatSync(data.lastSync)}
             </p>
           )}
+
+
         </div>
       </div>
 
@@ -576,6 +629,7 @@ const CompetitorSection = ({
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 const Competitors = () => {
+
   const competitors = useStore((s) => s.competitors);
   const setCompetitors = useStore((s) => s.setCompetitors);
   const addCompetitor = useStore((s) => s.addCompetitor);
@@ -609,7 +663,7 @@ const Competitors = () => {
   const [removeTarget, setRemoveTarget] = useState(null); // { id, name } | null
   const [removingId, setRemovingId] = useState(null);
 
-  const loadCompetitors = async () => {
+ {/* const loadCompetitors = async () => {
     setCompetitorsLoading(true);
     try {
       const data = await fetchCompetitors();
@@ -621,9 +675,38 @@ const Competitors = () => {
     }
   };
 
-  useEffect(() => {
+   useEffect(() => {
     loadCompetitors();
-  }, [activeStoreId]);
+  }, [activeStoreId]); */}
+
+  const loadCompetitors = async (showLoader = false) => {
+    if (showLoader) {
+      setCompetitorsLoading(true);
+    }
+
+    try {
+      const data = await fetchCompetitors();
+      setCompetitors(data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      if (showLoader) {
+        setCompetitorsLoading(false);
+      }
+    }
+  };
+
+useEffect(() => {
+  loadCompetitors(true);
+}, [activeStoreId]);
+
+useEffect(() => {
+  if (!competitors.some(item => item.isRunning)) return;
+  const interval = setInterval(() => {
+    loadCompetitors(false);
+  }, 3000);
+  return () => clearInterval(interval);
+}, [competitors]);
 
   const handleToggleSync = async (id, isActive) => {
     try {

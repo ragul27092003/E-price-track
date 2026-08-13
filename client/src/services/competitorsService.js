@@ -47,3 +47,22 @@ export const uploadCompetitorLogo = (slug, file) => {
     headers: { 'Content-Type': 'multipart/form-data' },
   }).then((r) => r.data);
 };
+
+
+export const fetchCompetitorProducts = ({
+  page = 1,
+  limit = 6,
+  competitor,
+  search,
+  status,
+} = {}) => {
+  const params = new URLSearchParams();
+
+  params.set("page", page);
+  params.set("limit", limit);
+
+  if (competitor) params.set("competitor", competitor);
+  if (search) params.set("search", search);
+  if (status && status !== "all") params.set("status", status);
+  return API.get(`/competitors/products?${params}`).then((r) => r.data);
+};
