@@ -1,4 +1,4 @@
-import { Moon, Sun, LogOut, ChevronDown, Bell, Clock } from "lucide-react";
+import { Moon, Sun, LogOut, ChevronDown, Bell, Clock, CreditCard, ShieldAlert, Gift, } from "lucide-react";
 import logo from "../../services/assets/main-logo.png";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -15,6 +15,7 @@ import { fetchAllStores } from "@/services/authService";
 import { fetchProducts } from "@/services/productsService";
 import { fetchCompetitors } from "@/services/competitorsService";
 import { ROUTE } from "../../utils/urls";
+import API from "@/hooks/useApi";
 
 export function AppHeader() {
   const user = useStore((s) => s.user);
@@ -171,8 +172,66 @@ export function AppHeader() {
     setDropdownOpen(false);
   };
 
+  const [alertNotifications, setAlertNotifications] = useState(null);
+
+  useEffect(() => {
+  if (!activeStoreId) {
+    setAlertNotifications(null);
+    return;
+  }
+
+  const loadNotifications = async () => {
+
+    try {
+      
+      const response = await API.get(`/settings/get-notification/${activeStoreId}`);
+      setAlertNotifications(response.data?.data || response.data || null);
+    } catch (error) {
+      console.error("Failed to load alert notifications:", error);
+      setAlertNotifications(null);
+    }
+  };
+
+  loadNotifications();
+}, [activeStoreId]);
+
+const notificationTypes = alertNotifications?.types || {};
+
+const notificationConfig = [
+  {
+    key: "payment",
+    label: "Payment Reminder :",
+    icon: CreditCard,
+    color: "amber",
+    enabled: notificationTypes.payment?.enabled === true,
+    message: notificationTypes.payment?.message?.trim(),
+  },
+  {
+    key: "admin",
+    label: "Admin Message :",
+    icon: ShieldAlert,
+    color: "violet",
+    enabled: notificationTypes.admin?.enabled === true,
+    message: notificationTypes.admin?.message?.trim(),
+  },
+  {
+    key: "festival",
+    label: "Festival Wishes :",
+    icon: Gift,
+    color: "emerald",
+    enabled: notificationTypes.festival?.enabled === true,
+    message: notificationTypes.festival?.message?.trim(),
+  },
+];
+
+const activeNotifications = notificationConfig.filter(
+  (notification) =>
+    notification.enabled && notification.message
+);
+
   // ── Monthly Payment Reminder Logic ──────────────────────────────────────────
-  const currentDay = new Date().getDate();
+
+  {/* const currentDay = new Date().getDate();
   const isDayInRange = currentDay >= 1 && currentDay <= 7;
   const daysRemaining = 7 - currentDay;
   const daysText = daysRemaining === 1 ? "1 day" : `${daysRemaining} days`;
@@ -215,16 +274,194 @@ export function AppHeader() {
     String(profile?.payment).toLowerCase() === "paid";
 
   const showPaymentReminder =
-    isDayInRange && !isSathyaUser && !isPaymentCompleted;
+    isDayInRange && !isSathyaUser && !isPaymentCompleted; */}
 
   return (
+
     <header className="flex items-center h-16 px-6 border-b border-border bg-card shrink-0">
       <div className="shrink-0 flex items-center ml-4">
         <img src={logo} alt="Logo" className="block h-6 w-auto shrink-0" />
       </div>
 
+
       {/* Smooth Running Payment Reminder Ticker */}
-      <div
+
+
+       {activeNotifications.length > 0 && (
+  <div className="flex-1 mr-4 relative overflow-hidden h-10">
+    <div className="notification-ticker">
+      <div className="notification-ticker-track">
+        {[...activeNotifications, ...activeNotifications].map(
+          (notification, index) => {
+            const Icon = notification.icon;
+
+            const colorStyles = {
+              amber: {
+                wrapper:
+                  "bg-amber-50 border-amber-200 text-amber-900",
+                icon:
+                  "bg-amber-100 text-amber-600",
+                label:
+                  "text-amber-800",
+                glow:
+                  "shadow-[0_0_15px_rgba(245,158,11,0.12)]",
+              },
+
+              violet: {
+                wrapper:
+                  "bg-violet-50 border-violet-200 text-violet-900",
+                icon:
+                  "bg-violet-100 text-violet-600",
+                label:
+                  "text-violet-800",
+                glow:
+                  "shadow-[0_0_15px_rgba(139,92,246,0.12)]",
+              },
+
+              emerald: {
+                wrapper:
+                  "bg-emerald-50 border-emerald-200 text-emerald-900",
+                icon:
+                  "bg-emerald-100 text-emerald-600",
+                label:
+                  "text-emerald-800",
+                glow:
+                  "shadow-[0_0_15px_rgba(16,185,129,0.12)]",
+              },
+            };
+
+            const colors =
+              colorStyles[notification.color] ||
+              colorStyles.amber;
+
+            return (
+              <div
+                key={`${notification.key}-${index}`}
+                className={`
+                  notification-item
+                  ${colors.wrapper}
+                  ${colors.glow}
+                `}
+              >
+                {/* Icon */}
+                <div
+                  className={`
+                    notification-icon
+                    ${colors.icon}
+                  `}
+                >
+                  <Icon className="w-4 h-4" />
+                </div>
+
+                {/* Content */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <span
+                    className={`
+                      text-[12px]
+                      font-bold
+                      uppercase
+                      tracking-wide
+                      ${colors.label}
+                    `}
+                  >
+                    {notification.label}
+                  </span>
+
+                  <span className="text-[13px] font-medium">
+                    {notification.message}
+                  </span>
+                </div>
+
+                {/* Small status indicator */}
+                <span className="notification-dot" />
+              </div>
+            );
+          }
+        )}
+      </div>
+    </div>
+
+    <style>{`
+      .notification-ticker {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        position: relative;
+      }
+
+      .notification-ticker-track {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        width: max-content;
+        animation: notificationTicker 35s linear infinite;
+        will-change: transform;
+      }
+
+      .notification-ticker:hover
+      .notification-ticker-track {
+        animation-play-state: paused;
+      }
+
+      .notification-item {
+        height: 34px;
+        min-width: max-content;
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        padding: 0 14px 0 6px;
+        border-width: 1px;
+        border-style: solid;
+        border-radius: 999px;
+        flex-shrink: 0;
+        white-space: nowrap;
+        transition: all 0.3s ease;
+      }
+
+      .notification-item:hover {
+        transform: translateY(-1px);
+      }
+
+      .notification-icon {
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .notification-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background: currentColor;
+        opacity: 0.55;
+        flex-shrink: 0;
+      }
+
+      @keyframes notificationTicker {
+        from {
+          transform: translateX(0);
+        }
+
+        to {
+          transform: translateX(-50%);
+        }
+      }
+    `}</style>
+  </div>
+)}
+
+
+
+
+
+
+      {/* <div
         className={`payment-ticker-container flex-1 mr-4 relative flex items-center overflow-hidden h-8 rounded-full bg-amber-50 border border-amber-200 text-amber-900 text-[13px] font-medium shadow-sm select-none transition-opacity duration-200 ${
           showPaymentReminder ? "opacity-100" : "opacity-0 pointer-events-none"
         }`}
@@ -241,7 +478,7 @@ export function AppHeader() {
       align-items: center;
       gap: 10px;
       white-space: nowrap;
-      padding-right: 100px; /* Message-ku naduvula nalla gap irukka */
+      padding-right: 100px; 
       flex-shrink: 0;
     }
     @keyframes paymentTicker {
@@ -254,7 +491,7 @@ export function AppHeader() {
   `}</style>
 
         <div className="payment-ticker-track">
-          {/* Message 1 */}
+        
           <div className="payment-ticker-item">
             <Clock className="w-4 h-4 text-amber-600 shrink-0" />
             <span className="leading-none">
@@ -281,7 +518,7 @@ export function AppHeader() {
             </span>
           </div>
 
-          {/* Message 2 (Loop-kaga duplicate) */}
+    
           <div className="payment-ticker-item">
             <Clock className="w-4 h-4 text-amber-600 shrink-0" />
             <span className="leading-none">
@@ -308,7 +545,7 @@ export function AppHeader() {
             </span>
           </div>
         </div>
-      </div>
+      </div> */}
 
       <div className="ml-auto flex items-center gap-2">
         {/* Bell Notification */}
@@ -462,6 +699,7 @@ export function AppHeader() {
           )}
         </div>
       </div>
+
     </header>
   );
 }

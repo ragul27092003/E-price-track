@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from "framer-motion";
 import { format, startOfToday, endOfToday, subDays, startOfMonth, endOfMonth } from "date-fns";
-import {User, Mail, Lock, Eye, EyeOff, Trash2, UserPlus,X, Check, AlertCircle, Users, FileText, ChevronDown, Camera, Calendar as CalendarIcon,UserRoundPlus,} from "lucide-react";
+import {User, Mail, Lock, Eye, EyeOff, Trash2, UserPlus,X, Check, AlertCircle, Users, FileText, ChevronDown, Camera, Calendar as CalendarIcon,UserRoundPlus, BellDot, Gift, Bell, CreditCard, Sparkles, Clock} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -32,6 +32,7 @@ const TABS = [
   { id: "users", label: "Manage Users", icon: Users },
   { id: "log", label: "Users Log", icon: FileText },
   { id: "pendingsignup", label: "Pending Signup", icon: UserRoundPlus },
+  { id: "alertnotification", label: "Alert Notification", icon: BellDot },
 ];
 
 function Avatar({ size = "lg", primaryColor, companyName = "", photoUrl = null }) {
@@ -1236,6 +1237,554 @@ function PendingSignupTab() {
    
 }
 
+
+function AlertNotification() {
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Notification types state
+  const [notificationTypes, setNotificationTypes] = useState({
+
+    payment: {
+      enabled: false,
+      message: '',
+      aiMessage: '',
+      icon: <CreditCard className="w-6 h-6" />,
+      title: 'Payment Reminder',
+      color: 'blue',
+      badge: 'URGENT',
+      defaultMessage: 'Your monthly subscription payment of $49.99 is due in {days} days. Please complete your payment to avoid service interruption.'
+    },
+    admin: {
+      enabled: false,
+      message: '',
+      aiMessage: '',
+      icon: <Bell className="w-6 h-6" />,
+      title: 'Admin Message',
+      color: 'purple',
+      badge: 'IMPORTANT',
+      defaultMessage: 'Important system update: Please review the latest changes to ensure smooth operations.'
+    },
+    festival: {
+      enabled: false,
+      message: '',
+      aiMessage: '',
+      icon: <Gift className="w-6 h-6" />,
+      title: 'Festival Wishes',
+      color: 'amber',
+      badge: 'CELEBRATION',
+      defaultMessage: 'Happy Festival Season! May your celebrations be filled with joy and prosperity. Special offers await!'
+    }
+  });
+  const [activeType, setActiveType] = useState('payment');
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+  const storeId = useStore(selectCurrentStoreId);
+  const user = useStore((s) => s.user);
+  const userId = useStore((s) => s.user.user_id);
+  const profile = useStore((s) => s.profile);
+  const setProfile = useStore((s) => s.setProfile);
+  
+
+  // Load notification settings from MongoDB
+
+  useEffect(() => {
+    const loadNotificationSettings = async () => {
+      if (!storeId || !user?.user_id) return;
+      
+      setLoading(true);
+      try {
+
+        const response = await API.get(`/settings/get-notification/${storeId}`);
+        if (response.data.status && response.data.data) {
+
+          const settings = response.data.data;
+
+          // Update state with loaded settings
+          setNotificationTypes(prev => ({
+            payment: {
+              ...prev.payment,
+              enabled: settings.types?.payment?.enabled || false,
+              message: settings.types?.payment?.message || '',
+              aiMessage: settings.types?.payment?.aiMessage || ''
+            },
+            admin: {
+              ...prev.admin,
+              enabled: settings.types?.admin?.enabled || false,
+              message: settings.types?.admin?.message || '',
+              aiMessage: settings.types?.admin?.aiMessage || ''
+            },
+            festival: {
+              ...prev.festival,
+              enabled: settings.types?.festival?.enabled || false,
+              message: settings.types?.festival?.message || '',
+              aiMessage: settings.types?.festival?.aiMessage || ''
+            }
+          }));
+        }
+      } catch (error) {
+        console.error('Error loading notification settings:', error);
+        toast.error('Failed to load notification settings');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadNotificationSettings();
+  }, [storeId, user?.user_id]);
+
+  
+  // Generate AI message for specific type
+  const generateAIMessage = async (type) => {
+    setIsGeneratingAI(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      const aiMessages = {
+
+        payment: [
+          `Your ePrice Track subscription payment is due. Please complete your payment to continue using our services without interruption.`,
+          `Keep your ePrice Track subscription active and continue tracking prices and competitors. Please complete your payment at your earliest convenience.`,
+          `Your ePrice Track subscription needs to be renewed. Complete your payment to enjoy uninterrupted price tracking, competitor monitoring, and product insights.`
+        ],
+        
+        admin: [
+          `We're rolling out new features to enhance your experience. Check out the latest improvements!`,
+          `Platform maintenance scheduled for this weekend. Minimal downtime expected.`,
+          `Important update available. Please check your ePrice Track account settings.`
+        ],
+        festival: [
+          `Wishing you and your business a joyful and successful festival! May this festive season bring you new opportunities, better sales, and greater success with ePrice Track.`,
+          `Happy Festive Season! May your business grow with smarter pricing, better insights, and greater success with ePrice Track.`,
+          `Wishing you a successful festive season! Stay ahead of competitors, track prices smarter, and maximize your sales with ePrice Track.`
+        ]
+      };
+      
+      const randomIndex = Math.floor(Math.random() * aiMessages[type].length);
+      const generated = aiMessages[type][randomIndex];
+      
+      setNotificationTypes(prev => ({
+        ...prev,
+        [type]: {
+          ...prev[type],
+          aiMessage: generated
+        }
+      }));
+      
+      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} AI message generated!`);
+    } catch (error) {
+      toast.error('Failed to generate message');
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
+  // Save notification settings to MongoDB
+  const saveNotificationSettings = async () => {
+
+    if (!storeId || !user?.user_id) {
+      toast.error('Company ID or user not available');
+      return;
+    }
+
+    // Validate message
+    const emptyMessageType = Object.keys(notificationTypes).find(
+      type =>
+        notificationTypes[type].enabled &&
+        !notificationTypes[type].message?.trim()
+    );
+
+    if (emptyMessageType) {
+      toast.error(
+        `Please enter a message for ${
+          emptyMessageType.charAt(0).toUpperCase() + emptyMessageType.slice(1)
+        } notification`
+      );
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      
+      const payload = {
+        types: {
+          payment: {
+            enabled: notificationTypes.payment.enabled,
+            message: notificationTypes.payment.message,
+            aiMessage: notificationTypes.payment.aiMessage
+          },
+          admin: {
+            enabled: notificationTypes.admin.enabled,
+            message: notificationTypes.admin.message,
+            aiMessage: notificationTypes.admin.aiMessage
+          },
+          festival: {
+            enabled: notificationTypes.festival.enabled,
+            message: notificationTypes.festival.message,
+            aiMessage: notificationTypes.festival.aiMessage
+          }
+        },
+        enabledNotifications: Object.keys(notificationTypes).filter(
+          key => notificationTypes[key].enabled
+        )
+      };
+
+      const response = await API.put(`/settings/put-notification/${storeId}/${userId}`, payload);
+      
+      if (response.data.success) {
+        toast.success('Notification settings saved successfully!');
+        
+        // Update profile with new settings
+        setProfile({
+          ...profile,
+          notificationTypes: notificationTypes,
+          enabledNotifications: payload.enabledNotifications
+        });
+
+        // Dispatch event for TopBar
+        window.dispatchEvent(new CustomEvent('notificationUpdate', {
+          detail: {
+            types: notificationTypes,
+            enabledTypes: payload.enabledNotifications,
+            timestamp: new Date().toISOString()
+          }
+        }));
+      } else {
+        toast.error(response.data.message || 'Failed to save settings');
+      }
+    } catch (error) {
+      console.error('Error saving notification settings:', error);
+      toast.error(error.response?.data?.message || 'Failed to save notification settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Toggle notification type
+  const toggleNotification = async (type) => {
+    setNotificationTypes(prev => ({
+      ...prev,
+      [type]: {
+        ...prev[type],
+        enabled: !prev[type].enabled
+      }
+    }));
+  };
+
+  // Update message for specific type
+  const updateMessage = (type, value) => {
+    setNotificationTypes(prev => ({
+      ...prev,
+      [type]: {
+        ...prev[type],
+        message: value
+      }
+    }));
+  };
+
+  const getColorClasses = (color) => {
+    const colors = {
+      blue: {
+        bg: 'bg-blue-50 dark:bg-blue-950/20',
+        border: 'border-l-4 border-blue-500',
+        iconBg: 'bg-blue-100 dark:bg-blue-900/30',
+        iconColor: 'text-blue-600 dark:text-blue-400',
+        badgeBg: 'bg-blue-100 dark:bg-blue-900/30',
+        badgeText: 'text-blue-700 dark:text-blue-300',
+        hover: 'hover:shadow-blue-100/50 dark:hover:shadow-blue-900/20'
+      },
+      amber: {
+        bg: 'bg-amber-50 dark:bg-amber-950/20',
+        border: 'border-l-4 border-amber-500',
+        iconBg: 'bg-amber-100 dark:bg-amber-900/30',
+        iconColor: 'text-amber-600 dark:text-amber-400',
+        badgeBg: 'bg-amber-100 dark:bg-amber-900/30',
+        badgeText: 'text-amber-700 dark:text-amber-300',
+        hover: 'hover:shadow-amber-100/50 dark:hover:shadow-amber-900/20'
+      },
+      purple: {
+        bg: 'bg-purple-50 dark:bg-purple-950/20',
+        border: 'border-l-4 border-purple-500',
+        iconBg: 'bg-purple-100 dark:bg-purple-900/30',
+        iconColor: 'text-purple-600 dark:text-purple-400',
+        badgeBg: 'bg-purple-100 dark:bg-purple-900/30',
+        badgeText: 'text-purple-700 dark:text-purple-300',
+        hover: 'hover:shadow-purple-100/50 dark:hover:shadow-purple-900/20'
+      }
+    };
+    return colors[color] || colors.blue;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-slate-400 font-medium">Loading notification settings...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const currentType = notificationTypes[activeType];
+
+  
+  const getDisplayMessage = (type) => {
+    const data = notificationTypes[type];
+    if (!data) return '';
+    
+    let message = data.message || data.aiMessage || data.defaultMessage || '';
+    return message;
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 8 }} 
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-6 pt-2"
+    >
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 className="font-bold text-gray-900 dark:text-white">Alert Notifications</h3>
+          <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+            Configure notification messages for your store (Tenant: {storeId})
+          </p>
+        </div>
+        <button
+          onClick={saveNotificationSettings}
+          disabled={saving}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors disabled:opacity-50"
+        >
+          {saving ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent inline-block mr-2" />
+              Saving...
+            </>
+          ) : (
+            'Save All Settings'
+          )}
+        </button>
+      </div>
+
+      {/* Notification Types Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {['payment', 'admin', 'festival'].map((type) => {
+
+          const data = notificationTypes[type];
+          const isActive = activeType === type;
+          const colors = getColorClasses(data.color);
+            
+          
+          return (
+            <div
+              key={type}
+              onClick={() => setActiveType(type)}
+              className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                isActive 
+                  ? `${colors.border} ${colors.bg} shadow-md` 
+                  : 'border-gray-200 dark:border-slate-700 bg-white dark:bg-[#151a2a] hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${colors.iconBg} ${colors.iconColor}`}>
+                    {data.icon}
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-800 dark:text-white text-sm">
+                      {data.title}
+                    </h4>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${data.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {data.enabled ? '✅ Active' : '⏸️ Disabled'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleNotification(type);
+                  }}
+                  className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${
+                    data.enabled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-slate-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                      data.enabled ? 'translate-x-5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Active Type Configuration */}
+      <div className="bg-white dark:bg-[#151a2a] border border-gray-200 dark:border-slate-700 rounded-xl p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+
+          {/* Left Column - Configuration */}
+          <div className="space-y-5">
+            <div className="flex items-center gap-2">
+              <div className={`p-2 rounded-lg ${getColorClasses(notificationTypes[activeType].color).iconBg} ${getColorClasses(notificationTypes[activeType].color).iconColor}`}>
+                {notificationTypes[activeType].icon}
+              </div>
+              <h4 className="text-lg font-bold text-gray-800 dark:text-white capitalize">
+                {activeType === 'payment' ? 'Payment Reminder' : 
+                 activeType === 'admin' ? 'Admin Message' : 
+                 'Festival Wishes'}
+              </h4>
+              <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${currentType.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                {currentType.enabled ? 'Active' : 'Disabled'}
+              </span>
+            </div>
+
+            {/* {activeType === 'payment' && (
+              <div>
+                <label className="text-sm font-bold text-gray-800 dark:text-white block mb-2">
+                  Days Before Due Date
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="1"
+                    max="15"
+                    value={notificationTypes.payment.daysRemaining}
+                    onChange={(e) => updateDays(parseInt(e.target.value))}
+                    className="flex-1 h-2 bg-gray-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                  <span className="text-sm font-semibold text-gray-800 dark:text-white min-w-[50px] text-center">
+                    {notificationTypes.payment.daysRemaining} {notificationTypes.payment.daysRemaining === 1 ? 'day' : 'days'}
+                  </span>
+                </div>
+              </div>
+            )} */}
+ 
+            <div>
+              <label className="text-sm font-bold text-gray-800 dark:text-white block mb-2">
+                Custom Message
+              </label>
+              <div className="relative">
+                <textarea
+                  value={currentType.message || ''}
+                  onChange={(e) => updateMessage(activeType, e.target.value)}
+                  placeholder={`Enter custom ${activeType === 'payment' ? 'payment reminder' : activeType === 'admin' ? 'admin' : 'festival'} message...`}
+                  rows="3"
+                  className="w-full rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+                {currentType.message && (
+                  <button
+                    onClick={() => updateMessage(activeType, '')}
+                    className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-bold text-gray-800 dark:text-white">
+                  AI Generated Message
+                </label>
+                <button
+                  onClick={() => generateAIMessage(activeType)}
+                  disabled={isGeneratingAI}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-sm font-semibold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {isGeneratingAI ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      Generate Message
+                    </>
+                  )}
+                </button>
+              </div>
+              {currentType.aiMessage && (
+                <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
+                  <p className="text-gray-700 dark:text-slate-300 text-sm leading-relaxed">
+                    {currentType.aiMessage}
+                  </p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold">AI Generated</span>
+                    <button
+                      onClick={() => {
+                        updateMessage(activeType, currentType.aiMessage);
+                        toast.success('AI message copied to custom message!');
+                      }}
+                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      Use this message
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          
+
+          {/* Right Column - Preview */}
+          <div className="bg-gray-50 dark:bg-[#0f1624] rounded-xl p-6 border border-gray-200 dark:border-slate-700">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-sm font-bold text-gray-800 dark:text-white">Live Preview</h4>
+              <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                currentType.enabled 
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                  : 'bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-slate-400'
+              }`}>
+                {currentType.enabled ? '✅ Active' : '⏸️ Disabled'}
+              </span>
+            </div>
+            
+            <div className={`rounded-xl p-4 transition-all ${
+              currentType.enabled 
+                ? 'bg-white dark:bg-[#151a2a] border border-gray-200 dark:border-slate-700 shadow-sm' 
+                : 'bg-gray-100 dark:bg-slate-800/50 opacity-50'
+            }`}>
+              <div className="flex items-start gap-3">
+                <div className={`p-2 rounded-lg ${getColorClasses(currentType.color).iconBg} ${getColorClasses(currentType.color).iconColor}`}>
+                  {currentType.icon}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-semibold text-gray-800 dark:text-white text-sm">
+                      {currentType.title}
+                    </h5>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${getColorClasses(currentType.color).badgeBg} ${getColorClasses(currentType.color).badgeText}`}>
+                      {currentType.badge}
+                    </span>
+                  </div>
+                  <p className="text-gray-600 dark:text-slate-300 text-sm mt-1.5 leading-relaxed">
+                    {getDisplayMessage(activeType) || 'Configure a message above to preview'}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-slate-500 mt-2 flex items-center gap-1.5">
+                    <Clock className="h-3 w-3" />
+                    Just now
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+     
+    </motion.div>
+  );
+}
+
 // ── Settings Page ───────────────────────────────────────────────────────────
 export default function Settings() {
   const user = useStore((s) => s.user);
@@ -1265,7 +1814,7 @@ export default function Settings() {
       );
     }
 
-    if (tab.id === "pendingsignup") {
+    if (tab.id === "pendingsignup" || tab.id === "alertnotification") {
       return user?.user_type === "super_admin";
     }
 
@@ -1321,6 +1870,7 @@ export default function Settings() {
             {activeTab === "users" && <ManageUsersTab key="users" />}
             {activeTab === "log" && <UsersLogTab key="log" />}
             {activeTab === "pendingsignup" && <PendingSignupTab key="pendingsignup" />}
+            {activeTab === "alertnotification" && <AlertNotification key="alertnotification" />}
           </AnimatePresence>
         </div>
       </motion.div>

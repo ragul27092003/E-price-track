@@ -12,6 +12,8 @@ const {
   getUsersLog,
   getLogFilterUsers,
   updateColor,
+  getAlertNotification,
+  putAlertNotification,
   uploadStoreLogo: uploadStoreLogoHandler,
 } = require('../../controllers/tenant/settingsController');
 const tenantResolver = require('../../middleware/tenantResolver');
@@ -36,6 +38,8 @@ router.delete('/users/:user_id',    auth, tenantResolver, removeUser);
 router.get('/users-log',            auth, getUsersLog);
 router.get('/log-users',            auth, getLogFilterUsers);
 router.put('/color', auth, tenantResolver, updateColor);
+router.get('/get-notification/:storeId', auth,tenantResolver, getAlertNotification);
+router.put('/put-notification/:storeId/:userId', auth, tenantResolver, putAlertNotification);
 router.post('/logo-upload', auth, requireAdmin, uploadStoreLogo.single('logo'), uploadStoreLogoHandler);
 
 

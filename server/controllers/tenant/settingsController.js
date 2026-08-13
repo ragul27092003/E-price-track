@@ -4,6 +4,8 @@ const { getAdminDb } = require('../../config/db');
 const User    = require('../../models/User');
 const Company = require('../../models/Company');
 const Access  = require('../../models/Access');
+const AlertNotification = require('../../models/AlertNotification');
+
 
 // Same hashing scheme as models/User.js pre('save') hook — must match,
 // since addUser writes directly to the collection and bypasses Mongoose hooks.
@@ -399,3 +401,97 @@ exports.getUsersLog = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+exports.getAlertNotification = async (req, res) => {
+
+  try {
+
+    const { storeId } = req.params;
+
+    if (!storeId) {
+      return res.status(400).json({
+        status: false,
+        message: 'Store ID is required',
+      });
+    }
+    
+    const db = req.tenantDb;
+    const notification = await db.collection('ept_alert_notication').findOne({
+      cmpid : storeId,
+    });
+
+    return res.status(200).json({
+      status: true,
+      message: 'Notification settings fetched successfully',
+      data: notification || null,
+    });
+
+  } catch (error) {
+    console.error('getAlertNotification error:', error);
+
+    return res.status(500).json({
+      status: false,
+      message: 'Failed to fetch notification settings',
+      error: error.message,
+    });
+  }
+};
+
+exports.putAlertNotification = async (req, res) => {
+
+  try {
+
+    const { storeId, userId } = req.params;
+    
+    const {
+      types,
+      enabledNotifications,
+      updatedBy
+    } = req.body;
+
+    if (!storeId) {
+      return res.status(400).json({
+        status: false,
+        message: 'Company ID is required',
+      });
+    }
+
+    const db = req.tenantDb;
+
+    const notification = await db.collection('ept_alert_notication').findOneAndUpdate(
+      {
+        cmpid : storeId
+      },
+      {
+        $set: {
+          types,
+          enabledNotifications,
+          updatedBy:userId,
+          updatedAt: new Date(),
+        },
+      },
+      {
+        new: true,
+        upsert: true,
+      }
+    );
+
+    return res.status(200).json({
+      status: true,
+      message: 'Notification settings updated successfully',
+      data: notification,
+    });
+
+  } catch (error) {
+    console.error('putAlertNotification error:', error);
+
+    return res.status(500).json({
+      status: false,
+      message: 'Failed to update notification settings',
+      error: error.message,
+    });
+  }
+};
+
+
+
