@@ -1576,27 +1576,35 @@ const MarketCompetitor = () => {
   // Select the competitor requested via ?competitor= slug, falling back to the
   // first active competitor once the list loads.
   useEffect(() => {
-    if (!selectedCompetitor && competitors.length > 0) {
+    if (competitors.length > 0) {
       const requestedSlug = searchParams.get("competitor");
-      const requested = requestedSlug
-        ? competitors.find((c) => c.slug === requestedSlug)
-        : null;
+      if (requestedSlug) {
+        const requested = competitors.find(
+          (c) =>
+            (c.slug && c.slug.toLowerCase() === requestedSlug.toLowerCase()) ||
+            (c.name && c.name.toLowerCase() === requestedSlug.toLowerCase())
+        );
 
-      if (requested) {
-        setSelectedCompetitor(requested);
-        return;
+        if (requested) {
+          if (selectedCompetitor?.slug !== requested.slug) {
+            setSelectedCompetitor(requested);
+          }
+          return;
+        }
       }
 
-      const eanSorted = competitors
-        .filter((c) => c.mappingType === "EAN")
-        .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-      const nonEanSorted = competitors
-        .filter((c) => c.mappingType === "NON_EAN")
-        .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      if (!selectedCompetitor) {
+        const eanSorted = competitors
+          .filter((c) => c.mappingType === "EAN")
+          .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+        const nonEanSorted = competitors
+          .filter((c) => c.mappingType === "NON_EAN")
+          .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
-      const orderedList = [...eanSorted, ...nonEanSorted];
-      const firstActive = orderedList.find((c) => c.isActive);
-      if (firstActive) setSelectedCompetitor(firstActive);
+        const orderedList = [...eanSorted, ...nonEanSorted];
+        const firstActive = orderedList.find((c) => c.isActive);
+        if (firstActive) setSelectedCompetitor(firstActive);
+      }
     }
   }, [competitors, searchParams]);
 

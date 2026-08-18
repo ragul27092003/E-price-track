@@ -346,8 +346,8 @@ exports.getAll = async (req, res) => {
       const productsTracked = (cronStatus && typeof cronStatus.totalCount === 'number')
         ? cronStatus.totalCount
         : staticCount;
-      const processCount = cronStatus.processCount;
-      const updateCount = cronStatus.updateCount;
+      const processCount = cronStatus?.processCount || 0;
+      const updateCount = cronStatus?.updateCount || 0;
 
       return {
         id:              c._id,

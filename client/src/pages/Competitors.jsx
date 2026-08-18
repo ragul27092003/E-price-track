@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { ROUTE } from "../utils/urls";
 import { useStore } from "../store";
 import {
   fetchCompetitors,
@@ -348,6 +350,7 @@ const CompetitorRow = ({
   onRequestRemove,
   removingId,
 }) => {
+  const navigate = useNavigate();
   const [isActive, setIsActive] = useState(data?.isActive || false);
   const [isSyncing, setIsSyncing] = useState(false);
   const isRemoving = removingId === data.id;
@@ -499,8 +502,23 @@ const CompetitorRow = ({
         <span className="md:hidden text-[11px] font-bold text-gray-400 dark:text-slate-500 uppercase">
           Tracked
         </span>
-        <div className="text-sm font-medium text-gray-800 dark:text-white">
-          {data.productsTracked ?? 0}
+        <div className="text-sm font-medium">
+          <button
+            type="button"
+            onClick={() => {
+              const key = data?.slug || data?.name;
+              if (key) {
+                navigate(`${ROUTE.market}?competitor=${encodeURIComponent(key)}`);
+              }
+            }}
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white/80 dark:bg-slate-800/80 hover:bg-[#475e77] hover:text-white dark:hover:bg-[#475e77] text-gray-800 dark:text-gray-200 font-semibold text-xs border border-gray-300/80 dark:border-slate-600 hover:border-[#475e77] transition-all duration-150 active:scale-95 shadow-xs cursor-pointer focus:outline-none group"
+            title={`View ${data?.name || "competitor"} products in Market Competitor`}
+          >
+            <span>{data.productsTracked ?? 0}</span>
+            <span className="text-[10px] text-gray-400 dark:text-gray-400 group-hover:text-white transition-colors">
+              ↗
+            </span>
+          </button>
         </div>
       </div>
 
