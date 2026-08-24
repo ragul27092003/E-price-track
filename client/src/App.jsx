@@ -23,6 +23,7 @@ import ProductMapping from "./pages/ProductMapping";
 import FullsiteRemapping from "./pages/FullsiteRemapping";
 import ProductMappingLayout from "./pages/ProductMappingLayout";
 import PendingSignups from "./pages/PendingSignups";
+import PriceChanges from "./pages/PriceChanges"
 import Home from "./pages/Home";
 import { ROUTES } from "./utilis/urls";
 import {ROUTE  , ADMIN_BASE} from "./utils/urls";
@@ -64,6 +65,7 @@ const App = () => (
               </Route>
               <Route path={ROUTE.smartReports} element={<SmartReports />} />
               <Route path={ROUTE.pendingSignups} element={<PendingSignups />} />
+              <Route path={ROUTE.priceChanges} element={<PriceChanges />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
