@@ -1,4 +1,4 @@
-import { Moon, Sun, LogOut, ChevronDown, Bell, Clock, CreditCard, ShieldAlert, Gift, } from "lucide-react";
+import { Moon, Sun, LogOut, ChevronDown, Bell, Clock, CreditCard, ShieldAlert, Gift, Search, } from "lucide-react";
 import logo from "../../services/assets/main-logo.png";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -57,6 +57,7 @@ export function AppHeader() {
     () => localStorage.getItem("darkMode") === "true",
   );
   const [stores, setStores] = useState([]);
+  const [storeSearch, setStoreSearch] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -275,6 +276,22 @@ const activeNotifications = notificationConfig.filter(
 
   const showPaymentReminder =
     isDayInRange && !isSathyaUser && !isPaymentCompleted; */}
+
+  const filteredStores = stores
+    .filter((store) =>
+      (store.companyName || "")
+        .toLowerCase()
+        .includes(storeSearch.toLowerCase().trim()),
+    )
+    .sort((a, b) => {
+      const isASelected =
+        a.companyId === activeStoreId || a.companyName === activeShopName;
+      const isBSelected =
+        b.companyId === activeStoreId || b.companyName === activeShopName;
+      if (isASelected && !isBSelected) return -1;
+      if (!isASelected && isBSelected) return 1;
+      return 0;
+    });
 
   return (
 
@@ -622,9 +639,12 @@ const activeNotifications = notificationConfig.filter(
             <>
               <div
                 className="fixed inset-0 z-40"
-                onClick={() => setDropdownOpen(false)}
+                onClick={() => {
+                  setDropdownOpen(false);
+                  setStoreSearch("");
+                }}
               />
-              <div className="absolute right-0 top-full mt-2 w-60 rounded-lg border bg-card shadow-lg z-50 py-1">
+              <div className="absolute right-0 top-full mt-2 w-64 rounded-lg border bg-card shadow-lg z-50 py-1">
                 {/* User info header */}
                 <div className="px-3 py-2.5 border-b">
                   <div className="flex items-center gap-2.5">
@@ -663,25 +683,49 @@ const activeNotifications = notificationConfig.filter(
                     <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-1">
                       Switch Store
                     </div>
-                    {stores.length === 0 ? (
-                      <p className="px-3 py-2 text-sm text-muted-foreground">
-                        No stores yet
+
+                    {/* Search Store input */}
+                    <div className="px-2.5 pb-1.5">
+                      <div className="relative flex items-center">
+                        <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                        <input
+                          type="text"
+                          placeholder="Search Store..."
+                          value={storeSearch}
+                          onChange={(e) => setStoreSearch(e.target.value)}
+                          className="w-full pl-8 pr-2.5 py-1 text-xs rounded-md border border-input bg-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                    </div>
+
+                    {filteredStores.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-muted-foreground text-center">
+                        {stores.length === 0 ? "No stores yet" : "No stores found"}
                       </p>
                     ) : (
-                      <div className="max-h-48 overflow-y-auto">
-                        {stores.map((store) => (
-                          <button
-                            key={store._id}
-                            onClick={() => handleStoreSelect(store)}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors ${
-                              activeShopName === store.companyName
-                                ? "bg-accent font-medium"
-                                : ""
-                            }`}
-                          >
-                            {store.companyName}
-                          </button>
-                        ))}
+                      <div className="max-h-[170px] overflow-y-auto px-1.5 space-y-0.5">
+                        {filteredStores.map((store) => {
+                          const isSelected =
+                            store.companyId === activeStoreId ||
+                            store.companyName === activeShopName;
+                          return (
+                            <button
+                              key={store._id || store.companyId}
+                              onClick={() => {
+                                handleStoreSelect(store);
+                                setStoreSearch("");
+                              }}
+                              className={`w-full text-left px-2.5 py-1.5 text-sm transition-all rounded-md flex items-center justify-between ${
+                                isSelected
+                                  ? "bg-primary/10 text-primary font-semibold shadow-sm border border-primary/25 dark:bg-primary/20 dark:border-primary/30"
+                                  : "hover:bg-accent/60 text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              <span className="truncate">{store.companyName}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                     <div className="my-1 border-t" />
