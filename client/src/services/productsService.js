@@ -43,6 +43,30 @@ export const updateProduct = (id, data) =>
 export const deleteProduct = (id) =>
   API.delete(`/products/${id}`).then((r) => r.data);
 
+export const deleteProductCompetitor = (unique_id, cmpid, comp_name) =>
+  API.delete(`/products/deleteproductcompetitor/${unique_id}`, {
+    params: {
+      cmpid,
+      comp_name
+    }
+  }).then((r) => r.data);
+
+export const updateProductCompetitor = (
+  unique_id,
+  cmpid,
+  comp_name,
+  product_url,
+  product_ean_id,
+  product_code
+) =>
+  API.put(`/products/updateproductcompetitor/${unique_id}`, {
+    cmpid,
+    comp_name,
+    product_url,
+    product_ean_id,
+    product_code
+  }).then((r) => r.data);
+
 export const fetchAdminUsers = () =>
   API.get('/products/admin-users').then((r) => r.data);
 

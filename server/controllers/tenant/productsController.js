@@ -147,15 +147,18 @@ async function enrichProducts(db, products) {
     const ourPrice = toPrice(product.product_price);
 
     const competitor_prices = onlineCompetitors.map((comp) => {
+
       const slug      = comp.competitor_slug;
       const cd        = competitorMap[slug]?.[ean];
       const compPrice = toPrice(cd?.product_price);
+      const uniqueId  = cd?.[`${slug}_unique_id`];
+      
 
       // ── Smart "is_listed" logic ──
       // 1. Check if the database explicitly says it's out of stock
       const stockStr = String(cd?.product_stock || '').toLowerCase();
       const isExplicitlyOos = stockStr.includes('out of stock') || stockStr === '0';
-
+  
       // 2. Only consider it "listed" if we have a real price (now correctly excludes ₹0)
       // OR it is explicitly out of stock. This hides "No Result"/₹0 scraping errors from the UI.
       const is_listed = !!cd && (compPrice !== null || isExplicitlyOos);
@@ -168,6 +171,7 @@ async function enrichProducts(db, products) {
         url:       cd?.product_url   || null,
         stock:     cd?.product_stock || null,
         is_listed: is_listed,
+        unique_id: uniqueId,
         image:     cd?.product_image || null,
         product_rating: cd?.product_rating ?? null,
         product_review: cd?.product_review ?? null,
@@ -879,7 +883,6 @@ exports.fullsiteMappingUpdation = async (req, res) => {
   }
 };
 
-
 exports.completedProductsExport = async (req, res) => {
 
   try {
@@ -958,9 +961,7 @@ exports.completedProductsExport = async (req, res) => {
 };
 
 exports.importFullsiteMapping = async (req, res) => {
-
   try {
-    
     const db = req.tenantDb;
 
     if (!req.file) {
@@ -974,11 +975,22 @@ exports.importFullsiteMapping = async (req, res) => {
 
     fs.createReadStream(req.file.path)
       .pipe(csv())
-      .on("data", (data) => rows.push(data))
+      .on("data", (data) => {
+        // Remove empty CSV column names / keys
+        const cleanRow = Object.fromEntries(
+          Object.entries(data).filter(
+            ([key, value]) => key && key.trim() !== ""
+          )
+        );
+
+        rows.push(cleanRow);
+      })
       .on("end", async () => {
         try {
           if (!rows.length) {
-            fs.unlinkSync(req.file.path);
+            if (fs.existsSync(req.file.path)) {
+              fs.unlinkSync(req.file.path);
+            }
 
             return res.status(400).json({
               success: false,
@@ -986,35 +998,91 @@ exports.importFullsiteMapping = async (req, res) => {
             });
           }
 
-          const operations = rows.map((row) => ({
-            updateOne: {
-              filter: {
-                product_ean_id: row.product_ean_id,
-                product_code: row.product_code,
-                product_url_change_competitior_name:
-                  row.product_url_change_competitior_name,
+          const operations = [];
+
+          rows.forEach((row, index) => {
+            const {
+              product_ean_id,
+              product_code,
+              product_url_change_competitior_name,
+              ...updateFields
+            } = row;
+
+            // Validate required fields
+            if (
+              !product_ean_id ||
+              !product_code ||
+              !product_url_change_competitior_name
+            ) {
+              console.log(`Skipping invalid CSV row ${index + 1}:`, row);
+              return;
+            }
+
+            // Remove empty values if required
+            const cleanUpdateFields = Object.fromEntries(
+              Object.entries(updateFields).filter(
+                ([key, value]) => key && key.trim() !== ""
+              )
+            );
+
+            // Don't create an empty $set
+            if (Object.keys(cleanUpdateFields).length === 0) {
+              console.log(`Skipping empty update row ${index + 1}`);
+              return;
+            }
+
+            operations.push({
+              updateOne: {
+                filter: {
+                  product_ean_id: product_ean_id.trim(),
+                  product_code: product_code.trim(),
+                  product_url_change_competitior_name:
+                    product_url_change_competitior_name.trim(),
+                },
+                update: {
+                  $set: cleanUpdateFields,
+                  $setOnInsert: {
+                    product_ean_id: product_ean_id.trim(),
+                    product_code: product_code.trim(),
+                    product_url_change_competitior_name:
+                      product_url_change_competitior_name.trim(),
+                  },
+                },
+                upsert: true,
               },
-              update: {
-                $set: row,
-              },
-              upsert: true,
-            },
-          }));
+            });
+          });
+
+          if (!operations.length) {
+            if (fs.existsSync(req.file.path)) {
+              fs.unlinkSync(req.file.path);
+            }
+
+            return res.status(400).json({
+              success: false,
+              message: "No valid rows found in CSV.",
+            });
+          }
 
           const result = await db
             .collection("ept_full_site_mapping_data_info")
             .bulkWrite(operations);
 
-          fs.unlinkSync(req.file.path);
+          if (fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+          }
 
           return res.status(200).json({
             success: true,
             total: rows.length,
+            processed: operations.length,
             inserted: result.upsertedCount,
             updated: result.modifiedCount,
             matched: result.matchedCount,
           });
         } catch (err) {
+          console.error("Import error:", err);
+
           if (fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
           }
@@ -1035,4 +1103,219 @@ exports.importFullsiteMapping = async (req, res) => {
   }
 };
 
+exports.deleteProductCompetitor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { cmpid, comp_name } = req.query;
 
+    if (!id || !cmpid || !comp_name) {
+      return res.status(400).json({
+        success: false,
+        message: "unique_id, cmpid and comp_name are required"
+      });
+    }
+
+    const competitor = String(comp_name).toLowerCase();
+
+    // Dynamic unique ID field
+    const uniqueIdField = `${competitor}_unique_id`;
+
+    // ----------------------------------------
+    // 1. Delete competitor document completely
+    // ----------------------------------------
+
+    const competitorCollectionName =
+      `ept_product_details_new_${competitor}`;
+
+    const competitorResult = await req.tenantDb
+      .collection(competitorCollectionName)
+      .deleteOne({
+        [uniqueIdField]: String(id)
+      });
+
+    // ----------------------------------------
+    // 2. Remove ONLY dynamic unique_id field
+    // ----------------------------------------
+
+    const mainResult = await req.tenantDb
+      .collection("ept_product_details_new")
+      .updateOne(
+        {
+          [uniqueIdField]: String(id)
+        },
+        {
+          $unset: {
+            [uniqueIdField]: ""
+          }
+        }
+      );
+
+    if (
+      competitorResult.deletedCount === 0 &&
+      mainResult.modifiedCount === 0
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: "Competitor product not found"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Competitor deleted and unique_id removed successfully",
+      competitorDeletedCount: competitorResult.deletedCount,
+      uniqueIdRemovedCount: mainResult.modifiedCount
+    });
+
+  } catch (error) {
+    console.error("Delete competitor error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete competitor product",
+      error: error.message
+    });
+  }
+};
+
+exports.updateProductCompetitor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      cmpid,
+      comp_name,
+      product_url,
+      product_ean_id,
+      product_code,
+    } = req.body;
+
+    if (
+      !id ||
+      !cmpid ||
+      !comp_name ||
+      !product_url ||
+      !product_ean_id ||
+      !product_code
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "id, cmpid, comp_name, product_url, product_ean_id and product_code are required",
+      });
+    }
+
+    const db = req.tenantDb;
+
+    const collectionName = `ept_product_details_new_${comp_name}`;
+    const collection = db.collection(collectionName);
+
+    const mainCollection = db.collection("ept_product_details_new");
+
+    const uniqueField = `${comp_name}_unique_id`;
+    const eanField = `${cmpid}_product_id`;
+    const codeField = `${cmpid}_product_code`;
+
+    const currentDate = new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+    });
+
+    const updateData = {
+      [eanField]: product_ean_id,
+      [codeField]: product_code,
+      [uniqueField]: id,
+
+      logo_image: `/assets/competitorlogos/${comp_name}_full.png`,
+      cmp_name: comp_name,
+
+      product_name: "No Result",
+      product_image: "No Result",
+      product_price: "No Result",
+      product_stock: "No Result",
+
+      product_url: product_url.trim(),
+      product_scrape_status: "pending",
+
+      status: "active",
+      competitor_status: "enable",
+
+      product_review: 0,
+      product_rating: 0,
+
+      [`${comp_name}_product_url_manual_update`]: "Yes",
+      [`${comp_name}_nikshan_product_url_manual_update_date`]:
+        currentDate,
+
+      pricechange: {
+        status: "pending",
+        decreasedValue: 0,
+        increasedValue: 0,
+        oldPriceValue: 0,
+        newPriceValue: 0,
+      },
+
+      modified_date: currentDate,
+    };
+
+
+    const result = await collection.updateOne(
+      {
+        [eanField]: product_ean_id,
+        [codeField]: product_code,
+      },
+      {
+        $set: updateData,
+
+        $setOnInsert: {
+          created_date: currentDate,
+        },
+      },
+      {
+        upsert: true,
+      }
+    );
+
+    // Update main product with competitor unique ID
+    const mainResult = await mainCollection.updateOne(
+      {
+        product_ean_id,
+        product_code,
+      },
+      {
+        $set: {
+          [uniqueField]: id,
+        },
+      }
+    );
+
+    if (result.matchedCount > 0) {
+      return res.status(200).json({
+        success: true,
+        action: "updated",
+        message: "Product URL updated successfully",
+        modifiedCount: result.modifiedCount,
+      });
+    }
+
+    if (result.upsertedCount > 0) {
+      return res.status(201).json({
+        success: true,
+        action: "inserted",
+        message: "Competitor product not found, so new product inserted",
+        insertedId: result.upsertedId,
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Product update/insert failed",
+    });
+  } catch (error) {
+    console.error("Update product competitor error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update/insert product URL",
+      error: error.message,
+    });
+  }
+};

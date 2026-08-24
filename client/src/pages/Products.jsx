@@ -16,6 +16,8 @@ import { Rss, Globe } from "lucide-react";
 import Swal from "sweetalert2";
 import CompetitorMeta from "../components/CompetitorMeta";
 import SingleProductUpdation from "../components/SingleProductUpdation";
+import { MD5 } from "crypto-js";
+
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -475,10 +477,27 @@ function MarketGapCell({ product, competitorMeta }) {
 }
 
 function CompetitorPrices({ product, competitorMeta, onShowHistory }) {
+
   // Get all competitors that actually have this product listed (even if out of stock)
-  const listed = (product.competitor_prices || []).filter((c) => c.is_listed);
+  /* const listed = (product.competitor_prices || []).filter((c) => c.is_listed);
 
   if (listed.length === 0) {
+    const { low, avg, high } = marketStats(product);
+    return <MarketCap low={low} avg={avg} high={high} />;
+  } */
+
+  const competitors = product.competitor_prices || [];
+  
+  // Normal listed competitors
+  const listed = competitors.filter((c) => c.is_listed === true);
+
+  // Pending competitors:
+  const pending = competitors.filter(
+    (c) =>
+      c.is_listed === false
+  );
+
+  if (listed.length === 0 && pending.length === 0) {
     const { low, avg, high } = marketStats(product);
     return <MarketCap low={low} avg={avg} high={high} />;
   }
@@ -491,19 +510,24 @@ function CompetitorPrices({ product, competitorMeta, onShowHistory }) {
     if (!aOos && bOos) return -1;
     if (aOos && !bOos) return 1;
     if (!aOos && !bOos) return a.price - b.price;
+    
     return 0;
   });
 
   const storedData = JSON.parse(localStorage.getItem("eprice-store"));
   const isSuperAdmin = storedData?.state.user?.user_type === "super_admin";
+  const [showPending, setShowPending] = useState(false);
 
   return (
+
     <div className="flex flex-col gap-2.5 w-full">
+
+      {/* Completed competitors */}
       {sorted.map((c) => {
         const meta = competitorMeta?.[c.slug] || {};
         const isOos = isCompetitorOos(c);
         const hasPrice = c.price !== null && c.price !== undefined && c.price > 0;
-
+        
         return (
           <div key={c.slug} className="flex items-center gap-2.5 w-full min-w-0">
             {/* Left section: Logo + Price/Status Badge + History Button */}
@@ -572,6 +596,51 @@ function CompetitorPrices({ product, competitorMeta, onShowHistory }) {
                 </div>
               )}
 
+              {/* Competitor Product Image - with fallback icon */}
+              <div className="relative inline-flex items-center justify-center shrink-0 ml-0.5">
+                <div className="group relative flex items-center justify-center h-6 w-6 rounded-full border border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white hover:border-amber-500 hover:shadow-sm transition-all cursor-pointer overflow-visible">
+                 {c.image && /^https?:\/\//i.test(c.image) ? (
+                    <>
+                      <img 
+                        src={c.image} 
+                        alt={c.name}
+                        className="w-3.5 h-3.5 object-contain pointer-events-none"
+                      />
+                      {/* Hover Zoom Tooltip */}
+                      <div className="absolute opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 bottom-full left-1/2 -translate-x-1/2 mb-3 z-[9999] pointer-events-none">
+                        <div className="relative">
+                          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 p-2 min-w-[50px] max-w-[100px]">
+                            <img 
+                              src={c.image} 
+                              alt={c.name}
+                              className="w-full h-auto max-h-[150px] object-contain rounded"
+                              style={{ minWidth: '50px', minHeight: '50px' }}
+                            />
+
+                            {/* <div className="text-center text-xs text-gray-600 dark:text-gray-300 mt-2 font-medium truncate px-1">
+                              {c.name}
+                            </div> */}
+
+                            {/* {hasPrice && (
+                              <div className="text-center text-sm font-bold text-amber-600 dark:text-amber-400 mt-1">
+                                ₹{c.price.toLocaleString("en-IN")}
+                              </div>
+                            )} */}
+                            
+                          </div>
+                          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white dark:bg-gray-800 border-r border-b border-gray-200 dark:border-gray-700 rotate-45"></div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    /* No image placeholder - no hover */
+                    <svg className="w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+
               {!isOos && (
                 <button
                   type="button"
@@ -636,11 +705,17 @@ function CompetitorPrices({ product, competitorMeta, onShowHistory }) {
             
               <div className="flex items-center shrink-0 whitespace-nowrap">
                   <SingleProductUpdation
-                    product_ean_id ={ product.product_ean_id }
-                    product_code ={ product.product_code }
-                    product_name ={ product.product_name }
-                    comp_name ={ c.name }
-                    cmpid = { localStorage.getItem("activeShopName")}
+                     product_ean_id ={ product.product_ean_id }
+                     product_code ={ product.product_code }
+                     product_name ={ product.product_name }
+                     comp_name ={ c.name }
+                     unique_id ={c.unique_id}
+                     cmpid = { localStorage.getItem("activeShopName")}
+                     product_status = 'completed'
+                     url_status={
+                        !!c.url &&
+                        c.url !== "No Result"
+                     }
                   />
               </div>
 
@@ -649,7 +724,91 @@ function CompetitorPrices({ product, competitorMeta, onShowHistory }) {
           </div>
         );
       })}
+
+      {/* Pending competitors */}
+      {isSuperAdmin && pending.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-dashed border-gray-200 dark:border-gray-700">
+          {/* Toggle Button */}
+          <button
+            onClick={() => setShowPending(!showPending)}
+            className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-2 hover:text-amber-700 dark:hover:text-amber-300 transition-colors group w-full"
+          >
+            <span>Pending ({pending.length})</span>
+            <svg 
+              className={`w-3 h-3 transition-transform duration-200 ${showPending ? 'rotate-180' : ''}`}
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {/* Pending items - conditionally rendered */}
+          {showPending && (
+            <div className="flex flex-col gap-2.5 w-full">
+              {pending.map((c) => {
+                const meta = competitorMeta?.[c.slug] || {};
+
+                return (
+                  <div
+                    key={c.slug}
+                    className="flex items-center gap-2.5 w-full min-w-0"
+                  >
+                    <a
+                      href={c.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Open on ${c.name}`}
+                      className="flex items-center gap-2 hover:opacity-75 transition-opacity"
+                    >
+                      <CompetitorLogo
+                        name={c.name}
+                        slug={c.slug}
+                        logo={meta.logo || ""}
+                      />
+
+                      <span className="font-bold text-amber-600 dark:text-amber-400 text-[10px] uppercase tracking-wider bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800 whitespace-nowrap">
+                        Pending
+                      </span>
+                    </a>
+
+                    <div className="flex items-center shrink-0 whitespace-nowrap">
+
+                      <SingleProductUpdation
+                          product_ean_id={product.product_ean_id}
+                          product_code={product.product_code}
+                          product_name={product.product_name}
+                          comp_name={c.name}
+                          unique_id={
+                            c.unique_id ??
+                            MD5(
+                              localStorage.getItem("activeShopName") +
+                              c.name +
+                              product.product_ean_id +
+                              product.product_code
+                            )
+                          }
+                          cmpid={localStorage.getItem("activeShopName")}
+                          product_status="pending"
+                          url_status={
+                              !!c.url &&
+                              c.url !== "No Result"
+                          }
+                      />
+
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
+
   );
 }
 
@@ -985,11 +1144,8 @@ function ProductCell({ product }) {
             {product.product_name || "Unnamed Product"}
           </p>
         )}
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-          {product.product_brand && <span>{product.product_brand} · </span>}
-          {product.product_ean_id || product.product_code || product._id}
-        </p>
-        {product.product_stock !== null && (
+
+        {/* {product.product_stock !== null && (
           <div className="flex items-center gap-1.5 mt-1">
             <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
               Quantity:
@@ -1004,7 +1160,56 @@ function ProductCell({ product }) {
               {product.product_stock} units
             </span>
           </div>
+        )} */}
+
+
+        {product.product_stock != null && (
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              Quantity:
+            </span>
+
+            {Number(product.product_stock) > 0 ? (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-emerald-600 bg-emerald-50">
+                {product.product_stock} units
+              </span>
+            ) : /in\s*stock/i.test(product.product_stock_status || "") ? (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-emerald-600 bg-emerald-50">
+                In Stock
+              </span>
+            ) : /out\s*of\s*stock/i.test(product.product_stock_status || "") ? (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-rose-600 bg-rose-50">
+                Out Of Stock
+              </span>
+            ) : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-rose-600 bg-rose-50">
+                None
+              </span>}
+          </div>
         )}
+
+
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+          {product.product_brand && <span>{product.product_brand} · </span>}
+          {product.product_category || product.product_item_group }
+        </p>
+        <p className="text-[11px] mt-0.5">
+          {product.product_ean_id && (
+            <span className="text-blue-600 dark:text-blue-400 font-bold">
+              {product.product_ean_id}
+            </span>
+          )}
+
+          {product.product_ean_id && product.product_code && (
+            <span className="text-slate-400"> · </span>
+          )}
+
+          {product.product_code && (
+            <span className="text-purple-600 dark:text-purple-400 font-bold">
+              {product.product_code}
+            </span>
+          )}
+        </p>
+        
         {product.product_movement && (
           <div className="flex items-center gap-1.5 mt-1">
             <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">

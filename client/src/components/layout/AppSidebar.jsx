@@ -10,6 +10,7 @@ import {
   BarChartBigIcon,
   ComponentIcon,
   Share2Icon,
+  Coins
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ const navItems = [
   { title: "Notifications",     icon: ClipboardCheck,  path: ROUTE.notifications },
   { title: "Product History",   icon: LucideHistory,   path: ROUTE.productHistory },
   { title: "Market Competitor", icon: ComponentIcon,   path: ROUTE.market },
+  { title: "Price Change Monitor", icon: Coins, path: ROUTE.priceChanges },
   { title: "Smart Reports",     icon: BarChartBigIcon, path: ROUTE.smartReports },
   { title: "Product Mapping",   icon: Share2Icon,      path: ROUTE.productMapping, activePaths: [
       ROUTE.productMapping,
