@@ -17,4 +17,5 @@ export const ROUTE = {
   fullsiteRemapping: `${ADMIN_BASE}/fullsite-remapping`,
   smartReports: `${ADMIN_BASE}/smart-reports`,
   pendingSignups: `${ADMIN_BASE}/pending-signups`,
+  priceChanges: `${ADMIN_BASE}/price-changes`,
 };

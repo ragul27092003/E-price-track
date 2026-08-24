@@ -25,7 +25,7 @@ const navItems = [
   { title: "Notifications",     icon: ClipboardCheck,  path: ROUTE.notifications },
   { title: "Product History",   icon: LucideHistory,   path: ROUTE.productHistory },
   { title: "Market Competitor", icon: ComponentIcon,   path: ROUTE.market },
-  { title: "Price Change Monitor", icon: Coins, path: ROUTE.priceChanges },
+  { title: "Price Change Monitor", icon: Coins, path: ROUTE.priceChanges, superAdminOnly: true },
   { title: "Smart Reports",     icon: BarChartBigIcon, path: ROUTE.smartReports },
   { title: "Product Mapping",   icon: Share2Icon,      path: ROUTE.productMapping, activePaths: [
       ROUTE.productMapping,
