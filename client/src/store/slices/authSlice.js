@@ -61,7 +61,11 @@ export const createAuthSlice = (set, get) => ({
     });
   },
 
-  logout: () => {
+  logout: async () => {
+    try {
+      const { logoutUser } = await import('../../services/authService');
+      await logoutUser();
+    } catch {}
     // Remove only auth-specific keys — DO NOT use localStorage.clear()
     // because that would wipe storeLogoMap, darkMode, and other persisted UI state
     localStorage.removeItem('token');

@@ -4,6 +4,7 @@ const auth       = require('../middleware/auth');
 const roleCheck  = require('../middleware/roleCheck');
 const {
   login,
+  logout,
   checkEmail,
   checkCompanyName,
   signup,
@@ -16,6 +17,7 @@ const {
 } = require('../controllers/authController');
 
 router.post('/login',            login);
+router.post('/logout',           auth, logout);
 router.get('/check-email',       checkEmail);
 router.get('/check-companyname', checkCompanyName);
 router.post('/signup',           signup);
