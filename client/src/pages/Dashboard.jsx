@@ -555,6 +555,23 @@ export default function Dashboard() {
     };
   }, [isRunning, currentStoreId]);
 
+ 
+  
+useEffect(() => {
+  const hasProcessStatus = activityLogs.some(log => log.status === "Process");
+  
+  if (!hasProcessStatus) {
+    return;
+  }
+  const interval = setInterval(() => {
+    loadActivityLog();
+  }, 10000);
+
+  return () => {
+    clearInterval(interval);
+  };
+}, [activityLogs]); 
+
   return (
     <>
     <style>

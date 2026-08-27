@@ -292,7 +292,7 @@ exports.getCompetitorActivityLog = async (req, res) => {
         return {
           date:       formatDate(doc.start_time),
           status:     !doc.end_time ? "Process" : doc.update_count > 0 ? "Success" : "Failed",
-          message:    `Scraped ${doc.cron_competitor_name || 'competitor'}: ${doc.update_count || 0} of ${doc.total_count || 0} products updated. Ended: ${formatDate(doc.end_time)}`,
+          message:    `Scraped ${doc.cron_competitor_name || 'competitor'}: ${doc.process_count || 0} of ${doc.total_count || 0} products updated. Ended: ${formatDate(doc.end_time)}`,
           source:     'cron_scrape',
           competitor: doc.cron_competitor_name || '',
           logo:       logoMap[competitorKey] || null,   // 👈 attach logo here
