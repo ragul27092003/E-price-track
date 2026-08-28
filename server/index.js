@@ -3,10 +3,13 @@ const express = require('express');
 const cors = require('cors');
 const { connectDB } = require('./config/db');
 const { initAllCrons } = require('./services/cronService');
-const cronRoutes       = require('./routes/cronRoutes');
+const cronRoutes = require('./routes/cronRoutes');
 const path = require('path');
 
 const app = express();
+
+// Trust reverse proxies (Nginx / Cloudflare / AWS Load Balancer) to get real client IP
+app.set('trust proxy', true);
 
 app.use(cors({
   origin: [
@@ -32,7 +35,7 @@ app.use('/api/custom-labels', require('./routes/tenant/customLabels'));
 app.use('/api/output-feeds', require('./routes/tenant/outputFeeds'));
 app.use('/api/settings', require('./routes/tenant/settings'));
 app.use('/api/competitors', require('./routes/tenant/competitors'));
-app.use('/api/dashboard',  require('./routes/tenant/dashboard'));
+app.use('/api/dashboard', require('./routes/tenant/dashboard'));
 app.use('/api/smart-reports', require('./routes/tenant/smartReports'));
 app.use('/api/product-history', require('./routes/tenant/productHistory'));
 app.use('/api/cron', cronRoutes);
@@ -44,6 +47,6 @@ const PORT = process.env.PORT || 5000;
 
 connectDB().then(async () => {
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-  
+
   // await initAllCrons();
 });

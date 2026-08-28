@@ -33,15 +33,30 @@ const generateToken = (payload) =>
 
 function formatLogTime(date) {
   const d = date || new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  let hours = d.getHours();
-  const mins = String(d.getMinutes()).padStart(2, '0');
-  const secs = String(d.getSeconds()).padStart(2, '0');
-  const ampm = hours >= 12 ? 'pm' : 'am';
-  hours = hours % 12 || 12;
-  return `${year}-${month}-${day} ${String(hours).padStart(2, '0')}:${mins}:${secs}${ampm}`;
+  // Force Indian Standard Time (Asia/Kolkata / UTC+5:30)
+  const formatter = new Intl.DateTimeFormat('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+
+  const parts = formatter.formatToParts(d);
+  const getPart = (type) => parts.find((p) => p.type === type)?.value || '';
+
+  const year = getPart('year');
+  const month = getPart('month');
+  const day = getPart('day');
+  const hour = getPart('hour').padStart(2, '0');
+  const minute = getPart('minute').padStart(2, '0');
+  const second = getPart('second').padStart(2, '0');
+  const dayPeriod = (getPart('dayPeriod') || '').toLowerCase() || (d.getHours() >= 12 ? 'pm' : 'am');
+
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}${dayPeriod}`;
 }
 
 function parseUA(ua = '') {
@@ -56,6 +71,27 @@ function parseUA(ua = '') {
   else if (/chrome/.test(s)) browser = 'Chrome';
   else if (/safari/.test(s)) browser = 'Safari';
   return { device, browser };
+}
+
+function getClientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  let ip =
+    req.headers['cf-connecting-ip'] ||
+    req.headers['x-real-ip'] ||
+    (forwarded ? forwarded.split(',')[0].trim() : null) ||
+    req.ip ||
+    req.socket?.remoteAddress ||
+    '';
+
+  if (typeof ip === 'string') {
+    if (ip.startsWith('::ffff:')) {
+      ip = ip.replace('::ffff:', '');
+    }
+    if (ip === '::1') {
+      ip = '127.0.0.1';
+    }
+  }
+  return ip;
 }
 
 exports.login = async (req, res) => {
@@ -125,7 +161,7 @@ exports.login = async (req, res) => {
         action: 'manual_login',
         log_at: formatLogTime(new Date()),
         system_log: {
-          ip_addr: req.ip || req.headers['x-forwarded-for'] || '',
+          ip_addr: getClientIp(req),
           device,
           browser,
         },
@@ -165,7 +201,7 @@ exports.logout = async (req, res) => {
           action: 'logout',
           log_at: formatLogTime(new Date()),
           system_log: {
-            ip_addr: req.ip || req.headers['x-forwarded-for'] || '',
+            ip_addr: getClientIp(req),
             device,
             browser,
           },
