@@ -3,6 +3,9 @@ import API from '../hooks/useApi';
 export const loginUser = (email, password) =>
   API.post('/auth/login', { email, password }).then((r) => r.data);
 
+export const logoutUser = () =>
+  API.post('/auth/logout').catch(() => {});
+
 export const signupUser = (form) =>
   API.post('/auth/signup', form).then((r) => r.data);
 

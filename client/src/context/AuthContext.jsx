@@ -50,7 +50,11 @@ export function AuthProvider({ children }) {
     });
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      const { logoutUser } = await import('../services/authService');
+      await logoutUser();
+    } catch {}
     const rememberedLogin = localStorage.getItem('ept_remember_login');
     localStorage.clear();
     if (rememberedLogin) {

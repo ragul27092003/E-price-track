@@ -328,7 +328,7 @@ const PriceChanges = () => {
   const [allProducts, setAllProducts] = useState([]);
   const [selectedCompetitor, setSelectedCompetitor] = useState('');
   const [page, setPage] = useState(1);
-  const [limit] = useState(50);
+  const [limit] = useState();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -383,6 +383,7 @@ const PriceChanges = () => {
       setAllProducts([]);
     } finally {
       setLoading(false);
+      setInitialLoading(false);
     }
   };
 
