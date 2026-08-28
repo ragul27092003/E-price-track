@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link, Navigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useStore } from '../store';
 import { useAuth } from '../context/AuthContext';
 import { loginUser } from '../services/authService';
@@ -41,7 +41,6 @@ function clearRememberedCredentials() {
 }
 
 const Login = () => {
-
   const [email,      setEmail]      = useState('');
   const [password,   setPassword]   = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -50,11 +49,7 @@ const Login = () => {
   const [showPass,   setShowPass]   = useState(false);
   const [capsLock,   setCapsLock]   = useState(false);
 
-  const token = useStore((s) => s.token);
-  if (token) {
-    return <Navigate to="/dashboard" replace />;
-  }
-  const login = useStore((s) => s.login);
+  const login        = useStore((s) => s.login);
   const { login: authLogin } = useAuth();
   const navigate = useNavigate();
 
