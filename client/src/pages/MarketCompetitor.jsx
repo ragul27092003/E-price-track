@@ -629,6 +629,63 @@ function CompetitorPrices({
                   </span>
                 </>
               )}
+
+
+
+
+
+              {/* Competitor Product Image - with fallback icon */}
+              <div className="relative inline-flex items-center justify-center shrink-0 ml-0.5">
+                <div className="group relative flex items-center justify-center h-6 w-6 rounded-full border border-amber-200 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white hover:border-amber-500 hover:shadow-sm transition-all cursor-pointer overflow-visible">
+                 {c.image && /^https?:\/\//i.test(c.image) ? (
+                    <>
+                      <img 
+                        src={c.image} 
+                        alt={c.name}
+                        className="w-3.5 h-3.5 object-contain pointer-events-none"
+                      />
+                      {/* Hover Zoom Tooltip */}
+                      <div className="absolute opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 bottom-full left-1/2 -translate-x-1/2 mb-3 z-[9999] pointer-events-none">
+                        <div className="relative">
+                          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 p-2 min-w-[50px] max-w-[100px]">
+                            <img 
+                              src={c.image} 
+                              alt={c.name}
+                              className="w-full h-auto max-h-[150px] object-contain rounded"
+                              style={{ minWidth: '50px', minHeight: '50px' }}
+                            />
+
+                            {/* <div className="text-center text-xs text-gray-600 dark:text-gray-300 mt-2 font-medium truncate px-1">
+                              {c.name}
+                            </div> */}
+
+                            {/* {hasPrice && (
+                              <div className="text-center text-sm font-bold text-amber-600 dark:text-amber-400 mt-1">
+                                ₹{c.price.toLocaleString("en-IN")}
+                              </div>
+                            )} */}
+                            
+                          </div>
+                          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white dark:bg-gray-800 border-r border-b border-gray-200 dark:border-gray-700 rotate-45"></div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    /* No image placeholder - no hover */
+                    <svg className="w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+
+
+
+
+
+
+
+
               {!isOos && (
                 <button
                   onClick={() =>
