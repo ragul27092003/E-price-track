@@ -9,6 +9,7 @@ const { getNameMatchStatus } = require("../../utils/nameCompare");
 const crypto = require("crypto");
 const fs = require("fs");
 const csv = require("csv-parser");
+const { log } = require('console');
 
 function toPrice(raw) {
   if (raw === null || raw === undefined || raw === 'No Result' || raw === 'no result' || raw === '') return null;
@@ -888,6 +889,8 @@ exports.completedProductsExport = async (req, res) => {
   try {
     
     const db = req.tenantDb;
+    const storeName =req.tenantId
+    
 
     const data = await db
       .collection("ept_full_site_mapping_data_info")
@@ -919,7 +922,16 @@ exports.completedProductsExport = async (req, res) => {
     const rows = data.map(({ _id, ...rest }) => rest);
 
     // CSV Headers
-    const headers = Object.keys(rows[0]);
+    const headers = [
+  "product_ean_id",
+  "product_code",
+  "product_mpn",
+  "product_name",
+  "product_url",
+  "product_url_change_competitior_name",
+  "product_url_change_competitior_web_url",
+  "status"
+];
 
     // Escape CSV values
     const escapeCSV = (value) => {
@@ -942,12 +954,11 @@ exports.completedProductsExport = async (req, res) => {
     });
 
     // Download
-    res.setHeader("Content-Type", "text/csv");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=completed_products_${Date.now()}.csv`
-    );
-
+ res.setHeader("Content-Type", "text/csv");
+res.setHeader(
+  "Content-Disposition",
+  `attachment; filename="${storeName}_completed_products_${Date.now()}.csv"`
+);
     return res.status(200).send(csv);
 
   } catch (err) {
@@ -959,6 +970,8 @@ exports.completedProductsExport = async (req, res) => {
     });
   }
 };
+
+
 
 exports.importFullsiteMapping = async (req, res) => {
   try {

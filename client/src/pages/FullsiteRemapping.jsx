@@ -54,6 +54,7 @@ const FullsiteRemapping = () => {
       setUrlValues({});
     }
   };
+  
 
 
   const StatusIcon = ({ type }) => {
@@ -148,6 +149,18 @@ const FullsiteRemapping = () => {
   };
 
   const completedProductsExport = async () => {
+    
+   function formatLogTime(date) {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+
+  return `${day}${month}${year}${hours}${minutes}${seconds}`;
+}
     const result = await Swal.fire({
 
       title: "Export Completed Products?",
@@ -176,16 +189,17 @@ const FullsiteRemapping = () => {
         },
       });
 
-      const response = await fetch(
-        
+           const response = await fetch(
         `${API.defaults.baseURL}/products/completedproductsexport`,
         {
           method: "GET",
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "x-tenant-id": activeStoreId || localStorage.getItem("activeStoreId"),
           },
         }
       );
+
 
       if (!response.ok) {
         throw new Error("Export failed");
@@ -196,8 +210,10 @@ const FullsiteRemapping = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "completed_products.csv";
-      document.body.appendChild(a);
+   const date = new Date();
+
+a.download = `${activeStoreId}_completed_products_${formatLogTime(date)}.csv`;
+document.body.appendChild(a);
       a.click();
       a.remove();
 

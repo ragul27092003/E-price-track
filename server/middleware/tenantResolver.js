@@ -1,7 +1,7 @@
 const { getTenantDb } = require('../config/db');
 
 const tenantResolver = (req, res, next) => {
-  let storeId = req.headers['x-tenant-id'] || req.user?.cmpid;
+  const storeId = req.headers['x-tenant-id']
   if (!storeId) return res.status(400).json({ message: 'Store ID is required' });
 
 
