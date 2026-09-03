@@ -171,6 +171,7 @@ export function AppHeader() {
   const handleStoreSelect = (store) => {
     switchStore(store.companyId, store.companyName);
     setDropdownOpen(false);
+    window.location.reload();
   };
 
   const [alertNotifications, setAlertNotifications] = useState(null);

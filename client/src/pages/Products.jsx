@@ -710,7 +710,7 @@ function CompetitorPrices({ product, competitorMeta, onShowHistory }) {
                      product_name ={ product.product_name }
                      comp_name ={ c.name }
                      unique_id ={c.unique_id}
-                     cmpid = { localStorage.getItem("activeShopName")}
+                     cmpid = { localStorage.getItem("activeStoreId")}
                      product_status = 'completed'
                      url_status={
                         !!c.url &&
@@ -783,13 +783,13 @@ function CompetitorPrices({ product, competitorMeta, onShowHistory }) {
                           unique_id={
                             c.unique_id ??
                             MD5(
-                              localStorage.getItem("activeShopName") +
+                              localStorage.getItem("activeStoreId") +
                               c.name +
                               product.product_ean_id +
                               product.product_code
                             )
                           }
-                          cmpid={localStorage.getItem("activeShopName")}
+                          cmpid={localStorage.getItem("activeStoreId")}
                           product_status="pending"
                           url_status={
                               !!c.url &&
