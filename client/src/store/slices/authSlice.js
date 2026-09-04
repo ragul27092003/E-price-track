@@ -99,7 +99,14 @@ export const createAuthSlice = (set, get) => ({
 
   // ── FIX: Clear cached competitors + products when switching tenant ──
   // Without this, old tenant's data stays in Zustand and pages don't refetch
-  switchStore: (companyId, companyName) => {
+    switchStore: (companyId, companyName) => {
+    // 🔍 FRONTEND STORE SWITCH LOG
+    console.log("=================================");
+    console.log("🔄 Store Switched to:");
+    console.log("Company ID   :", companyId);
+    console.log("Company Name :", companyName);
+    console.log("=================================");
+
     localStorage.setItem('activeStoreId',  companyId);
     localStorage.setItem('activeShopName', companyName);
     set({
@@ -107,10 +114,10 @@ export const createAuthSlice = (set, get) => ({
       activeShopName: companyName,
       exportType:     '',
       showLsp:        false,
-      // Clear stale data so pages re-fetch from new tenant DB
       competitors:    [],
       products:       [],
     });
     get().fetchMerchant(companyId);
   },
+
 });

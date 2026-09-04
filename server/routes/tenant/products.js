@@ -2,10 +2,13 @@ const express        = require('express');
 const router         = express.Router();
 const auth           = require('../../middleware/auth');
 const tenantResolver = require('../../middleware/tenantResolver');
-const { getAll, getMeta, create, update, remove, pendingMapping,configureProduct, removeConfiguration, getAlertProducts, exportAll, webPriceUpdation, fullsiteMapping, fullsiteMappingUpdation, completedProductsExport, importFullsiteMapping, deleteProductCompetitor,updateProductCompetitor } = require('../../controllers/tenant/productsController');
+const { getAll, getMeta, create, update, remove, pendingMapping,configureProduct, removeConfiguration, getAlertProducts, exportAll, webPriceUpdation, fullsiteMapping, fullsiteMappingUpdation, completedProductsExport, importFullsiteMapping, deleteProductCompetitor,updateProductCompetitor, validateCompetitors, transformFinalActivation, runFinalActivation } = require('../../controllers/tenant/productsController');
 const multer = require("multer");
 const upload = multer({dest: "uploads/",});
 
+router.post('/validatecompetitors',          auth, tenantResolver, validateCompetitors);
+router.post('/transform-final-activation',   auth, tenantResolver, transformFinalActivation);
+router.post('/run-final-activation',         auth, tenantResolver, runFinalActivation);
 router.get('/alert',                      auth, tenantResolver, getAlertProducts);
 router.get('/meta',                       auth, tenantResolver, getMeta);
 router.get('/',                           auth, tenantResolver, getAll);

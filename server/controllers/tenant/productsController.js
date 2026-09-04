@@ -1204,124 +1204,171 @@ exports.updateProductCompetitor = async (req, res) => {
 
     if (
       !id ||
-      !cmpid ||
       !comp_name ||
       !product_url ||
-      !product_ean_id ||
-      !product_code
+      !product_ean_id
     ) {
       return res.status(400).json({
         success: false,
         message:
-          "id, cmpid, comp_name, product_url, product_ean_id and product_code are required",
+          "id, comp_name, product_url, and product_ean_id are required",
       });
     }
 
     const db = req.tenantDb;
+    const companyId = req.tenantId || cmpid || req.headers['x-tenant-id'] || 'store';
+    const competitor = String(comp_name).trim().toLowerCase().replace(/\s+/g, '_');
 
-    const collectionName = `ept_product_details_new_${comp_name}`;
+    const collectionName = `ept_product_details_new_${competitor}`;
     const collection = db.collection(collectionName);
-
     const mainCollection = db.collection("ept_product_details_new");
 
-    const uniqueField = `${comp_name}_unique_id`;
-    const eanField = `${cmpid}_product_id`;
-    const codeField = `${cmpid}_product_code`;
+    const uniqueField = `${competitor}_unique_id`;
+    const eanField = `${companyId}_product_id`;
+    const codeField = `${companyId}_product_code`;
 
     const currentDate = new Date().toLocaleString("en-IN", {
       timeZone: "Asia/Kolkata",
     });
 
-    const updateData = {
-      [eanField]: product_ean_id,
-      [codeField]: product_code,
-      [uniqueField]: id,
+    const eanVariants = [String(product_ean_id).trim()];
+    if (!isNaN(Number(product_ean_id)) && String(product_ean_id).trim() !== '') {
+      eanVariants.push(Number(product_ean_id));
+    }
+    if (String(product_ean_id).trim().startsWith('0')) {
+      eanVariants.push(String(product_ean_id).trim().replace(/^0+/, ''));
+    }
 
-      logo_image: `/assets/competitorlogos/${comp_name}_full.png`,
-      cmp_name: comp_name,
+    const codeVariants = [String(product_code || '').trim()];
+    if (!isNaN(Number(product_code)) && String(product_code || '').trim() !== '') {
+      codeVariants.push(Number(product_code));
+    }
 
-      product_name: "No Result",
-      product_image: "No Result",
-      product_price: "No Result",
-      product_stock: "No Result",
+    // Comprehensive query conditions to locate the already existing competitor document
+    const findConditions = [];
+    if (id && String(id).trim() !== '') {
+      findConditions.push({ [uniqueField]: String(id).trim() });
+      findConditions.push({ unique_id: String(id).trim() });
+    }
+    findConditions.push({
+      [eanField]: { $in: eanVariants },
+      [codeField]: { $in: codeVariants }
+    });
+    findConditions.push({
+      product_ean_id: { $in: eanVariants },
+      product_code: { $in: codeVariants }
+    });
+    findConditions.push({
+      [eanField]: { $in: eanVariants }
+    });
+    findConditions.push({
+      product_ean_id: { $in: eanVariants }
+    });
 
-      product_url: product_url.trim(),
-      product_scrape_status: "pending",
+    // 1. Look for existing document in competitor collection
+    const existingDoc = await collection.findOne({ $or: findConditions });
 
-      status: "active",
-      competitor_status: "enable",
+    if (existingDoc) {
+      // ✅ UPDATE EXISTING DOCUMENT (Preserves title, price, images, rating, etc.)
+      const updateData = {
+        product_url: product_url.trim(),
+        product_scrape_status: "pending",
+        status: "active",
+        competitor_status: "enable",
+        [`${competitor}_product_url_manual_update`]: "Yes",
+        [`${competitor}_${companyId}_product_url_manual_update_date`]: currentDate,
+        modified_date: currentDate,
+        [uniqueField]: String(id).trim(),
+      };
 
-      product_review: 0,
-      product_rating: 0,
+      await collection.updateOne(
+        { _id: existingDoc._id },
+        { $set: updateData }
+      );
 
-      [`${comp_name}_product_url_manual_update`]: "Yes",
-      [`${comp_name}_nikshan_product_url_manual_update_date`]:
-        currentDate,
-
-      pricechange: {
-        status: "pending",
-        decreasedValue: 0,
-        increasedValue: 0,
-        oldPriceValue: 0,
-        newPriceValue: 0,
-      },
-
-      modified_date: currentDate,
-    };
-
-
-    const result = await collection.updateOne(
-      {
-        [eanField]: product_ean_id,
-        [codeField]: product_code,
-      },
-      {
-        $set: updateData,
-
-        $setOnInsert: {
-          created_date: currentDate,
+      // Also ensure main ept_product_details_new has competitor unique ID and manual flag
+      await mainCollection.updateOne(
+        {
+          $or: [
+            { product_ean_id: { $in: eanVariants }, product_code: { $in: codeVariants } },
+            { product_ean_id: { $in: eanVariants } },
+            { product_code: { $in: codeVariants } }
+          ]
         },
-      },
-      {
-        upsert: true,
-      }
-    );
+        {
+          $set: {
+            [uniqueField]: String(id).trim(),
+            [`${competitor}_product_url_manual_update`]: "Yes",
+            modified_date: currentDate
+          }
+        }
+      );
 
-    // Update main product with competitor unique ID
-    const mainResult = await mainCollection.updateOne(
-      {
-        product_ean_id,
-        product_code,
-      },
-      {
-        $set: {
-          [uniqueField]: id,
-        },
-      }
-    );
-
-    if (result.matchedCount > 0) {
       return res.status(200).json({
         success: true,
         action: "updated",
-        message: "Product URL updated successfully",
-        modifiedCount: result.modifiedCount,
+        message: "Existing competitor product updated successfully",
+        matchedCount: 1,
+        modifiedCount: 1
       });
-    }
+    } else {
+      // ✅ Only insert if the competitor product did not exist at all
+      const insertData = {
+        [eanField]: product_ean_id,
+        [codeField]: product_code || "",
+        [uniqueField]: String(id).trim(),
+        logo_image: `/assets/competitorlogos/${competitor}_full.png`,
+        cmp_name: competitor,
+        product_name: "No Result",
+        product_image: "No Result",
+        product_price: "No Result",
+        product_stock: "No Result",
+        product_url: product_url.trim(),
+        product_scrape_status: "pending",
+        status: "active",
+        competitor_status: "enable",
+        product_review: 0,
+        product_rating: 0,
+        [`${competitor}_product_url_manual_update`]: "Yes",
+        [`${competitor}_${companyId}_product_url_manual_update_date`]: currentDate,
+        pricechange: {
+          status: "pending",
+          decreasedValue: 0,
+          increasedValue: 0,
+          oldPriceValue: 0,
+          newPriceValue: 0,
+        },
+        created_date: currentDate,
+        modified_date: currentDate,
+      };
 
-    if (result.upsertedCount > 0) {
+      const insertResult = await collection.insertOne(insertData);
+
+      // Update main product with competitor unique ID and manual update flag
+      await mainCollection.updateOne(
+        {
+          $or: [
+            { product_ean_id: { $in: eanVariants }, product_code: { $in: codeVariants } },
+            { product_ean_id: { $in: eanVariants } },
+            { product_code: { $in: codeVariants } }
+          ]
+        },
+        {
+          $set: {
+            [uniqueField]: String(id).trim(),
+            [`${competitor}_product_url_manual_update`]: "Yes",
+            modified_date: currentDate
+          }
+        }
+      );
+
       return res.status(201).json({
         success: true,
         action: "inserted",
-        message: "Competitor product not found, so new product inserted",
-        insertedId: result.upsertedId,
+        message: "New competitor product inserted",
+        insertedId: insertResult.insertedId,
       });
     }
-
-    return res.status(500).json({
-      success: false,
-      message: "Product update/insert failed",
-    });
   } catch (error) {
     console.error("Update product competitor error:", error);
 
@@ -1329,6 +1376,387 @@ exports.updateProductCompetitor = async (req, res) => {
       success: false,
       message: "Failed to update/insert product URL",
       error: error.message,
+    });
+  }
+};
+
+// ── Validate CSV competitors against tenant DB ept_competitor_info ──
+exports.validateCompetitors = async (req, res) => {
+  try {
+    const db = req.tenantDb;
+    const { competitors } = req.body;
+
+    if (!Array.isArray(competitors) || competitors.length === 0) {
+      return res.json({
+        isValid: true,
+        missing: [],
+        inactive: [],
+        disabled: [],
+        errors: []
+      });
+    }
+
+    // Fetch all competitors from client DB ept_competitor_info
+    const dbCompetitors = await db.collection('ept_competitor_info').find({}).toArray();
+
+    const missing = [];
+    const inactive = [];
+    const disabled = [];
+    const errors = [];
+
+    competitors.forEach((rawComp) => {
+      const compName = String(rawComp || '').toLowerCase().trim();
+      if (!compName) return;
+
+      // Find competitor in DB
+      const matched = dbCompetitors.find((c) => {
+        const cName = String(c.competitor_name || '').toLowerCase().trim();
+        const cSlug = String(c.competitor_slug || '').toLowerCase().trim();
+        const cTitle = String(c.competitors || '').toLowerCase().trim();
+        return cName === compName || cSlug === compName || cTitle === compName;
+      });
+
+      if (!matched) {
+        missing.push(rawComp);
+        errors.push({ competitor: rawComp, reason: 'missing', message: `Competitor '${rawComp}' is missing in database` });
+      } else {
+        const status = String(matched.status || '').toLowerCase().trim();
+        const competitorStatus = String(matched.competitor_status || '').toLowerCase().trim();
+
+        if (status !== 'active') {
+          inactive.push(rawComp);
+          errors.push({ competitor: rawComp, reason: 'inactive', message: `Competitor '${rawComp}' is inactive (status: ${matched.status})` });
+        } else if (competitorStatus !== 'enable') {
+          disabled.push(rawComp);
+          errors.push({ competitor: rawComp, reason: 'disabled', message: `Competitor '${rawComp}' is disabled (competitor_status: ${matched.competitor_status})` });
+        }
+      }
+    });
+
+    const isValid = errors.length === 0;
+
+    return res.json({
+      isValid,
+      missing,
+      inactive,
+      disabled,
+      errors
+    });
+  } catch (error) {
+    console.error("Validate competitors error:", error);
+    return res.status(500).json({
+      isValid: false,
+      message: "Server error validating competitors",
+      error: error.message
+    });
+  }
+};
+
+// ── Transform CSV rows into Final Activation documents (Backend PHP logic equivalent) ──
+exports.transformFinalActivation = async (req, res) => {
+  try {
+    const companyId = req.tenantId || req.headers['x-tenant-id'] || 'store';
+    const { products } = req.body;
+
+    if (!Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No product data provided'
+      });
+    }
+
+    const now = new Date();
+    const formattedDate = now.toISOString().replace('T', ' ').substring(0, 19);
+
+    const transformed = products
+      .map((item) => {
+        const productId = String(item.product_ean_id || item["product_ean_id"] || "").trim();
+        const productCode = String(item.product_code || item["product_code"] || "").trim();
+        const productName = String(item.product_name || item["product_name"] || "No Result").trim();
+        const compName = String(item.product_url_change_competitior_name || item.product_url_change_competitor_name || "")
+          .replace(/["\\]/g, "")
+          .trim()
+          .toLowerCase();
+        const productUrl = String(item.product_url_change_competitior_web_url || item.product_url || "").trim();
+
+        if (!compName) return null;
+
+        // MD5 hash matching PHP: md5(companyId + compName + productId + productCode)
+        const uniqueId = crypto
+          .createHash('md5')
+          .update(`${companyId}${compName}${productId}${productCode}`)
+          .digest('hex');
+
+        // Document structure matching PHP output format
+        return {
+          [`${companyId}_product_id`]: productId,
+          [`${companyId}_product_code`]: productCode,
+          [`${compName}_unique_id`]: uniqueId,
+          logo_image: `/assets/competitorlogos/${compName}_full.png`,
+          cmp_name: compName,
+          product_name: productName,
+          product_image: "",
+          product_price: "No Result",
+          product_stock: "No Result",
+          product_url: productUrl,
+          product_scrape_status: "pending",
+          status: "active",
+          competitor_status: "enable",
+          created_date: formattedDate,
+          modified_date: formattedDate
+        };
+      })
+      .filter(Boolean);
+
+    return res.status(200).json({
+      success: true,
+      count: transformed.length,
+      data: transformed
+    });
+  } catch (error) {
+    console.error("Transform final activation error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to transform final activation documents",
+      error: error.message
+    });
+  }
+};
+
+// ── Execute Final Activation in MongoDB (Exact PHP cron equivalent) ──
+exports.runFinalActivation = async (req, res) => {
+  try {
+    const db = req.tenantDb;
+    const companyId = req.tenantId || req.headers['x-tenant-id'] || 'store';
+    const { products } = req.body;
+
+    if (!Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No products provided for final activation'
+      });
+    }
+
+    const now = new Date();
+    const formattedDate = now.toISOString().replace('T', ' ').substring(0, 19);
+
+    let insertedCount = 0;
+    let updatedCount = 0;
+    let mainUpdatedCount = 0;
+
+    for (const item of products) {
+      const productId = String(
+        item.product_ean_id ||
+        item[`${companyId}_product_id`] ||
+        item["product_ean_id"] ||
+        item.ean ||
+        item.EAN ||
+        item.product_id ||
+        item["0"] ||
+        ""
+      ).trim();
+
+      let productCode = String(
+        item.product_code ||
+        item[`${companyId}_product_code`] ||
+        item["product_code"] ||
+        item.code ||
+        item.CODE ||
+        item["1"] ||
+        ""
+      ).trim();
+
+      const productName = String(
+        item.product_name ||
+        item["product_name"] ||
+        item["3"] ||
+        "No Result"
+      ).trim();
+
+      const compName = String(
+        item.product_url_change_competitior_name ||
+        item.product_url_change_competitor_name ||
+        item.cmp_name ||
+        item["5"] ||
+        ""
+      )
+        .replace(/["\\]/g, "")
+        .trim()
+        .toLowerCase();
+
+      let productUrl = String(
+        item.product_url_change_competitior_web_url ||
+        item.product_url ||
+        item["6"] ||
+        ""
+      ).trim();
+
+      if (!productId && !productCode) continue;
+
+      // Build flexible variants for EAN (handles String vs Number in MongoDB)
+      const eanVariants = [productId];
+      if (!isNaN(Number(productId)) && productId !== '') {
+        eanVariants.push(Number(productId));
+      }
+      if (productId.startsWith('0')) {
+        eanVariants.push(productId.replace(/^0+/, ''));
+      }
+
+      // If productCode is missing or 'No Result', find it from ept_product_details_new
+      if (!productCode || productCode === 'No Result' || productCode === '') {
+        const foundDoc = await db.collection('ept_product_details_new').findOne({
+          product_ean_id: { $in: eanVariants }
+        });
+        if (foundDoc && foundDoc.product_code) {
+          productCode = String(foundDoc.product_code).trim();
+        }
+      }
+
+      const codeVariants = [productCode];
+      if (!isNaN(Number(productCode)) && productCode !== '') {
+        codeVariants.push(Number(productCode));
+      }
+
+      // Build main collection query filter
+      const mainConditions = [];
+      if (productId && productCode && productCode !== 'No Result') {
+        mainConditions.push({ product_ean_id: { $in: eanVariants }, product_code: { $in: codeVariants } });
+      }
+      if (productId) {
+        mainConditions.push({ product_ean_id: { $in: eanVariants } });
+      }
+      if (productCode && productCode !== 'No Result') {
+        mainConditions.push({ product_code: { $in: codeVariants } });
+      }
+      const mainFilter = mainConditions.length === 1 ? mainConditions[0] : { $or: mainConditions };
+
+      if (compName) {
+        const competitorCollection = `ept_product_details_new_${compName}`;
+
+        const filter = {
+          $or: [
+            {
+              $and: [
+                { [`${companyId}_product_id`]: { $in: eanVariants } },
+                { [`${companyId}_product_code`]: { $in: codeVariants } }
+              ]
+            },
+            { [`${companyId}_product_id`]: { $in: eanVariants } }
+          ]
+        };
+
+        // 1. Check if competitor doc already exists
+        const existingCompDoc = await db.collection(competitorCollection).findOne(filter);
+
+        // 2. Check main product doc
+        const mainDoc = await db.collection('ept_product_details_new').findOne(mainFilter);
+
+        // 3. Check if manual update is set to "Yes" in competitor doc OR main doc
+        const isManualUpdate = Boolean(
+          (existingCompDoc && String(existingCompDoc[`${compName}_product_url_manual_update`] || '').trim().toLowerCase() === 'yes') ||
+          (mainDoc && String(mainDoc[`${compName}_product_url_manual_update`] || '').trim().toLowerCase() === 'yes')
+        );
+
+        const uniqueId = crypto
+          .createHash('md5')
+          .update(`${companyId}${compName}${productId}${productCode}`)
+          .digest('hex');
+
+        const isNoResult = !productUrl || /no result/i.test(productUrl);
+        const isValidUrl = !isNoResult && (productUrl.startsWith('http://') || productUrl.startsWith('https://') || productUrl.length > 5);
+
+        if (existingCompDoc) {
+          // Document already exists in competitor collection
+          const updateSet = {
+            status: 'active',
+            competitor_status: 'enable',
+            product_name: productName,
+            [`${compName}_unique_id`]: uniqueId,
+            modified_date: formattedDate
+          };
+
+          // 👉 If manual update is NOT "Yes", update URL from CSV.
+          // 👉 If manual update IS "Yes", keep existing old URL (do NOT update product_url)!
+          if (!isManualUpdate && isValidUrl) {
+            updateSet.product_url = productUrl;
+          }
+
+          await db.collection(competitorCollection).updateOne(
+            filter,
+            { $set: updateSet }
+          );
+          updatedCount++;
+        } else if (isValidUrl) {
+          // New competitor product insert
+          const arrtempstoreInfo = {
+            [`${companyId}_product_id`]: productId,
+            [`${companyId}_product_code`]: productCode,
+            [`${compName}_unique_id`]: uniqueId,
+            logo_image: `/assets/competitorlogos/${compName}_full.png`,
+            cmp_name: compName,
+            product_name: productName,
+            product_image: "",
+            product_price: "No Result",
+            product_stock: "No Result",
+            product_url: productUrl,
+            product_scrape_status: "pending",
+            status: "active",
+            competitor_status: "enable",
+            created_date: formattedDate,
+            modified_date: formattedDate
+          };
+
+          await db.collection(competitorCollection).insertOne(arrtempstoreInfo);
+          insertedCount++;
+        }
+
+        // Always update main ept_product_details_new collection
+        const mainRes = await db.collection('ept_product_details_new').updateMany(
+          mainFilter,
+          {
+            $set: {
+              [`${compName}_unique_id`]: uniqueId,
+              ean_product_data_details_scrap_status: 'completed',
+              modified_date: formattedDate
+            }
+          }
+        );
+        if (mainRes.modifiedCount > 0 || mainRes.matchedCount > 0) {
+          mainUpdatedCount++;
+        }
+      } else {
+        // Without competitor mapping
+        const mainRes = await db.collection('ept_product_details_new').updateMany(
+          mainFilter,
+          {
+            $set: {
+              ean_product_data_details_scrap_status: 'completed',
+              modified_date: formattedDate
+            }
+          }
+        );
+        if (mainRes.modifiedCount > 0 || mainRes.matchedCount > 0) {
+          mainUpdatedCount++;
+        }
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Final activation processed successfully',
+      stats: {
+        total: products.length,
+        inserted: insertedCount,
+        updated: updatedCount,
+        mainUpdated: mainUpdatedCount
+      }
+    });
+  } catch (error) {
+    console.error("Run final activation error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to run final activation",
+      error: error.message
     });
   }
 };

@@ -17,7 +17,8 @@ app.use(cors({
   ],
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // ─── Static file serving ─────────────────────────────────────────────────────
 // Use path.resolve() so paths work correctly on Windows regardless of where

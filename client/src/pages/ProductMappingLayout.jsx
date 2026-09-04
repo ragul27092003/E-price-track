@@ -31,6 +31,17 @@ export default function ProductMappingLayout() {
         >
           Fullsite Re-Mapping
         </NavLink>
+
+        <NavLink
+          to={ROUTE.finalActivation}
+          className={({ isActive }) =>
+            `ml-5 pb-3 text-sm font-semibold ${isActive ? "text-[#1e6191] border-b-[3px]   border-[#2B86C5]" : "text-slate-400 hover:text-slate-600"
+            }
+  `
+          }
+        >
+          Final Activation
+        </NavLink>
       </div>
 
       {/* Child page */}

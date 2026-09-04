@@ -25,6 +25,7 @@ import ProductMappingLayout from "./pages/ProductMappingLayout";
 import PendingSignups from "./pages/PendingSignups";
 import PriceChanges from "./pages/PriceChanges"
 import Home from "./pages/Home";
+import FinalActivation from "./pages/FinalActivation";
 import { ROUTES } from "./utilis/urls";
 import {ROUTE  , ADMIN_BASE} from "./utils/urls";
 
@@ -62,6 +63,7 @@ const App = () => (
               <Route element={<ProductMappingLayout />}>
                   <Route path={ROUTE.productMapping} element={<ProductMapping />} />
                   <Route path={ROUTE.fullsiteRemapping} element={<FullsiteRemapping />} />
+                  <Route path={ROUTE.finalActivation} element={<FinalActivation />} />
               </Route>
               <Route path={ROUTE.smartReports} element={<SmartReports />} />
               <Route path={ROUTE.pendingSignups} element={<PendingSignups />} />

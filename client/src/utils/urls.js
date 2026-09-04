@@ -18,4 +18,5 @@ export const ROUTE = {
   smartReports: `${ADMIN_BASE}/smart-reports`,
   pendingSignups: `${ADMIN_BASE}/pending-signups`,
   priceChanges: `${ADMIN_BASE}/price-changes`,
+  finalActivation: `${ADMIN_BASE}/final-activation`,
 };

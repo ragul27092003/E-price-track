@@ -30,6 +30,7 @@ const navItems = [
   { title: "Product Mapping",   icon: Share2Icon,      path: ROUTE.productMapping, activePaths: [
       ROUTE.productMapping,
       ROUTE.fullsiteRemapping,
+      ROUTE.finalActivation,
     ],superAdminOnly: true },
   { title: "Settings",          icon: Settings,        path: ROUTE.settings },
 ];
