@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import { Upload, FileJson, X, AlertTriangle, CheckCircle2, ArrowRight, Layers, Play, RefreshCw, LogOut } from "lucide-react";
 import API from "../hooks/useApi";
-import md5 from "md5";
 
 const FinalActivation = () => {
     const fileInputRef = useRef(null);
