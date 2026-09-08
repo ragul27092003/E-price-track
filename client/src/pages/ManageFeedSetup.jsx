@@ -661,11 +661,11 @@ const ManageFeedSetup = () => {
           <table className="w-full table-fixed text-left border-collapse">
             <thead className="sticky top-0 bg-gray-600 dark:bg-[#0f1420] z-10">
               <tr className="text-white dark:text-slate-400 text-xs uppercase font-bold">
-                <th className="w-[20%] py-3 border-none whitespace-nowrap px-[10px]">Start Time</th>
-                <th className="w-[13%] py-3 border-none whitespace-nowrap px-[10px]">Status</th>
+                <th className="w-[21%] py-3 border-none whitespace-nowrap px-[10px] pl-5">Start Time</th>
+                <th className="w-[12%] py-3 border-none whitespace-nowrap px-[10px]">Status</th>
                 <th className="w-[17%] py-3 border-none whitespace-nowrap px-[10px]">Progress</th>
-                <th className="w-[34%] py-3 border-none whitespace-nowrap px-[10px]">Steps</th>
-                <th className="w-[16%] py-3 border-none whitespace-nowrap px-[10px]">End Time</th>
+                <th className="w-[33%] py-3 border-none whitespace-nowrap px-[10px]">Steps</th>
+                <th className="w-[18%] py-3 border-none whitespace-nowrap px-[10px]">End Time</th>
               </tr>
             </thead>
             <tbody className="text-sm">
@@ -706,7 +706,7 @@ const ManageFeedSetup = () => {
                               : 'hover:bg-slate-50 dark:hover:bg-[#151a2a]'
                           }`}>
                           {/* Start & End Dates */}
-                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center px-[10px]">
+                          <td className="py-3 border-b border-gray-600/10 dark:border-slate-700/40 align-center px-[10px] pl-5">
                             <div className="flex flex-col gap-0.5">
                               <span className="text-gray-600 dark:text-gray-300 font-semibold whitespace-nowrap">
                                 {displayDate(log.started_at)}
@@ -715,7 +715,7 @@ const ManageFeedSetup = () => {
                           </td>
                           
                           {/* Status */}
-                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center px-[10px]">
+                          <td className="py-3 border-b border-gray-600/10 dark:border-slate-700/40 align-center px-[10px]">
                             <div className="flex items-center gap-1.5 whitespace-nowrap">
                               {statusIcon}
                               <span className={`font-medium ${statusColor}`}>
@@ -725,7 +725,7 @@ const ManageFeedSetup = () => {
                           </td>
                           
                           {/* Progress */}
-                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center px-[10px]">
+                          <td className="py-3 border-b border-gray-600/10 dark:border-slate-700/40 align-center px-[10px]">
                             <div className="flex items-center gap-2">
                               <div className="w-24 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                 <div 
@@ -741,7 +741,7 @@ const ManageFeedSetup = () => {
                           </td>
                           
                           {/* Steps */}
-                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center px-[10px]">
+                          <td className="py-3 border-b border-gray-600/10 dark:border-slate-700/40 align-center px-[10px]">
                             <div className="flex items-center gap-2 flex-wrap">
                               {log.steps && log.steps.map((step, i) => {
                                 const display = getStepStatusDisplay(step.status);
@@ -758,7 +758,7 @@ const ManageFeedSetup = () => {
                           </td>
                           
                           {/* Message */}
-                          <td className="py-3 border-b border-gray-50 dark:border-slate-700/40 align-center px-[10px]">
+                          <td className="py-3 border-b border-gray-600/10 dark:border-slate-700/40 align-center px-[10px]">
                             <div className="flex flex-col gap-0.5">
                               <span className="text-gray-600 dark:text-gray-300 font-semibold whitespace-nowrap">
                                 {displayDate(log.ended_at)}
