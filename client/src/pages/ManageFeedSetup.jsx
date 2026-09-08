@@ -72,6 +72,22 @@ const ManageFeedSetup = () => {
     import_time: '12:00 PM',
   });
 
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyFeedUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(formData.feed_url || '');
+
+      setCopied(true);
+
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to copy URL:', error);
+    }
+  };
+
   const feedcronlink = `${import.meta.env.VITE_CRON_DOMAIN}/eprice/admin/cron/cron_upload_sathya_json_products.php?cmpid=${formData.store_name}`;
 
   useEffect(() => {
@@ -523,6 +539,7 @@ const ManageFeedSetup = () => {
                 <select
                   name="feed_type"
                   value={formData.feed_type}
+                  disabled={isCronRunning}
                   onChange={handleChange}
                   className="w-full border border-gray-300 dark:border-slate-700 rounded px-3 py-2 text-sm bg-white dark:bg-[#1e2535] text-gray-800 dark:text-slate-200"
                 >
@@ -533,22 +550,37 @@ const ManageFeedSetup = () => {
               </div>
               <div className="md:col-span-9">
                 <label className="block text-xs font-bold mb-1">URL for Import</label>
-                <input
+                <div className="flex gap-2">
+                  <input
                   name="feed_url"
                   value={formData.feed_url}
                   onChange={handleChange}
-                  disabled={isRestrictedUser}
+                  disabled={isRestrictedUser || isCronRunning}
                   readOnly={isRestrictedUser}
                   onCopy={(e) => { if (isRestrictedUser) e.preventDefault(); }}
                   onCut={(e) => { if (isRestrictedUser) e.preventDefault(); }}
                   onContextMenu={(e) => { if (isRestrictedUser) e.preventDefault(); }}
                   style={isRestrictedUser ? { userSelect: 'none', WebkitUserSelect: 'none' } : undefined}
                   className={`w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-teal-600 placeholder:text-gray-400 dark:placeholder:text-slate-500 ${
-                    isRestrictedUser
+                    isRestrictedUser || isCronRunning
                       ? 'bg-gray-100 dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-400 dark:text-slate-500 cursor-not-allowed'
                       : 'bg-white dark:bg-[#1e2535] text-gray-800 dark:text-slate-200 border-gray-300 dark:border-slate-700'
                   }`}
-                />
+                  />
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={handleCopyFeedUrl}
+                    disabled={!formData.feed_url}
+                    className={`px-4 py-2 text-sm font-medium rounded border ${
+                      copied
+                        ? 'bg-green-100 text-green-700 border-green-300'
+                        : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 border-gray-300 dark:border-slate-700 hover:bg-gray-200 dark:hover:bg-slate-700'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {copied ? 'Copied' : 'Copy'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -595,7 +627,7 @@ const ManageFeedSetup = () => {
           <div className="mt-6 pt-4 border-t border-gray-100 dark:border-slate-700/60">
             <button
               onClick={handleSave}
-              disabled={isSaving}
+              disabled={isSaving || isCronRunning}
               className="flex items-center gap-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-300 text-white px-6 py-2 rounded text-sm font-medium transition-colors"
             >
               {isSaving ? (
@@ -625,9 +657,9 @@ const ManageFeedSetup = () => {
           </button>)}
         </div>
 
-        <div className="overflow-x-auto overflow-y-auto max-h-[400px] border-t border-gray-100 dark:border-slate-700/60 scrollbar-hide">
+        <div className="overflow-x-auto overflow-y-auto max-h-[400px] rounded-xl border-2 border-gray-600/10 dark:border-slate-700/60 scrollbar-hide">
           <table className="w-full table-fixed text-left border-collapse">
-            <thead className="sticky top-0 bg-teal-600 dark:bg-[#0f1420] z-10">
+            <thead className="sticky top-0 bg-gray-600 dark:bg-[#0f1420] z-10">
               <tr className="text-white dark:text-slate-400 text-xs uppercase font-bold">
                 <th className="w-[20%] py-3 border-none whitespace-nowrap px-[10px]">Start Time</th>
                 <th className="w-[13%] py-3 border-none whitespace-nowrap px-[10px]">Status</th>
@@ -670,7 +702,7 @@ const ManageFeedSetup = () => {
                       <React.Fragment key={idx}>
                         <tr className={`${
                             isToday(log.started_at)
-                              ? 'bg-teal-100/20 dark:bg-red-950/20'
+                              ? 'bg-teal-100/60 dark:bg-red-950/20'
                               : 'hover:bg-slate-50 dark:hover:bg-[#151a2a]'
                           }`}>
                           {/* Start & End Dates */}
@@ -704,7 +736,7 @@ const ManageFeedSetup = () => {
                                   style={{ width: `${log.progress || 0}%` }}
                                 />
                               </div>
-                              <span className="text-xs text-gray-500">{log.progress || 0}%</span>
+                              <span className="text-xs text-gray-500 font-bold">{log.progress || 0}%</span>
                             </div>
                           </td>
                           
