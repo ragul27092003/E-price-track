@@ -462,7 +462,8 @@ export default function Notifications() {
                       )}
                       <p className="text-[11px] text-slate-400 dark:text-slate-500 font-medium mt-0.5">
                         {p.product_brand && <span>{p.product_brand} · </span>}
-                        {p.product_ean_id || p.product_code || p._id}
+                        {p.product_ean_id && <span>{p.product_ean_id} · </span>}
+                        {p.product_code && <span>{p.product_code}</span>}
                       </p>
                     </div>
                   </div>

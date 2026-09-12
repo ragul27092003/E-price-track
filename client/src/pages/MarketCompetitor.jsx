@@ -809,8 +809,11 @@ function ProductCell({ product }) {
           </p>
         )}
         <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+
           {product.product_brand && <span>{product.product_brand} · </span>}
-          {product.product_ean_id || product.product_code || product._id}
+          {product.product_ean_id && <span>{product.product_ean_id} · </span>}
+          {product.product_code && <span>{product.product_code}</span>}
+          
         </p>
       </div>
     </div>

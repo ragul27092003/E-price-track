@@ -744,7 +744,10 @@ useEffect(() => {
                         {fmt(parsePrice(selectedProduct.product_price))}
                       </p>
                       {selectedProduct.product_ean_id && (
-                        <p className="mt-1 text-center text-[10px] text-gray-400">EAN: {selectedProduct.product_ean_id}</p>
+                        <p className="mt-1 text-center text-[10px] text-gray-400">EAN: <b>{selectedProduct.product_ean_id}</b></p>
+                      )}
+                      {selectedProduct.product_code && (
+                        <p className="mt-1 text-center text-[10px] text-gray-400">CODE: <b>{selectedProduct.product_code}</b></p>
                       )}
                     </div>
  

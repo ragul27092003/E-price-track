@@ -2478,9 +2478,9 @@ export default function SmartReports() {
                         {selectedProduct.product_name}
                       </h3>
                       <p className="text-sm text-slate-500 dark:text-slate-400">
-                        {selectedProduct.product_brand} · EAN:{" "}
-                        {selectedProduct.product_ean_id ||
-                          selectedProduct.product_code}
+                        {selectedProduct.product_brand} · {" "}
+                        {selectedProduct.product_ean_id} · {" "}
+                        {selectedProduct.product_code}
                       </p>
                     </div>
                   </div>

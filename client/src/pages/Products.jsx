@@ -1199,8 +1199,8 @@ function ProductCell({ product }) {
             </span>
           )}
 
-          {product.product_ean_id && product.product_code && (
-            <span className="text-slate-400"> · </span>
+          {product.product_code && (
+            <span className="text-slate-400"> - </span>
           )}
 
           {product.product_code && (
@@ -1208,12 +1208,14 @@ function ProductCell({ product }) {
               {product.product_code}
             </span>
           )}
+
+
         </p>
         
         {product.product_movement && (
           <div className="flex items-center gap-1.5 mt-1">
             <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-              ProductMovement:
+              Movement:
             </span>
             <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
               {product.product_movement}

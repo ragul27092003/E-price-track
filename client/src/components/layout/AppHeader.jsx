@@ -1,4 +1,4 @@
-import { Moon, Sun, LogOut, ChevronDown, Bell, Clock, CreditCard, ShieldAlert, Gift, Search, } from "lucide-react";
+import { Moon, Sun, LogOut, ChevronDown, Bell, Clock, CreditCard, ShieldAlert, Gift, Search, Power, Network} from "lucide-react";
 import logo from "../../services/assets/main-logo.png";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -174,28 +174,45 @@ export function AppHeader() {
     window.location.reload();
   };
 
-  const [alertNotifications, setAlertNotifications] = useState(null);
 
-  useEffect(() => {
-  if (!activeStoreId) {
+const effectiveStoreId =
+  activeStoreId ||
+  user?.cmpid ||
+  user?.companyId ||
+  profile?.cmpid ||
+  profile?.companyId ||
+  null;
+
+ const [alertNotifications, setAlertNotifications] = useState(null);
+
+useEffect(() => {
+  if (!effectiveStoreId) {
     setAlertNotifications(null);
     return;
   }
 
-  const loadNotifications = async () => {
+  let cancelled = false;
 
+  const loadNotifications = async () => {
     try {
-      
-      const response = await API.get(`/settings/get-notification/${activeStoreId}`);
-      setAlertNotifications(response.data?.data || response.data || null);
+      const response = await API.get(
+        `/settings/get-notification/${effectiveStoreId}`
+      );
+      if (!cancelled) {
+        setAlertNotifications(response.data?.data || response.data || null);
+      }
     } catch (error) {
       console.error("Failed to load alert notifications:", error);
-      setAlertNotifications(null);
+      if (!cancelled) setAlertNotifications(null);
     }
   };
 
   loadNotifications();
-}, [activeStoreId]);
+
+  return () => {
+    cancelled = true;
+  };
+}, [effectiveStoreId]);
 
 const notificationTypes = alertNotifications?.types || {};
 
@@ -230,6 +247,8 @@ const activeNotifications = notificationConfig.filter(
   (notification) =>
     notification.enabled && notification.message
 );
+
+console.log(activeNotifications);
 
   // ── Monthly Payment Reminder Logic ──────────────────────────────────────────
 
@@ -306,173 +325,173 @@ const activeNotifications = notificationConfig.filter(
 
 
        {activeNotifications.length > 0 && (
-  <div className="flex-1 mr-4 relative overflow-hidden h-10">
-    <div className="notification-ticker">
-      <div className="notification-ticker-track">
-        {[...activeNotifications, ...activeNotifications].map(
-          (notification, index) => {
-            const Icon = notification.icon;
+          <div className="flex-1 mr-4 relative overflow-hidden h-10">
+            <div className="notification-ticker">
+              <div className="notification-ticker-track">
+                {[...activeNotifications, ...activeNotifications].map(
+                  (notification, index) => {
+                    const Icon = notification.icon;
 
-            const colorStyles = {
-              amber: {
-                wrapper:
-                  "bg-amber-50 border-amber-200 text-amber-900",
-                icon:
-                  "bg-amber-100 text-amber-600",
-                label:
-                  "text-amber-800",
-                glow:
-                  "shadow-[0_0_15px_rgba(245,158,11,0.12)]",
-              },
+                    const colorStyles = {
+                      amber: {
+                        wrapper:
+                          "bg-amber-50 border-amber-200 text-amber-900",
+                        icon:
+                          "bg-amber-100 text-amber-600",
+                        label:
+                          "text-amber-800",
+                        glow:
+                          "shadow-[0_0_15px_rgba(245,158,11,0.12)]",
+                      },
 
-              violet: {
-                wrapper:
-                  "bg-violet-50 border-violet-200 text-violet-900",
-                icon:
-                  "bg-violet-100 text-violet-600",
-                label:
-                  "text-violet-800",
-                glow:
-                  "shadow-[0_0_15px_rgba(139,92,246,0.12)]",
-              },
+                      violet: {
+                        wrapper:
+                          "bg-violet-50 border-violet-200 text-violet-900",
+                        icon:
+                          "bg-violet-100 text-violet-600",
+                        label:
+                          "text-violet-800",
+                        glow:
+                          "shadow-[0_0_15px_rgba(139,92,246,0.12)]",
+                      },
 
-              emerald: {
-                wrapper:
-                  "bg-emerald-50 border-emerald-200 text-emerald-900",
-                icon:
-                  "bg-emerald-100 text-emerald-600",
-                label:
-                  "text-emerald-800",
-                glow:
-                  "shadow-[0_0_15px_rgba(16,185,129,0.12)]",
-              },
-            };
+                      emerald: {
+                        wrapper:
+                          "bg-emerald-50 border-emerald-200 text-emerald-900",
+                        icon:
+                          "bg-emerald-100 text-emerald-600",
+                        label:
+                          "text-emerald-800",
+                        glow:
+                          "shadow-[0_0_15px_rgba(16,185,129,0.12)]",
+                      },
+                    };
 
-            const colors =
-              colorStyles[notification.color] ||
-              colorStyles.amber;
+                    const colors =
+                      colorStyles[notification.color] ||
+                      colorStyles.amber;
 
-            return (
-              <div
-                key={`${notification.key}-${index}`}
-                className={`
-                  notification-item
-                  ${colors.wrapper}
-                  ${colors.glow}
-                `}
-              >
-                {/* Icon */}
-                <div
-                  className={`
-                    notification-icon
-                    ${colors.icon}
-                  `}
-                >
-                  <Icon className="w-4 h-4" />
-                </div>
+                    return (
+                      <div
+                        key={`${notification.key}-${index}`}
+                        className={`
+                          notification-item
+                          ${colors.wrapper}
+                          ${colors.glow}
+                        `}
+                      >
+                        {/* Icon */}
+                        <div
+                          className={`
+                            notification-icon
+                            ${colors.icon}
+                          `}
+                        >
+                          <Icon className="w-4 h-4" />
+                        </div>
 
-                {/* Content */}
-                <div className="flex items-center gap-2 min-w-0">
-                  <span
-                    className={`
-                      text-[12px]
-                      font-bold
-                      uppercase
-                      tracking-wide
-                      ${colors.label}
-                    `}
-                  >
-                    {notification.label}
-                  </span>
+                        {/* Content */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className={`
+                              text-[12px]
+                              font-bold
+                              uppercase
+                              tracking-wide
+                              ${colors.label}
+                            `}
+                          >
+                            {notification.label}
+                          </span>
 
-                  <span className="text-[13px] font-medium">
-                    {notification.message}
-                  </span>
-                </div>
+                          <span className="text-[13px] font-medium">
+                            {notification.message}
+                          </span>
+                        </div>
 
-                {/* Small status indicator */}
-                <span className="notification-dot" />
+                        {/* Small status indicator */}
+                        <span className="notification-dot" />
+                      </div>
+                    );
+                  }
+                )}
               </div>
-            );
-          }
+            </div>
+
+            <style>{`
+              .notification-ticker {
+                width: 100%;
+                height: 100%;
+                overflow: hidden;
+                display: flex;
+                align-items: center;
+                position: relative;
+              }
+
+              .notification-ticker-track {
+                display: flex;
+                align-items: center;
+                gap: 14px;
+                width: max-content;
+                animation: notificationTicker 35s linear infinite;
+                will-change: transform;
+              }
+
+              .notification-ticker:hover
+              .notification-ticker-track {
+                animation-play-state: paused;
+              }
+
+              .notification-item {
+                height: 34px;
+                min-width: max-content;
+                display: inline-flex;
+                align-items: center;
+                gap: 9px;
+                padding: 0 14px 0 6px;
+                border-width: 1px;
+                border-style: solid;
+                border-radius: 999px;
+                flex-shrink: 0;
+                white-space: nowrap;
+                transition: all 0.3s ease;
+              }
+
+              .notification-item:hover {
+                transform: translateY(-1px);
+              }
+
+              .notification-icon {
+                width: 26px;
+                height: 26px;
+                border-radius: 999px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+              }
+
+              .notification-dot {
+                width: 6px;
+                height: 6px;
+                border-radius: 999px;
+                background: currentColor;
+                opacity: 0.55;
+                flex-shrink: 0;
+              }
+
+              @keyframes notificationTicker {
+                from {
+                  transform: translateX(0);
+                }
+
+                to {
+                  transform: translateX(-50%);
+                }
+              }
+            `}</style>
+          </div>
         )}
-      </div>
-    </div>
-
-    <style>{`
-      .notification-ticker {
-        width: 100%;
-        height: 100%;
-        overflow: hidden;
-        display: flex;
-        align-items: center;
-        position: relative;
-      }
-
-      .notification-ticker-track {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        width: max-content;
-        animation: notificationTicker 35s linear infinite;
-        will-change: transform;
-      }
-
-      .notification-ticker:hover
-      .notification-ticker-track {
-        animation-play-state: paused;
-      }
-
-      .notification-item {
-        height: 34px;
-        min-width: max-content;
-        display: inline-flex;
-        align-items: center;
-        gap: 9px;
-        padding: 0 14px 0 6px;
-        border-width: 1px;
-        border-style: solid;
-        border-radius: 999px;
-        flex-shrink: 0;
-        white-space: nowrap;
-        transition: all 0.3s ease;
-      }
-
-      .notification-item:hover {
-        transform: translateY(-1px);
-      }
-
-      .notification-icon {
-        width: 26px;
-        height: 26px;
-        border-radius: 999px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-      }
-
-      .notification-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 999px;
-        background: currentColor;
-        opacity: 0.55;
-        flex-shrink: 0;
-      }
-
-      @keyframes notificationTicker {
-        from {
-          transform: translateX(0);
-        }
-
-        to {
-          transform: translateX(-50%);
-        }
-      }
-    `}</style>
-  </div>
-)}
 
 
 
@@ -566,6 +585,19 @@ const activeNotifications = notificationConfig.filter(
       </div> */}
 
       <div className="ml-auto flex items-center gap-2">
+       
+      { isSuperAdmin && (
+
+        <button
+          type="button"
+          onClick={() => navigate(ROUTE.productMapping)}
+          className="relative p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary flex items-center justify-center shrink-0 cursor-pointer"
+        > 
+          <Network className="w-5 h-5" />
+
+        </button> 
+      )}
+
         {/* Bell Notification */}
         <TooltipProvider delayDuration={150}>
           <Tooltip>
@@ -597,6 +629,7 @@ const activeNotifications = notificationConfig.filter(
           </Tooltip>
         </TooltipProvider>
 
+      
         {/* Store name + logo badge */}
         {displayName && (
           <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-muted/60 border border-border mr-1">

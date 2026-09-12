@@ -27,11 +27,11 @@ const navItems = [
   { title: "Market Competitor", icon: ComponentIcon,   path: ROUTE.market },
   { title: "Price Change Monitor", icon: Coins, path: ROUTE.priceChanges, superAdminOnly: true },
   { title: "Smart Reports",     icon: BarChartBigIcon, path: ROUTE.smartReports },
-  { title: "Product Mapping",   icon: Share2Icon,      path: ROUTE.productMapping, activePaths: [
+  /*{ title: "Product Mapping",   icon: Share2Icon,      path: ROUTE.productMapping, activePaths: [
       ROUTE.productMapping,
       ROUTE.fullsiteRemapping,
       ROUTE.finalActivation,
-    ],superAdminOnly: true },
+    ],superAdminOnly: true },*/
   { title: "Settings",          icon: Settings,        path: ROUTE.settings },
 ];
 
