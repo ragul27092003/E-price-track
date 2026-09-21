@@ -109,3 +109,21 @@ export const fetchFullsiteMappingProducts = ({
 
 export const updatefullsiteProductMapping = (data) =>
   API.post('/products/fullsitemapping/update', data).then((r) => r.data);
+
+
+export const getProductStockReport = (ean, period = "1m") =>
+  API.get(`/products/stock-history/${encodeURIComponent(ean)}`, {
+    params: { period },
+  }).then((r) => r.data);
+
+export const getQuantityPeriods = () =>
+  API.get("/products/stock-history/periods").then((r) => r.data);
+
+export const PERIOD_OPTIONS = [
+  { key: "week", label: "1 Week" },
+  { key: "1m",   label: "1 Month" },
+  { key: "3m",   label: "3 Months" },
+  { key: "6m",   label: "6 Months" },
+  { key: "1y",   label: "1 Year" },
+];
+

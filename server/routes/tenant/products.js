@@ -2,7 +2,7 @@ const express        = require('express');
 const router         = express.Router();
 const auth           = require('../../middleware/auth');
 const tenantResolver = require('../../middleware/tenantResolver');
-const { getAll, getMeta, create, update, remove, pendingMapping,configureProduct, removeConfiguration, getAlertProducts, exportAll, webPriceUpdation, fullsiteMapping, fullsiteMappingUpdation, completedProductsExport, importFullsiteMapping, deleteProductCompetitor,updateProductCompetitor, validateCompetitors, transformFinalActivation, runFinalActivation } = require('../../controllers/tenant/productsController');
+const { getAll, getMeta, create, update, remove, pendingMapping,configureProduct, removeConfiguration, getAlertProducts, exportAll, webPriceUpdation, fullsiteMapping, fullsiteMappingUpdation, completedProductsExport, importFullsiteMapping, deleteProductCompetitor,updateProductCompetitor, validateCompetitors, transformFinalActivation, runFinalActivation, getQuantityPeriods, getProductStockReport } = require('../../controllers/tenant/productsController');
 const multer = require("multer");
 const upload = multer({dest: "uploads/",});
 
@@ -28,5 +28,8 @@ router.get('/completedproductsexport',    auth,  tenantResolver, completedProduc
 router.post('/importFullsiteMapping',     auth, tenantResolver, upload.single("file"),
   importFullsiteMapping
 );
+router.get("/stock-history/periods", auth, tenantResolver, getQuantityPeriods);
+router.get("/stock-history/:ean",auth, tenantResolver,getProductStockReport);
+
 
 module.exports = router;

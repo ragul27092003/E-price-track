@@ -7,6 +7,7 @@ import Swal from "sweetalert2";
 import { useStore } from "../store";
 
 
+
 const FullsiteRemapping = () => {
 
   const [products, setProducts] = useState([]);
@@ -65,11 +66,70 @@ const FullsiteRemapping = () => {
         </svg>
       );
     }
+    if (type === "error") {
+      return (
+        <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 4h.01M10.29 3.86l-7.82 13.5A2 2 0 004.2 20h15.6a2 2 0 001.73-2.64l-7.82-13.5a2 2 0 00-3.42 0z"
+          />
+        </svg>
+      );
+    }
     return (
       <svg className="w-6 h-6 text-red-500 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     );
+  };
+
+  const HighlightMatches = ({ text, mpn, code }) => {
+    if (!text) return null;
+
+    const matches = [
+      { value: mpn, type: "MPN" },
+      { value: code, type: "CODE" },
+    ].filter((item) => item.value && String(item.value).trim() !== "");
+
+    if (!matches.length) {
+      return text;
+    }
+
+    // Longest match first
+    matches.sort((a, b) => String(b.value).length - String(a.value).length);
+
+    // Escape special characters
+    const escapedMatches = matches.map((item) =>
+      String(item.value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    );
+
+    // FIX: Add negative lookbehind and lookahead to prevent partial word matches
+    const regex = new RegExp(`(?<![a-zA-Z0-9])(${escapedMatches.join("|")})(?![a-zA-Z0-9])`, "gi");
+
+    return text.split(regex).map((part, index) => {
+      const matchedItem = matches.find(
+        (item) =>
+          String(item.value).toLowerCase() === part.toLowerCase()
+      );
+
+      if (!matchedItem) {
+        return <span key={index}>{part}</span>;
+      }
+
+      return (
+        <span
+          key={index}
+          title={matchedItem.type}
+          className={
+            matchedItem.type === "MPN"
+              ? "bg-yellow-200 text-yellow-900 font-bold px-1 rounded"
+              : "bg-blue-200 text-blue-900 font-bold px-1 rounded"
+          }
+        >
+          {part}
+        </span>
+      );
+    });
   };
   
   useEffect(() => {
@@ -529,7 +589,11 @@ document.body.appendChild(a);
 
                     ) : (
 
+
                       products.map((product, index) => {
+
+                        console.log(product);
+                        
                         return (
 
                           <div key={product.id} className={`${product.mapping_status === 'completed' ? "bg-green-100" : "bg-red-100" } p-4 rounded-lg mb-4`}>
@@ -569,7 +633,7 @@ document.body.appendChild(a);
                                     <p className="text-white text-xs font-semibold">EAN NUMBER</p>
                                   </div>
                                   <div className="py-1 bg-white">
-                                    <p className="text-sm font-medium">{product.ean}</p>
+                                    <p className="text-sm font-medium"><StatusIcon type={product.status.ean} />&ensp;{product.ean}</p>
                                   </div>
                                 </div>
                               </div>
@@ -589,7 +653,7 @@ document.body.appendChild(a);
                                     <p className="text-white text-xs font-semibold">PRODUCT CODE</p>
                                   </div>
                                   <div className="py-1 bg-white">
-                                    <p className="text-sm font-medium">{product.productCode}</p>
+                                    <p className="text-sm font-medium"><StatusIcon type={product.status.code} />&ensp;{product.productCode}</p>
                                   </div>
                                 </div>
                               </div>
@@ -609,7 +673,7 @@ document.body.appendChild(a);
                                     <p className="text-white text-xs font-semibold">MPN NUMBER</p>
                                   </div>
                                   <div className="py-1 bg-white">
-                                    <p className="text-sm font-medium">{product.mpn}</p>
+                                    <p className="text-sm font-medium"><StatusIcon type={product.status.ean} />&ensp;{product.mpn}</p>
                                   </div>
                                 </div>
                               </div>
@@ -622,7 +686,13 @@ document.body.appendChild(a);
                                {product.store.name}
                               </div>
                               <div className="col-span-3 text-xs font-medium uppercase leading-tight">
-                                {product.competitor.name}
+                                
+                                <HighlightMatches
+                                  text={product.competitor.name}
+                                  mpn={product.mpn}
+                                  code={product.productCode}
+                                />
+
                               </div>
                               <div className="col-span-1">
                                 <StatusIcon type={product.status.price} />

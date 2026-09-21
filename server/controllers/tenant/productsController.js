@@ -6,6 +6,8 @@ const { compareImages } = require('../../utils/imageCompare');
 const { getPriceMatchStatus } = require("../../utils/priceCompare");
 const { getBrandMatchStatus } = require("../../utils/brandCompare");
 const { getNameMatchStatus } = require("../../utils/nameCompare");
+const { getCodesStatus } = require("../../utils/codesCompare");
+
 const crypto = require("crypto");
 const fs = require("fs");
 const csv = require("csv-parser");
@@ -770,6 +772,13 @@ exports.fullsiteMapping = async (req, res) => {
           item.product_url_change_competitior_web_name
         );
 
+        const codesResult = await getCodesStatus(
+          item.product_ean_id,
+          item.product_code,
+          item.product_mpn,
+          item.product_url_change_competitior_web_url
+        );
+
         return {
 
           id: skip + index + 1,
@@ -810,6 +819,15 @@ exports.fullsiteMapping = async (req, res) => {
 
             name:
               nameResult.status,
+
+            ean:
+              codesResult.ean,
+
+            code:
+              codesResult.code,
+
+            mpn:
+              codesResult.mpn,
           },
         };
       })
@@ -1760,3 +1778,200 @@ exports.runFinalActivation = async (req, res) => {
     });
   }
 };
+
+
+
+/**
+ * GET /products/stock-history/periods
+ * Return the available period options.
+ */
+
+const PERIOD_MAP = {
+  week: { days: 7,   label: "Last 7 Days" },
+  "1m": { days: 30,  label: "Last 1 Month" },
+  "3m": { days: 90,  label: "Last 3 Months" },
+  "6m": { days: 180, label: "Last 6 Months" },
+  "1y": { days: 365, label: "Last 1 Year" },
+};
+
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+exports.getQuantityPeriods = async (_req, res) => {
+  try {
+    const periods = Object.entries(PERIOD_MAP).map(([key, { label }]) => ({
+      key,
+      label,
+    }));
+    return res.status(200).json({ success: true, periods });
+  } catch (err) {
+    console.error("[getQuantityPeriods]", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /products/stock-history/:ean?period=week|1m|3m|6m|1y
+ *
+ * Returns stock + price history for a single product (EAN),
+ * including per-unit profit (store_price - price) and stock stats.
+ */
+exports.getProductStockReport = async (req, res) => {
+
+  try {
+    const db = req.tenantDb;
+
+    const ean    = String(req.params.ean || req.query.ean || "").trim();
+    const period = String(req.query.period || "week").trim();
+
+    if (!ean) {
+      return res.status(400).json({
+        success: false,
+        message: "product_ean_id is required.",
+      });
+    }
+
+    if (!PERIOD_MAP[period]) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid period. Use one of: week, 1m, 3m, 6m, 1y.",
+      });
+    }
+
+    // snapshot_date is stored as "YYYY-MM-DD" string → lexicographic compare works
+    const fromDate = new Date(Date.now() - PERIOD_MAP[period].days * 86400 * 1000);
+    const fromStr  = fromDate.toISOString().slice(0, 10);
+    const toStr    = new Date().toISOString().slice(0, 10);
+
+    const coll  = db.collection('ept_product_stock_history');
+    const match = {
+      product_ean_id: ean,
+      snapshot_date:  { $gte: fromStr, $lte: toStr },
+    };
+
+    /* ---------- 1. Totals for the period ---------- */
+    const totalsAgg = await coll
+      .aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: null,
+            product_name:      { $last: "$product_name" },
+            product_brand:     { $last: "$product_brand" },
+            product_category:  { $last: "$product_category" },
+            product_mpn:       { $last: "$product_mpn" },
+            product_code:      { $last: "$product_code" },
+
+            latest_stock:       { $last: "$stock" },
+            latest_price:       { $last: "$price" },
+            latest_store_price: { $last: "$store_price" },
+            latest_snapshot:    { $last: "$snapshot_date" },
+
+            avg_stock: { $avg: "$stock" },
+            max_stock: { $max: "$stock" },
+            min_stock: { $min: "$stock" },
+
+            avg_price: { $avg: "$price" },
+            max_price: { $max: "$price" },
+            min_price: { $min: "$price" },
+
+            avg_store_price: { $avg: "$store_price" },
+            snapshots:       { $sum: 1 },
+          },
+        },
+      ])
+      .toArray();
+
+    const totals = totalsAgg[0] || {};
+
+    /* ---------- 2. Daily trend ---------- */
+    const trendAgg = await coll
+      .aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: "$snapshot_date",
+            stock:       { $last: "$stock" },
+            price:       { $last: "$price" },
+            store_price: { $last: "$store_price" },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ])
+      .toArray();
+
+    /* ---------- 3. Latest snapshot overall (for "current" info) ---------- */
+    const latestRows = await coll
+      .find({ product_ean_id: ean })
+      .sort({ snapshot_date: -1, created_at: -1 })
+      .limit(1)
+      .toArray();
+
+    const latestRow = latestRows[0] || null;
+
+    /* ---------- Computed margins ---------- */
+    const latest_price       = totals.latest_price ?? 0;
+    const latest_store_price = totals.latest_store_price ?? 0;
+    const profit_per_unit    = latest_store_price - latest_price;
+    const margin_pct         = latest_store_price
+      ? (profit_per_unit / latest_store_price) * 100
+      : 0;
+
+    return res.status(200).json({
+      success: true,
+      ean,
+      period,
+      label: PERIOD_MAP[period].label,
+      from: fromStr,
+      to: toStr,
+      product: {
+        name:     totals.product_name     || "",
+        brand:    totals.product_brand    || "",
+        category: totals.product_category || "",
+        mpn:      totals.product_mpn      || "",
+        code:     totals.product_code     || "",
+      },
+      summary: {
+        snapshots:          totals.snapshots || 0,
+        latest_stock:       totals.latest_stock || 0,
+        latest_price:       round2(latest_price),
+        latest_store_price: round2(latest_store_price),
+        profit_per_unit:    round2(profit_per_unit),
+        margin_pct:         round2(margin_pct),
+        avg_stock:          round2(totals.avg_stock),
+        max_stock:          totals.max_stock || 0,
+        min_stock:          totals.min_stock || 0,
+        avg_price:          round2(totals.avg_price),
+        max_price:          round2(totals.max_price),
+        min_price:          round2(totals.min_price),
+        avg_store_price:    round2(totals.avg_store_price),
+        latest_snapshot:    totals.latest_snapshot || null,
+      },
+      trend: trendAgg.map((t) => ({
+        date:        t._id,
+        stock:       t.stock,
+        price:       round2(t.price),
+        store_price: round2(t.store_price),
+        margin:      round2((t.store_price || 0) - (t.price || 0)),
+      })),
+      latest: latestRow
+        ? {
+            snapshot_date: latestRow.snapshot_date,
+            stock:         latestRow.stock,
+            price:         round2(latestRow.price),
+            store_price:   round2(latestRow.store_price),
+            stock_status:  latestRow.stock_status,
+            created_at:    latestRow.created_at,
+          }
+        : null,
+    });
+  } catch (err) {
+    console.error("[getProductStockReport]", err);
+    return res
+      .status(err.statusCode || 500)
+      .json({ success: false, message: err.message });
+  }
+};
+
+
+
+

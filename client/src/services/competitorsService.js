@@ -1,8 +1,5 @@
 import API from '../hooks/useApi';
 
-export const fetchCompetitors = () =>
-  API.get('/competitors').then((r) => r.data);
-
 /**
  * Fetch competitors from the global admin pool (plm_admin_competitor)
  * that have NOT yet been assigned to the current store.
@@ -48,21 +45,35 @@ export const uploadCompetitorLogo = (slug, file) => {
   }).then((r) => r.data);
 };
 
+export const fetchCompetitors = () =>
+  API.get('/competitors').then((r) => r.data);
 
-export const fetchCompetitorProducts = ({
-  page = 1,
-  limit = 6,
+export const fetchCompetitorProducts = async ({
+
   competitor,
-  search,
-  status,
+  search = "",
+  status = "",
+
 } = {}) => {
+
   const params = new URLSearchParams();
 
-  params.set("page", page);
-  params.set("limit", limit);
+  if (competitor) {
+    params.set("competitor", competitor);
+  }
 
-  if (competitor) params.set("competitor", competitor);
-  if (search) params.set("search", search);
-  if (status && status !== "all") params.set("status", status);
-  return API.get(`/competitors/products?${params}`).then((r) => r.data);
+  if (search) {
+    params.set("search", search);
+  }
+
+  if (status && status !== "") {
+    params.set("status", status);
+  }
+
+  const response = await API.get(
+    `/competitors/products?${params.toString()}`
+  );
+
+  return response.data;
 };
+

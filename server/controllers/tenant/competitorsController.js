@@ -678,10 +678,6 @@ exports.getCompetitorProducts = async (req, res) => {
 
     const db = req.tenantDb;
     const companyId = req.tenantId;
-    
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 6;
-    const skip = (page - 1) * limit;
 
     const {
       competitor,
@@ -721,17 +717,18 @@ exports.getCompetitorProducts = async (req, res) => {
 
     const activeProducts = [];
 
-for (const product of products) {
-  const mainProduct = await productcollection.findOne({
-    status: "active",
-    product_ean_id: product[`${companyId}_product_id`],
-    product_code: product[`${companyId}_product_code`],
-    ean_product_data_details_scrap_status: "completed",
-  });
+    for (const product of products) {
 
-  if (!mainProduct) continue;
+      const mainProduct = await productcollection.findOne({
+        status: "active",
+        product_ean_id: product[`${companyId}_product_id`],
+        product_code: product[`${companyId}_product_code`],
+        ean_product_data_details_scrap_status: "completed",
+      });
 
-    activeProducts.push({
+      if (!mainProduct) continue;
+
+      activeProducts.push({
       
         product_ean_id: mainProduct.product_ean_id,
         product_code: mainProduct.product_code,
@@ -763,18 +760,12 @@ for (const product of products) {
           },
         },
       });
+      
     }
 
-    const total = activeProducts.length;
-    const paginatedProducts = activeProducts.slice(skip, skip + limit);
-    
     return res.json({
       success: true,
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit),
-      data: paginatedProducts,
+      data: activeProducts,
     });
 
 
