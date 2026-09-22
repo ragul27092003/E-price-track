@@ -772,13 +772,16 @@ exports.fullsiteMapping = async (req, res) => {
           item.product_url_change_competitior_web_name
         );
 
+
         const codesResult = await getCodesStatus(
           item.product_ean_id,
           item.product_code,
           item.product_mpn,
-          item.product_url_change_competitior_web_url
+          item.product_url_change_competitior_web_url,
+          item.scrape_mode
         );
 
+      
         return {
 
           id: skip + index + 1,
@@ -1779,6 +1782,53 @@ exports.runFinalActivation = async (req, res) => {
   }
 };
 
+exports.updateScrapeModeFullsite = async (req, res) => {
+  try {
+
+    const { scrape_mode, filters = {} } = req.body;
+
+    if (!["yes", "no"].includes(scrape_mode)) {
+      return res.status(400).json({ success: false, message: "Invalid scrape_mode" });
+    }
+
+    const db = req.tenantDb;
+    if (!db) {
+      return res.status(400).json({ success: false, message: "Tenant DB not found" });
+    }
+
+    const collection = db.collection("ept_full_site_mapping_data_info");
+
+    // Build filter query
+    const query = {};
+
+    if (filters.search) {
+      const rx = new RegExp(filters.search, "i");
+      query.$or = [
+        { product_ean_id: rx },
+        { product_code: rx },
+        { product_name: rx },
+      ];
+    }
+
+    if (filters.competitor)    query.product_url_change_competitior_name = filters.competitor;
+    if (filters.mappingstatus) query.mapping_status = filters.mappingstatus;
+
+
+    const result = await collection.updateMany(
+      query,
+      { $set: { scrape_mode, updatedAt: new Date() } }
+    );
+
+    return res.json({
+      success: true,
+      matched: result.matchedCount,
+      modified: result.modifiedCount,
+    });
+  } catch (err) {
+    console.error("updateScrapeModeFullsite error:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 
 /**

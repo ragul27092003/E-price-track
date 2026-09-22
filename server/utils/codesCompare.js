@@ -5,17 +5,27 @@ const getCodesStatus = async (
   eanId,
   productCode,
   productMpn,
-  productUrl
+  productUrl,
+  scrapeMode
+
 ) => {
+
   const result = {
     ean: "mismatch",
     code: "mismatch",
     mpn: "mismatch",
   };
 
+  const scrapeModeResult = {
+    ean: "error",
+    code: "error",
+    mpn: "error",
+  };
+
   try {
-    if (!productUrl) {
-      return result;
+
+    if (scrapeMode != 'yes') {
+      return scrapeModeResult;
     }
 
     const response = await axios.get(productUrl, {

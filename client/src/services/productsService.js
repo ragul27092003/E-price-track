@@ -110,6 +110,9 @@ export const fetchFullsiteMappingProducts = ({
 export const updatefullsiteProductMapping = (data) =>
   API.post('/products/fullsitemapping/update', data).then((r) => r.data);
 
+export const updateScrapeModeFullsite = (data) =>
+  API.post('/products/updatescrapemodefullsite', data).then((r) => r.data);
+
 
 export const getProductStockReport = (ean, period = "1m") =>
   API.get(`/products/stock-history/${encodeURIComponent(ean)}`, {

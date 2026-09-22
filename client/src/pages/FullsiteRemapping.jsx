@@ -27,6 +27,9 @@ const FullsiteRemapping = () => {
   const [urlValues, setUrlValues] = useState({});
   const fileInputRef = useRef(null);
 
+  const [scrapeMode, setScrapeMode] = useState("");    
+  const [updatingScrapeMode, setUpdatingScrapeMode] = useState(false);
+
   const loadProducts = async () => {
     try {
       
@@ -59,6 +62,7 @@ const FullsiteRemapping = () => {
 
 
   const StatusIcon = ({ type }) => {
+
     if (type === 'match') {
       return (
         <svg className="w-6 h-6 text-green-500 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -66,21 +70,15 @@ const FullsiteRemapping = () => {
         </svg>
       );
     }
-    if (type === "error") {
+
+    if (type === "mismatch") {
       return (
-        <svg className="w-6 h-6 text-yellow-500" fill="none" stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 4h.01M10.29 3.86l-7.82 13.5A2 2 0 004.2 20h15.6a2 2 0 001.73-2.64l-7.82-13.5a2 2 0 00-3.42 0z"
-          />
+        <svg className="w-6 h-6 text-red-500 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       );
     }
-    return (
-      <svg className="w-6 h-6 text-red-500 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    );
+    
   };
 
   const HighlightMatches = ({ text, mpn, code }) => {
@@ -139,6 +137,72 @@ const FullsiteRemapping = () => {
   useEffect(() => {
     loadProducts();
   }, [page, limit, search, selectedCompetitor, mappingStatus,activeStoreId]);
+
+
+  const updateScrapeMode = async () => {
+
+    const result = await Swal.fire({
+      title: "Update Scrape Mode?",
+      html: `
+        <p>This will set <b>scrape_mode = ${scrapeMode}</b> for the
+        currently filtered products.</p>
+        <p>Do you want to continue?</p>
+      `,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Yes, Update",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      setUpdatingScrapeMode(true);
+
+      Swal.fire({
+        title: "Updating...",
+        text: "Please wait.",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+
+      const response = await API.post(
+        "/products/updatescrapemodefullsite",   // adjust route to match your backend
+        {
+          scrape_mode: scrapeMode,
+          filters: {
+            search,
+            competitor: selectedCompetitor,
+            mappingstatus: mappingStatus,
+            scrape_mode: scrapeMode,
+          },
+        }
+      );
+
+      if (response.data?.success) {
+        Swal.fire({
+          icon: "success",
+          title: "Updated",
+          text: `Scrape mode set to "${scrapeMode}" successfully.`,
+        });
+        loadProducts();
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: response.data?.message || "Update failed.",
+        });
+      }
+    } catch (err) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: err.response?.data?.message || err.message || "Update failed.",
+      });
+    } finally {
+      setUpdatingScrapeMode(false);
+    }
+  };
 
 
   const productUpdation = async (product, action) => {
@@ -374,20 +438,19 @@ document.body.appendChild(a);
         <h2 className="text-xl font-bold">Fullsite Remapping</h2>
 
         <div className="mx-auto flex max-w-[1400px] flex-col gap-5 px-2 py-3">
-          
-          <div className="flex flex-wrap lg:flex-nowrap items-end gap-4">
-            {/* Search */}
-            <div className="flex-1 min-w-[240px]">
-              <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-transparent">
-                Search
-              </p>
+        
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-12 items-end">
 
-              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+            {/* Search */}
+            <div className="xl:col-span-4">
+              <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-600">
+                Search
+              </label>
+
+              <div className="flex h-[46px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 shadow-sm">
                 <svg
-                  className="text-slate-400"
+                  className="h-[18px] w-[18px] shrink-0 text-slate-400"
                   viewBox="0 0 24 24"
-                  width="18"
-                  height="18"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
@@ -401,71 +464,100 @@ document.body.appendChild(a);
                   type="text"
                   value={search}
                   onChange={(e) => {
-                      setSearch(e.target.value);
-                      setPage(1);
+                    setSearch(e.target.value);
+                    setPage(1);
                   }}
                   placeholder="Search by name, brand or EAN..."
-                  className="w-full bg-transparent outline-none text-sm"
+                  className="w-full bg-transparent text-sm outline-none disabled:cursor-not-allowed"
                 />
               </div>
             </div>
 
+
             {/* Competitors */}
-            <div className="w-52">
+            <div className="xl:col-span-2">
               <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-600">
                 Competitors
               </label>
 
               <select
                 disabled={loading}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none"
                 value={selectedCompetitor}
                 onChange={(e) => {
-                    setSelectedCompetitor(e.target.value);
-                    setPage(1);
+                  setSelectedCompetitor(e.target.value);
+                  setPage(1);
                 }}
+                className="h-[46px] w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50"
               >
-              <option value="">All</option>
-              {competitors.map(
-                (item) => (
-                    <option key={item.slug} value={item.slug}>{item.name}</option>
-                )
-              )}
+                <option value="">All</option>
+
+                {competitors.map((item) => (
+                  <option key={item.slug} value={item.slug}>
+                    {item.name}
+                  </option>
+                ))}
               </select>
             </div>
 
+
             {/* Status */}
-            <div className="w-52">
+            <div className="xl:col-span-2">
               <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-600">
                 Status
               </label>
 
               <select
                 disabled={loading}
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-blue-500 focus:outline-none"
                 value={mappingStatus}
                 onChange={(e) => {
-                    setMappingStatus(e.target.value);
-                    setPage(1);
+                  setMappingStatus(e.target.value);
+                  setPage(1);
                 }}
+                className="h-[46px] w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50"
               >
                 <option value="">All</option>
                 <option value="pending">Pending</option>
                 <option value="completed">Completed</option>
-                
               </select>
             </div>
-            
-            {/* Export */}
-               {mappingStatus === 'completed' && !loading && (
-                <div className="w-44">
-                  <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-transparent">
-                    Export
-                  </label>
 
+
+            {/* Scrape Mode */}
+            <div className="xl:col-span-2">
+              <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-slate-600">
+                Scrape Mode
+              </label>
+
+              <select
+                disabled={loading}
+                value={scrapeMode}
+                onChange={(e) => {
+                  setScrapeMode(e.target.value);
+                  setPage(1);
+                }}
+                className="h-[46px] w-full rounded-lg border border-slate-200 bg-white px-3 text-sm shadow-sm outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50"
+              >
+                <option value="">All</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+            </div>
+
+
+            {/* Action */}
+            <div className="xl:col-span-2">
+              <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-transparent">
+                Action
+              </label>
+
+              <div className="flex h-[46px] gap-2">
+
+                {/* Export */}
+                {mappingStatus === "completed" && !loading && (
                   <button
-                    onClick={ () => completedProductsExport()}
-                    className="flex h-[46px] w-full items-center justify-center gap-2 rounded-lg bg-[#2B86C5] text-sm font-semibold text-white shadow transition hover:bg-[#2B86C5]"
+                    type="button"
+                    onClick={completedProductsExport}
+                    className="flex h-[46px] flex-1 items-center justify-center gap-2 rounded-lg bg-[#2B86C5] px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1f6ea3]"
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -481,64 +573,93 @@ document.body.appendChild(a);
                         d="M12 3v12m0 0l4-4m-4 4l-4-4M4 21h16"
                       />
                     </svg>
+
                     Export
                   </button>
-                </div>
-            )}
+                )}
 
-            {/* Import */}
-               {mappingStatus === 'pending' && !loading && (
-              <div className="w-44">
-                <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-transparent">
-                  Import
-                </label>
+                {/* Import */}
+                {mappingStatus === "pending" && !loading && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex h-[46px] flex-1 items-center justify-center gap-2 rounded-lg bg-[#2B86C5] px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1f6ea3]"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 21V9m0 0l-4 4m4-4l4 4M4 21h16"
+                        />
+                      </svg>
 
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex h-[46px] w-full items-center justify-center gap-2 rounded-lg bg-[#2B86C5] text-sm font-semibold text-white shadow transition hover:bg-[#2B86C5]"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M12 21V9m0 0l-4 4m4-4l4 4M4 21h16"
+                      Import
+                    </button>
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".csv"
+                      className="hidden"
+                      onChange={handleImport}
                     />
-                  </svg>
+                  </>
+                )}
 
-                  Import CSV
-                </button>
+                {/* Update Scrape Mode */}
+                {scrapeMode !== "" && !loading && (
+                  <button
+                    type="button"
+                    disabled={updatingScrapeMode}
+                    onClick={updateScrapeMode}
+                    className="flex h-[46px] flex-1 items-center justify-center rounded-lg bg-[#2B86C5] px-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1f6ea3] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {updatingScrapeMode ? "Updating..." : "Update"}
+                  </button>
+                )}
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv"
-                  className="hidden"
-                  onChange={handleImport}
-                />
+                {/* Empty state - keeps alignment */}
+                {mappingStatus === "" && scrapeMode === "" && !loading && (
+                  <div className="h-[46px] flex-1 rounded-lg border border-dashed border-slate-200 bg-slate-50" />
+                )}
               </div>
-            )}
+            </div>
+
 
             {/* Counts */}
-            <div className="flex gap-3">
-              <div className="flex h-[46px] w-44 items-center justify-between rounded-lg bg-green-600 px-4 text-white shadow">
-                <span className="text-sm font-semibold uppercase">Completed</span>
-                <span className="rounded bg-white/20 px-2 py-0.5 text-sm font-bold">
-                  {counts.completed}
-                </span>
-              </div>
+            <div className="xl:col-span-12">
+              <div className="flex flex-wrap items-center gap-3">
 
-              <div className="flex h-[46px] w-44 items-center justify-between rounded-lg bg-red-500 px-4 text-white shadow">
-                <span className="text-sm font-semibold uppercase">Pending</span>
-                <span className="rounded bg-white/20 px-2 py-0.5 text-sm font-bold">
-                  {counts.pending}
-                </span>
+                {/* Completed */}
+                <div className="flex h-[42px] min-w-[145px] items-center justify-between rounded-lg bg-green-600 px-4 text-white shadow-sm">
+                  <span className="text-xs font-semibold uppercase tracking-wide">
+                    Completed
+                  </span>
+
+                  <span className="rounded-md bg-white/20 px-2 py-0.5 text-sm font-bold">
+                    {counts.completed}
+                  </span>
+                </div>
+
+                {/* Pending */}
+                <div className="flex h-[42px] min-w-[145px] items-center justify-between rounded-lg bg-red-500 px-4 text-white shadow-sm">
+                  <span className="text-xs font-semibold uppercase tracking-wide">
+                    Pending
+                  </span>
+
+                  <span className="rounded-md bg-white/20 px-2 py-0.5 text-sm font-bold">
+                    {counts.pending}
+                  </span>
+                </div>
+
               </div>
             </div>
 
@@ -591,8 +712,6 @@ document.body.appendChild(a);
 
 
                       products.map((product, index) => {
-
-                        console.log(product);
                         
                         return (
 
@@ -762,6 +881,7 @@ document.body.appendChild(a);
 
             </div>
           </div>
+
         </div>
       </div>
 
