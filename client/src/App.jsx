@@ -15,6 +15,7 @@ import NotFound from "@/pages/NotFound";
 import Settings from "./pages/Settings";
 import ProductHistory from "./pages/ProductHistory";
 import Competitors from "./pages/Competitors";
+import Reports from "./pages/Reports";
 import Products from "./pages/Products";
 import Notifications from "./pages/Notifications";
 import SmartReports from "./pages/SmartReports";
@@ -58,6 +59,7 @@ const App = () => (
               <Route path={ROUTE.manageFeedSetup} element={<ManageFeedSetup />} />
               <Route path={ROUTE.settings} element={<Settings />} />
               <Route path={ROUTE.competitors} element={<Competitors />} />
+              <Route path={ROUTE.reports} element={<Reports />} />
               <Route path={ROUTE.products} element={<Products />} />
               <Route path={ROUTE.market} element={<MarketCompetitor />} />
               <Route element={<ProductMappingLayout />}>

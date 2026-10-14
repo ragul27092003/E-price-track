@@ -11,6 +11,7 @@ export const ROUTE = {
   manageFeedSetup: `${ADMIN_BASE}/manage-feed-setup`,
   settings: `${ADMIN_BASE}/settings`,
   competitors: `${ADMIN_BASE}/competitors`,
+  reports: `${ADMIN_BASE}/reports`,
   products: `${ADMIN_BASE}/products`,
   market: `${ADMIN_BASE}/market`,
   productMapping: `${ADMIN_BASE}/product-mapping`,
