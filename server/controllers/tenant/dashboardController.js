@@ -29,6 +29,10 @@ exports.getRankAnalysis = async (req, res) => {
 // ─── GET /api/dashboard/brand-analytics/brands ───────────────────────────────
 exports.getBrandAnalyticsBrands = async (req, res) => {
   try {
+    const brand = req.query.brand;
+    if (brand) {
+      return res.json([brand]);   // ← return + array
+    }
     const brands = await req.tenantDb
       .collection('ept_dashboard_price_analysis')
       .distinct('brand_name');

@@ -249,6 +249,10 @@ export default function Dashboard() {
   const [webUpdateStatus, setWebUpdateStatus] = useState(null); // { status, var_end_time } — nandilathgmart only
   const isSuperAdmin = useStore((s) => s.user?.user_type === 'super_admin');
   const canEditEasyGainPercentage = useStore((s) => s.user?.user_type === 'super_admin');
+  const profile = useStore((s) => s.profile);
+  const isProfileLoading = useStore((s) => s.isProfileLoading);
+  const isBranduser = useStore((s) => s.profile?.brand_user ? true : false);
+  const Brandslug = useStore((s) => s.profile?.brand_user ? s.profile?.brand_slug : null);
   const [easyGainPercentage, setEasyGainPercentage] = useState(0);
   const [showEasyGainModal, setShowEasyGainModal] = useState(false);
   const [percentageInput, setPercentageInput] = useState("");
@@ -269,10 +273,17 @@ export default function Dashboard() {
   } = useStore();
 
     useEffect(() => {
+      if (isProfileLoading || !profile) {
+        return;
+      }
       fetchSapUpdateStatus();
       fetchOverallStatistics();
       fetchRankAnalysis();
-      fetchBrandAnalyticsBrands();
+      if (isBranduser && Brandslug) {
+        fetchBrandAnalyticsBrands(Brandslug);
+      } else if (!isBranduser) {
+        fetchBrandAnalyticsBrands();
+      }
 
       // ── WEB Price Update Status (nandilathgmart only) ──
       if (activeShopName?.toLowerCase() === 'nandilathgmart') {
@@ -306,7 +317,7 @@ export default function Dashboard() {
 
       // ── Competitor Activity Log ──
       loadActivityLog();
-    }, [currentStoreId]);
+    }, [currentStoreId, profile, isProfileLoading, isBranduser, Brandslug]);
 
   // Separate function to load activity log
   const loadActivityLog = async () => {
@@ -395,6 +406,10 @@ export default function Dashboard() {
     setSelectedBrand('');
     setSelectedCategory('');
   }, [currentStoreId]);
+
+  const brandOptions = isBranduser
+  ? (Brandslug ? [Brandslug] : [])
+  : (Array.isArray(brandAnalyticsBrands) ? brandAnalyticsBrands : []);
 
   useEffect(() => {
     if (brandAnalyticsBrands.length > 0 && !selectedBrand) {
@@ -508,10 +523,17 @@ export default function Dashboard() {
   }));
 
   useEffect(() => {
+    if (isProfileLoading || !profile) {
+      return;
+    }
     fetchSapUpdateStatus();
     fetchOverallStatistics();
     fetchRankAnalysis();
-    fetchBrandAnalyticsBrands();
+    if (isBranduser && Brandslug) {
+      fetchBrandAnalyticsBrands(Brandslug);
+    } else if (!isBranduser) {
+      fetchBrandAnalyticsBrands();
+    }
 
     const fetchCompetitorCounts = async () => {
       try {
@@ -538,7 +560,7 @@ export default function Dashboard() {
       }
     };
     loadActivityLog();
-  }, []);
+  }, [isBranduser, Brandslug, profile, isProfileLoading]);
 
   // SAP Status Only Polling //
   useEffect(() => {
@@ -802,7 +824,7 @@ useEffect(() => {
                   {brandAnalyticsBrandsLoading ? (
                     <option>Loading…</option>
                   ) : (
-                    brandAnalyticsBrands.map((b) => (
+                    brandOptions.map((b) => (
                       <option key={b} value={b}>
                         {b}
                       </option>

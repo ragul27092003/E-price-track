@@ -3,6 +3,7 @@ import { useSearchParams,useParams } from "react-router-dom";
 import { useStore } from "../store";
 import { fetchProducts } from "../services/productsService";
 import { fetchCompetitors } from "../services/competitorsService";
+import Swal from "sweetalert2";
 import API from "../hooks/useApi";
 // ── Helpers ───────────────────────────────────────────────────────────────────
  
@@ -351,6 +352,9 @@ export default function ProductHistory() {
   const activeStoreId      = useStore((s) => s.activeStoreId);
   const lastViewedEan      = useStore((s) => s.lastViewedEan);
   const setLastViewedEan   = useStore((s) => s.setLastViewedEan);
+  const isBranduser      = useStore((s) => s.profile?.brand_user ? true : false);
+  const Brandslug        = useStore((s) => s.profile?.brand_user ? s.profile?.brand_slug : null);
+  const isProfileLoading = useStore((s) => s.isProfileLoading);
  
   const [loading,       setLoading]       = useState(true);
   const [searchQuery,   setSearchQuery]   = useState("");
@@ -384,18 +388,16 @@ const effectiveEan = eanFromUrl || lastViewedEan || null;
       setEanProduct(null);
       return;
     }
-    // Wait for the main product-list load to finish before deciding whether we
-    // need a separate request — on first mount effectiveEan is often already
-    // satisfied by that list, so firing this in parallel every refresh was a
-    // guaranteed-redundant network call.
     if (loading) return;
+
     const alreadyLoaded = storeProducts.find(
       (p) => String(p.product_ean_id) === String(effectiveEan) || String(p.product_code) === String(effectiveEan)
     );
     if (alreadyLoaded) {
-      setEanProduct(null); // storeProducts already has it, no need for a separate fetch
+      setEanProduct(null);
       return;
     }
+
     let cancelled = false;
     setEanLoading(true);
     fetchProducts({ search: effectiveEan, limit: 1 })
@@ -405,6 +407,24 @@ const effectiveEan = eanFromUrl || lastViewedEan || null;
         const match = arr.find(
           (p) => String(p.product_ean_id) === String(effectiveEan) || String(p.product_code) === String(effectiveEan)
         ) || arr[0] || null;
+
+        // Brand users: don't load a product from another brand
+        if (match && isBranduser && Brandslug) {
+          const matchBrand = String(match.product_brand || "").toLowerCase().trim();
+          if (matchBrand !== String(Brandslug).toLowerCase().trim()) {
+            Swal.fire({
+              icon: "info",
+              title: "Product Not Matched",
+              html: `You can only view <b>${Brandslug}</b> products.`,
+              confirmButtonText: "OK",
+            });
+            setEanProduct(null);
+            // Clear so the next render falls back to the default brand product
+            if (setLastViewedEan) setLastViewedEan(null);
+            return;
+          }
+        }
+
         setEanProduct(match);
       })
       .catch((e) => {
@@ -415,14 +435,19 @@ const effectiveEan = eanFromUrl || lastViewedEan || null;
         if (!cancelled) setEanLoading(false);
       });
     return () => { cancelled = true; };
-  }, [effectiveEan, storeProducts, loading]);
+  }, [effectiveEan, storeProducts, loading, isBranduser, Brandslug]);
  
   useEffect(() => {
+    // Brand user: wait for the profile so Brandslug is available.
+    if (isBranduser && (isProfileLoading || !Brandslug)) return;
+
     const load = async () => {
       setLoading(true);
       try {
+        const productParams = isBranduser && Brandslug ? { brand: Brandslug } : {};
+
         const [, comps] = await Promise.all([
-          fetchProducts().then((d) => {
+          fetchProducts(productParams).then((d) => {
             const arr = Array.isArray(d) ? d : (d?.products ?? d?.data ?? d?.items ?? []);
             setProducts(arr);
             setProductsLoading(false);
@@ -440,7 +465,7 @@ const effectiveEan = eanFromUrl || lastViewedEan || null;
       }
     };
     load();
-  }, [activeStoreId]);
+  }, [activeStoreId, isBranduser, Brandslug, isProfileLoading]);
  
   // NOTE: storeProducts is just whatever page of products happens to already
   // be loaded in the shared store (limit=15 by default) — filtering that
@@ -551,10 +576,33 @@ useEffect(() => {
     setUserSearched(true);
     setSearchLoading(true);
     try {
-      // Same backend search used by the Products page — matches on
-      // product_name, product_brand, product_ean_id, AND product_code.
       const d = await fetchProducts({ search: q, limit: 50 });
-      const arr = Array.isArray(d) ? d : (d?.products ?? d?.data ?? d?.items ?? []);
+      let arr = Array.isArray(d) ? d : (d?.products ?? d?.data ?? d?.items ?? []);
+
+      // Brand users can only see their own brand's products
+      if (isBranduser && Brandslug) {
+        const brand = String(Brandslug).toLowerCase().trim();
+        const brandMatched = arr.filter(
+          (p) => String(p.product_brand || "").toLowerCase().trim() === brand
+        );
+
+        // Something matched but none of it is their brand → popup + reset
+        if (arr.length > 0 && brandMatched.length === 0) {
+          Swal.fire({
+              icon: "info",
+              title: "Product Not Matched",
+              html: `You can only view <b>${Brandslug}</b> products.`,
+              confirmButtonText: "OK",
+            });
+          setSearchQuery("");
+          setUserSearched(false);
+          setSearchResults([]);
+          return;
+        }
+
+        arr = brandMatched;
+      }
+
       setSearchResults(arr);
     } catch (e) {
       console.error("ProductHistory search error:", e);

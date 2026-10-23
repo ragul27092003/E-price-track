@@ -2386,9 +2386,15 @@ export default function Products() {
   const competitors = useStore((s) => s.competitors);
   const setCompetitors = useStore((s) => s.setCompetitors);
   const activeStoreId = useStore((s) => s.activeStoreId);
+  const profile = useStore((s) => s.profile);
+  const isProfileLoading = useStore((s) => s.isProfileLoading);
+  const isBranduser = useStore((s) => s.profile?.brand_user ? true : false);
+  const Brandslug = useStore((s) => s.profile?.brand_user ? s.profile?.brand_slug : null);
   const currentUserId = useStore((s) => s.user?.user_id);
   const exportType = useStore((s) => s.exportType) || "A";
   const canExport = useStore((s) => (s.user?.export_option ?? "yes") !== "no");
+
+  console.log("isBrandUser", isBranduser); console.log(Brandslug);
 
   const competitorMeta = {};
   competitors.forEach((c) => {
@@ -2411,6 +2417,8 @@ export default function Products() {
   const [catFilter, _setCatFilter] = useState("");
   const [rankFilter, _setRankFilter] = useState("");
   const [itemGroupFilter, _setItemGroupFilter] = useState("");
+  // Brand users are locked to their own brand; normal users use the dropdown.
+  const effectiveBrand = isBranduser ? (Brandslug || "") : brandFilter;
 
   const setSearch = (v) => {
     _setSearch(v);
@@ -2499,10 +2507,13 @@ export default function Products() {
   }, [activeStoreId]);
 
   useEffect(() => {
+    // Brand user: wait until the profile (and Brandslug) is ready.
+    if (isBranduser && (isProfileLoading || !Brandslug)) return;
+
     load(
       currentPage,
       search,
-      brandFilter,
+      effectiveBrand,   // ← was brandFilter
       catFilter,
       rankFilter,
       itemGroupFilter,
@@ -2510,12 +2521,15 @@ export default function Products() {
   }, [
     currentPage,
     search,
-    brandFilter,
+    effectiveBrand,     // ← was brandFilter
     catFilter,
     rankFilter,
     itemGroupFilter,
     activeStoreId,
     competitorSlug,
+    isBranduser,
+    Brandslug,
+    isProfileLoading,
   ]);
 
   const brandOptions = productsMeta?.brands || [];
@@ -2747,7 +2761,7 @@ export default function Products() {
                       const result = await exportProductsCSV({
                         competitorSlug: competitorSlug || null,
                         search,
-                        brand: brandFilter,
+                        brand: effectiveBrand,   // ← forced to Brandslug for brand users
                         category: catFilter,
                         rank: rankFilter,
                         itemGroup: itemGroupFilter,
@@ -2796,25 +2810,43 @@ export default function Products() {
               value={itemGroupFilter}
               onChange={setItemGroupFilter}
             />
-            <FilterSelect
-              label="Brand"
-              options={brandOptions}
-              value={brandFilter}
-              onChange={setBrandFilter}
-            />
+
+            {/* Brand filter: only for non-brand users */}
+            {!isBranduser && (
+              <FilterSelect
+                label="Brand"
+                options={brandOptions}
+                value={brandFilter}
+                onChange={setBrandFilter}
+              />
+            )}
+
+            {/* Brand users: show which brand they're locked to */}
+            {isBranduser && Brandslug && (
+              <div className="flex-1 min-w-[140px] sm:min-w-[160px] max-w-full sm:max-w-[220px]">
+                <p className="mb-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                  Brand
+                </p>
+                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700">
+                  {Brandslug}
+                </div>
+              </div>
+            )}
+
             <FilterSelect
               label="Category"
               options={catOptions}
               value={catFilter}
               onChange={setCatFilter}
             />
+
             <FilterSelect
               label="Rank"
               options={rankOptions}
               value={rankFilter}
               onChange={setRankFilter}
             />
-          </div>
+</div>
 
           {/* Tabs */}
           <div>
@@ -2843,7 +2875,7 @@ export default function Products() {
                   load(
                     currentPage,
                     search,
-                    brandFilter,
+                    effectiveBrand,   // ← was brandFilter
                     catFilter,
                     rankFilter,
                     itemGroupFilter,

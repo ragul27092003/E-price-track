@@ -518,6 +518,9 @@ const Competitors = () => {
   const [UsersNotificationData, setUsersNotificationData] = useState([]);
   const [Storecompetitors, setStorecompetitors] = useState([]);
   const [RandomProductData, setRandomProductData] = useState([]);
+  const [isreportdataLoading, setreportdataLoading] = useState(true);
+  const [isoveralldataLoading, setoveralldataLoading] = useState(true);
+  const [iscompetitorsloading, setiscompetitorsloading] = useState(true);
   const [notificationLoading, setNotificationLoading] = useState(true);
   const [isCompetitorLoading, setCompetitorLoading] = useState(true);
   const [isRandomPDloading, setRandomPDloading] = useState(true);
@@ -604,6 +607,7 @@ const Competitors = () => {
       setTotalactiveUsers(data.totalusers);
       setUsersLogHistory(data.UsersLog);
       setCurrentMonthUserCount(data.CurrentMonthUser);
+      setreportdataLoading(false);
     } catch (err) {
       console.error("Failed to fetch competitor counts", err);
     }
@@ -613,6 +617,7 @@ const Competitors = () => {
     try {
       const data = await fetchOverallStatistics();
       setoveralldata(data);
+      setoveralldataLoading(false);
     } catch (err) {
       console.error("Failed to fetch overalldashboard status", err);
     }
@@ -623,6 +628,7 @@ const Competitors = () => {
       setCompetitorLoading(true);
       const data = await fetchCompetitors();
       setStorecompetitors(data);
+      setiscompetitorsloading(false);
     } catch (err) {
       console.error("Failed to fetch competitor counts", err);
     } finally {
@@ -765,15 +771,15 @@ const Competitors = () => {
       <style dangerouslySetInnerHTML={{ __html: printStyles }} />
 
       <div className="report-wrapper">
-        <div className="report-shell p-4 bg-white dark:bg-[#0b101e] min-h-screen print:min-h-0 border-2 print:border-0 border-gray-200 dark:border-gray-800 text-slate-800 dark:text-slate-200 font-sans selection:bg-indigo-500/30">
-          <div className="hidden print:flex justify-between mb-5"><img className="w-40 h-max" src="https://epricetrack.com/src/services/assets/main-logo.png" alt="" /><img className="w-40" src="https://www.eywamedia.com/assets/img/logo.png" alt="" /></div>
+        <div className="report-shell p-6 bg-white dark:bg-[#0b101e] min-h-screen print:min-h-0 print:p-3 border-2 print:border-0 border-gray-200 dark:border-gray-800 text-slate-800 dark:text-slate-200 font-sans selection:bg-indigo-500/30">
+          <div className="hidden print:flex justify-between mb-14"><img className="w-40 h-max" src="https://epricetrack.com/src/services/assets/main-logo.png" alt="" /><img className="w-40" src="https://www.eywamedia.com/assets/img/logo.png" alt="" /></div>
           {/* ══════════ PAGE 1 — Header + KPI + Trend Analysis ══════════ */}
-          <PrintPage center className="mb-10 print:mb-0">
+          <PrintPage className="mb-10 print:mb-0">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 print-avoid-break">
               <div className="print:max-w-[70%]">
                 <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight capitalize mb-3 print:mb-6">
                   {activeShopName} Monthly Report{" "}
-                  <span className="text-indigo-600 dark:text-indigo-400">
+                  <span className="text-indigo-600 dark:text-indigo-400 print:block print:mt-3">
                     {currentmonth} 2026
                   </span>
                 </h1>
@@ -808,22 +814,19 @@ const Competitors = () => {
               Dashboard Overview
             </h2>
 
-            <div className="grid grid-cols-1 print:grid-cols-4 sm:grid-cols-2 lg:grid-cols-4 gap-6 print:gap-3 mb-10 print:mb-6">
+            <div className="grid grid-cols-1 print:grid-flow-col md:grid-cols-2 lg:grid-flow-col lg:grid-cols-none gap-6 print:gap-3 mb-10 print:mb-6">
               {[
-                { label: "Total Products",      value: overalldata.varActiveInactiveProductsCount, icon: "📦", color: "text-blue-600 dark:text-blue-400" },
-                { label: "Completed Products",  value: overalldata.varCompletedProductCount,       icon: "📦", color: "text-blue-600 dark:text-blue-400" },
-                { label: "New Products",        value: newproductcount,                            icon: "✨", color: "text-emerald-600 dark:text-emerald-400" },
-                { label: "Price Notifications", value: overalldata.varNotificationCounts,          icon: "🔔", color: "text-rose-600 dark:text-rose-400" },
-                { label: "Competitors",         value: `${overalldata.varChoosedCompetitorCount}/${overalldata.varOursCompetitorCount}`, icon: "⚔️", color: "text-indigo-600 dark:text-indigo-400" },
+                { label: "Total Products",      value: isoveralldataLoading ? "Loading..." : overalldata.varActiveInactiveProductsCount, color: "text-blue-600 dark:text-blue-400" },
+                { label: "Completed Products",  value: isoveralldataLoading ? "Loading..." : overalldata.varCompletedProductCount,       color: "text-blue-600 dark:text-blue-400" },
+                { label: "New Products",        value: isreportdataLoading ? "Loading..." : newproductcount,                            color: "text-emerald-600 dark:text-emerald-400" },
+                { label: "Price Notifications", value: isoveralldataLoading ? "Loading..." : overalldata.varNotificationCounts,          color: "text-rose-600 dark:text-rose-400" },
+                { label: "Competitors",         value: isoveralldataLoading ? "Loading..." : `${overalldata.varChoosedCompetitorCount}/${overalldata.varOursCompetitorCount}`, color: "text-indigo-600 dark:text-indigo-400" },
               ].map((card, idx) => (
                 <Card
                   key={idx}
-                  className="print-avoid-break p-6 print:p-3 relative overflow-hidden group print:border-[1px] border-indigo-300 dark:hover:border-indigo-500/50 transition-colors"
+                  className="print-avoid-break p-4 print:p-3 relative overflow-hidden group border-indigo-300 dark:hover:border-indigo-500/50 transition-colors"
                 >
-                  <div className="absolute print:hidden top-0 right-0 p-4 opacity-50 group-hover:opacity-100 transition-opacity">
-                    <span className="text-4xl">{card.icon}</span>
-                  </div>
-                  <div className="flex flex-col items-start print:items-center">
+                  <div className="flex flex-col items-center">
                     <p className="text-xs print:text-[10px] font-semibold text-slate-500 dark:text-slate-400 tracking-wider uppercase mb-2">
                       {card.label}
                     </p>
@@ -837,7 +840,8 @@ const Competitors = () => {
 
               <SectionHeader title="Trend Analysis Summary" />
               <div className="overflow-x-auto flex-1 border-2 rounded-lg border-slate-200">
-                <table className="w-full text-sm text-left">
+                {!isreportdataLoading && !isoveralldataLoading ?
+                  (<table className="w-full text-sm text-left">
                   <thead className="text-xs text-slate-400 dark:text-slate-500 uppercase bg-slate-50/50 dark:bg-slate-800/50">
                     <tr className="border-b-2 border-slate-200">
                       <th className="px-4 py-3 font-semibold rounded-tl-lg text-center">Metric</th>
@@ -858,12 +862,14 @@ const Competitors = () => {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                  </table>)
+                : (<p className="text-center p-2 font-bold">Loading...</p>)
+                }
               </div>
           </PrintPage>
 
           {/* ══════════ PAGE 2 — Daily Activities + User Activity ══════════ */}
-          <PrintPage className="mb-10 print:mb-0">
+          <PrintPage center className="mb-10 print:mb-0">
             <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 tracking-tight print:mt-6 mb-6">
               Daily and Users Activity Overview
             </h2>
@@ -886,45 +892,49 @@ const Competitors = () => {
               </Card>
 
               <Card className="print-avoid-break p-6 flex-1 flex flex-col">
-                <SectionHeader title="User Activity" />
-                <div className="flex justify-between items-center mb-6 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700/50">
-                  <div className="text-center w-1/2 border-r border-slate-200 dark:border-slate-700">
-                    <p className="text-2xl font-bold text-slate-800 dark:text-white">{totalActiveUsers}</p>
-                    <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-1">Active Users</p>
-                  </div>
-                  <div className="text-center w-1/2">
-                    <p className="text-2xl font-bold text-slate-800 dark:text-white">{CurrentMonthUserCount}</p>
-                    <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-1">New Users</p>
-                  </div>
-                </div>
-
-                <div
-                  className="flex flex-wrap gap-x-2.5 gap-y-2.5 justify-center overflow-auto top-users-container"
-                  style={{
-                    scrollbarWidth: "none",
-                    maxHeight: isPrint ? "none" : `${topUsersMaxHeight}px`,
-                  }}
-                >
-                  {topUsers.map((user, idx) => (
-                    <div
-                      key={idx}
-                      ref={idx === 0 ? topUserRef : null}
-                      className="flex items-center justify-between gap-x-2 p-1.5 bg-indigo-100 rounded-full"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold bg-blue-400 text-blue-100 dark:bg-blue-900/30 dark:text-blue-400">
-                          {user.initials}
-                        </div>
-                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                          {user.user}
-                        </span>
+                {isreportdataLoading ? (<p className="p-2 text-center font-bold">Loading...</p>) 
+                : (<>
+                  <SectionHeader title="User Activity" />
+                    <div className="flex justify-between items-center mb-6 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700/50">
+                      <div className="text-center w-1/2 border-r border-slate-200 dark:border-slate-700">
+                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{totalActiveUsers}</p>
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-1">Active Users</p>
                       </div>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 print:text-left">
-                        <span className="text-green-600">Logged</span> {user.logins}
-                      </span>
+                      <div className="text-center w-1/2">
+                        <p className="text-2xl font-bold text-slate-800 dark:text-white">{CurrentMonthUserCount}</p>
+                        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-1">New Users</p>
+                      </div>
                     </div>
-                  ))}
-                </div>
+
+                    <div
+                      className="flex flex-wrap gap-x-2.5 gap-y-2.5 justify-center overflow-auto top-users-container"
+                      style={{
+                        scrollbarWidth: "none",
+                        maxHeight: isPrint ? "none" : `${topUsersMaxHeight}px`,
+                      }}
+                    >
+                      {topUsers.map((user, idx) => (
+                        <div
+                          key={idx}
+                          ref={idx === 0 ? topUserRef : null}
+                          className="flex items-center justify-between gap-x-2 p-1.5 bg-indigo-100 rounded-full"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold bg-blue-400 text-blue-100 dark:bg-blue-900/30 dark:text-blue-400">
+                              {user.initials}
+                            </div>
+                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                              {user.user}
+                            </span>
+                          </div>
+                          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 print:text-left">
+                            <span className="text-green-600">Logged</span> {user.logins}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </>)
+                  }
               </Card>
             </div>
           </PrintPage>
@@ -1017,9 +1027,12 @@ const Competitors = () => {
             <Card className="print-avoid-break mb-10 print:mb-0 print:mt-9 p-6 md:p-8 print:p-4">
               <SectionHeader
                 title="Competitors Overview"
-                badge={`${activeCompetitorCount} Active Competitors`}
+                badge={iscompetitorsloading ? "Loading..." : `${activeCompetitorCount} Active Competitors`}
               />
-
+              {iscompetitorsloading 
+              ? (<p className="text-center p-2 font-bold">Loading...</p>) 
+              : 
+              (<>
               {competitors.some((comp) => comp.type === "EAN") && (
                 <div>
                   <h3 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-4">
@@ -1077,6 +1090,7 @@ const Competitors = () => {
                   </div>
                 </div>
               )}
+              </>)}
             </Card>
           </PrintPage>
 

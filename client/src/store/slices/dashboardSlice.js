@@ -55,11 +55,11 @@ export const createDashboardSlice = (set) => ({
     }
   },
 
-  fetchBrandAnalyticsBrands: async () => {
+  fetchBrandAnalyticsBrands: async (brand) => {
     set({ brandAnalyticsBrandsLoading: true });
     try {
       const { fetchBrandAnalyticsBrands } = await import('../../services/dashboardService');
-      const brands = await fetchBrandAnalyticsBrands();
+      const brands = await fetchBrandAnalyticsBrands(brand);
       set({ brandAnalyticsBrands: brands, brandAnalyticsBrandsLoading: false });
     } catch (err) {
       set({ brandAnalyticsBrandsLoading: false });

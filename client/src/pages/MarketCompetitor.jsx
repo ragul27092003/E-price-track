@@ -1584,6 +1584,9 @@ const MarketCompetitor = () => {
   // Same export settings pattern as Products.jsx
   const exportType = useStore((s) => s.exportType) || "A";
   const canExport = useStore((s) => (s.user?.export_option ?? "yes") !== "no");
+  const isBranduser      = useStore((s) => s.profile?.brand_user ? true : false);
+  const Brandslug        = useStore((s) => s.profile?.brand_user ? s.profile?.brand_slug : null);
+  const isProfileLoading = useStore((s) => s.isProfileLoading);
 
   const competitorMeta = {};
   competitors.forEach((c) => {
@@ -1605,6 +1608,8 @@ const MarketCompetitor = () => {
   const [catFilter, setCatFilter] = useState("");
   const [rankFilter, setRankFilter] = useState("");
   const [itemGroupFilter, setItemGroupFilter] = useState("");
+  // Brand users are locked to their own brand; normal users use the dropdown.
+  const effectiveBrand = isBranduser ? (Brandslug || "") : brandFilter;
 
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -1676,7 +1681,7 @@ const MarketCompetitor = () => {
         limit: 20,
         competitorSlug: competitor.slug,
         search: search || undefined,
-        brand: brandFilter || undefined,
+        brand: effectiveBrand || undefined,   // ← was brandFilter
         category: catFilter || undefined,
         rank: rankFilter || undefined,
         itemGroup: itemGroupFilter || undefined,
@@ -1695,17 +1700,22 @@ const MarketCompetitor = () => {
   };
 
   useEffect(() => {
-    if (selectedCompetitor) {
-      loadCompetitorProducts(selectedCompetitor, currentPage);
-    }
+    if (!selectedCompetitor) return;
+    // Brand user: wait until the profile (and Brandslug) is ready.
+    if (isBranduser && (isProfileLoading || !Brandslug)) return;
+
+    loadCompetitorProducts(selectedCompetitor, currentPage);
   }, [
     selectedCompetitor,
     currentPage,
     search,
-    brandFilter,
+    effectiveBrand,      // ← was brandFilter
     catFilter,
     rankFilter,
     itemGroupFilter,
+    isBranduser,
+    Brandslug,
+    isProfileLoading,
   ]);
 
   const handleTabClick = (competitor) => {
@@ -1735,7 +1745,7 @@ const MarketCompetitor = () => {
       const result = await exportProductsCSV({
         competitorSlug: selectedCompetitor.slug,
         search: search || undefined,
-        brand: brandFilter || undefined,
+        brand: effectiveBrand || undefined,   // ← was brandFilter
         category: catFilter || undefined,
         rank: rankFilter || undefined,
         itemGroup: itemGroupFilter || undefined,
@@ -1940,15 +1950,28 @@ const MarketCompetitor = () => {
                     setCurrentPage(1);
                   }}
                 />
-                <FilterSelect
-                  label="Brand"
-                  options={productsMeta?.brands || []}
-                  value={brandFilter}
-                  onChange={(v) => {
-                    setBrandFilter(v);
-                    setCurrentPage(1);
-                  }}
-                />
+                {!isBranduser && (
+                  <FilterSelect
+                    label="Brand"
+                    options={productsMeta?.brands || []}
+                    value={brandFilter}
+                    onChange={(v) => {
+                      setBrandFilter(v);
+                      setCurrentPage(1);
+                    }}
+                  />
+                )}
+
+                {isBranduser && Brandslug && (
+                  <div className="flex-1 min-w-[140px] sm:min-w-[160px] max-w-full sm:max-w-[220px]">
+                    <p className="mb-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+                      Brand
+                    </p>
+                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-700">
+                      {Brandslug}
+                    </div>
+                  </div>
+                )}
                 <FilterSelect
                   label="Category"
                   options={productsMeta?.categories || []}

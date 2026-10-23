@@ -9,8 +9,16 @@ export const fetchOverallStatistics = () =>
 export const fetchRankAnalysis = () =>
   API.get('/dashboard/rank-analysis').then((r) => r.data);
 
-export const fetchBrandAnalyticsBrands = () =>
-  API.get('/dashboard/brand-analytics/brands').then((r) => r.data);
+export const fetchBrandAnalyticsBrands = (brand) =>{
+  console.log("Service brand:", brand);
+  const params = brand
+    ? new URLSearchParams({ brand })
+    : new URLSearchParams();
+    console.log("Request URL:", 
+    `/dashboard/brand-analytics/brands?${params}`
+  );
+  return API.get(`/dashboard/brand-analytics/brands?${params}`).then((r) => r.data);
+}
 
 export const fetchBrandAnalytics = (brand, category) => {
   const params = new URLSearchParams({ brand });

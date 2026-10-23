@@ -26,7 +26,7 @@ const navItems = [
   { title: "Product History",   icon: LucideHistory,   path: ROUTE.productHistory },
   { title: "Market Competitor", icon: ComponentIcon,   path: ROUTE.market },
   { title: "Price Change Monitor", icon: Coins, path: ROUTE.priceChanges, superAdminOnly: true },
-  { title: "Smart Reports",     icon: BarChartBigIcon, path: ROUTE.smartReports },
+  { title: "Smart Reports",     icon: BarChartBigIcon, path: ROUTE.smartReports, hideForBrandUser: true },
   /*{ title: "Product Mapping",   icon: Share2Icon,      path: ROUTE.productMapping, activePaths: [
       ROUTE.productMapping,
       ROUTE.fullsiteRemapping,
@@ -39,12 +39,15 @@ export function AppSidebar() {
   const location = useLocation();
   const isSuperAdmin = useStore(selectIsSuperAdmin);
   const primaryColor = useStore(selectPrimaryColor);
+  const isBranduser  = useStore((s) => s.profile?.brand_user ? true : false);
 
   // Only keep items that either have no restriction, or are marked
   // superAdminOnly and the logged-in user IS a super admin.
-  const visibleNavItems = navItems.filter(
-    (item) => !item.superAdminOnly || isSuperAdmin
-  );
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.superAdminOnly && !isSuperAdmin) return false;
+    if (item.hideForBrandUser && isBranduser) return false;
+    return true;
+  });
 
   return (
     <aside className="flex flex-col border-r border-sidebar-border bg-sidebar shrink-0 w-[70px] h-screen">
