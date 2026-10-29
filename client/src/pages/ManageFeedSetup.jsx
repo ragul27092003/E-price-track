@@ -659,7 +659,7 @@ const ManageFeedSetup = () => {
 
         <div className="overflow-x-auto overflow-y-auto max-h-[400px] rounded-xl border-2 border-gray-600/10 dark:border-slate-700/60 scrollbar-hide">
           <table className="w-full table-fixed text-left border-collapse">
-            <thead className="sticky top-0 bg-gray-600 dark:bg-[#0f1420] z-10">
+            <thead className="sticky top-0 bg-gray-600 dark:bg-[#0f1420] z-20">
               <tr className="text-white dark:text-slate-400 text-xs uppercase font-bold">
                 <th className="w-[21%] py-3 border-none whitespace-nowrap px-[10px] pl-5">Start Time</th>
                 <th className="w-[12%] py-3 border-none whitespace-nowrap px-[10px]">Status</th>
@@ -741,16 +741,19 @@ const ManageFeedSetup = () => {
                           </td>
                           
                           {/* Steps */}
-                          <td className="py-3 border-b border-gray-600/10 dark:border-slate-700/40 align-center px-[10px]">
+                          <td className="py-3 border-b border-gray-600/10 dark:border-slate-700/40 align-center px-[10px] group">
                             <div className="flex items-center gap-2 flex-wrap">
                               {log.steps && log.steps.map((step, i) => {
                                 const display = getStepStatusDisplay(step.status);
                                 return (
-                                  <div key={i} className="flex items-center gap-1 bg-gray-50 border border-gray-400 dark:bg-slate-800/50 px-1.5 py-0.5 rounded-full">
-                                    {display.icon}
-                                    <span className="text-[11px] text-gray-600 dark:text-slate-400 font-medium">
-                                      {step.label.split(' ')[0]}
-                                    </span>
+                                  <div className='flex flex-col items-center'>
+                                    <div key={i} className="z-10 flex items-center gap-1 bg-gray-50 border border-gray-400 dark:bg-slate-800/50 px-1.5 py-0.5 rounded-full">
+                                      {display.icon}
+                                      <span className="text-[11px] text-gray-600 dark:text-slate-400 font-medium">
+                                        {step.label.split(' ')[0]}
+                                      </span>
+                                    </div>
+                                    {step.timing && (<span className="leading-none z-0 px-0 py-0 border-0 h-0 opacity-0 -translate-y-3  group-hover:px-1.5 group-hover:py-0.5 group-hover:border group-hover:h-fit group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 ease-linear rounded-full bg-gray-600 text-white font-bold border-gray-400 text-[10px]">{step.timing}</span>)}
                                   </div>
                                 );
                               })}

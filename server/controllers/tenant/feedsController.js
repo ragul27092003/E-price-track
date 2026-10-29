@@ -173,12 +173,66 @@ exports.getActivityLog = async (req, res) => {
       .limit(40)
       .toArray();
 
+    function calculateDuration(startTime, endTime) {
+      function parseTime(value) {
+        const match = value.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(AM|PM)$/);
+
+        if (!match) return NaN;
+
+        const [, year, month, day, hour, minute, second, period] = match;
+
+        let hours = Number(hour);
+
+        // 12-hour format AM/PM handle
+        if (hours <= 12) {
+          if (period === "AM" && hours === 12) hours = 0;
+          if (period === "PM" && hours !== 12) hours += 12;
+        }
+
+        return new Date(
+          Number(year),
+          Number(month) - 1,
+          Number(day),
+          hours,
+          Number(minute),
+          Number(second)
+        ).getTime();
+      }
+
+      const start = parseTime(startTime);
+      const end = parseTime(endTime);
+
+      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+        return "Invalid time";
+      }
+
+      const totalSeconds = Math.floor((end - start) / 1000);
+
+      if (totalSeconds < 0) return "Invalid time";
+
+      if (totalSeconds < 60) {
+        return `${totalSeconds}s`;
+      }
+
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+
+      return seconds === 0
+        ? `${minutes}m`
+        : `${minutes}.${String(seconds).padStart(2, "0")}m`;
+    }
+
     const logs = sapDocs.map((doc) => {
       const productStatus = doc.product_update_status || 'queue';
       const rankStatus = doc.rank_update_status || 'queue';
       const priceNotificationStatus = doc.price_notification_update_status || 'queue';
       const dashboardStatus = doc.dashboard_update_status || 'queue';
 
+      const producttiming = doc.product_start_time && doc.product_end_time ? calculateDuration(doc.product_start_time, doc.product_end_time) : false;
+      const ranktiming = doc.rank_start_time && doc.rank_end_time ? calculateDuration(doc.rank_start_time, doc.rank_end_time) : false;
+      const pricetiming = doc.price_start_time && doc.price_end_time ? calculateDuration(doc.price_start_time, doc.price_end_time) : false;
+      const dashboardtiming = doc.dashboard_start_time && doc.dashboard_end_time ? calculateDuration(doc.dashboard_start_time, doc.dashboard_end_time) : false;
+      
       const allSuccess = 
         productStatus === 'success' &&
         rankStatus === 'success' &&
@@ -240,10 +294,10 @@ exports.getActivityLog = async (req, res) => {
         progress: progress,
         isComplete: allSuccess,
         steps: [
-          { id: 'product', label: 'Product Update', status: productStatus, icon: 'product' },
-          { id: 'rank', label: 'Rank Update', status: rankStatus, icon: 'rank' },
-          { id: 'price_notification', label: 'Price Notification', status: priceNotificationStatus, icon: 'notification' },
-          { id: 'dashboard', label: 'Dashboard Update', status: dashboardStatus, icon: 'dashboard' }
+          { id: 'product', label: 'Product Update', status: productStatus, icon: 'product', timing: producttiming },
+          { id: 'rank', label: 'Rank Update', status: rankStatus, icon: 'rank', timing: ranktiming },
+          { id: 'price_notification', label: 'Price Notification', status: priceNotificationStatus, icon: 'notification', timing: pricetiming },
+          { id: 'dashboard', label: 'Dashboard Update', status: dashboardStatus, icon: 'dashboard', timing: dashboardtiming }
         ]
       };
     });
